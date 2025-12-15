@@ -30,7 +30,7 @@ class LoginPage extends StatelessWidget {
                   child: Column(
                     children: [
                       Image.asset(
-                        'assets/LogIN_roobot.jpeg',
+                        'assets/login_image.jpeg',
                         height: 120,
                       ),
                       const SizedBox(height: 12),
