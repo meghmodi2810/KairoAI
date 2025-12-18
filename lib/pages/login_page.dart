@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -12,6 +13,8 @@ class _LoginPageState extends State<LoginPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _isLoading = false;
+  final _auth = FirebaseAuth.instance;
 
   @override
   void dispose() {
@@ -41,14 +44,142 @@ class _LoginPageState extends State<LoginPage> {
     return null;
   }
 
-  void _submitForm() {
+  Future<void> _signIn() async {
     if (_formKey.currentState!.validate()) {
-      // Form is valid, proceed with login
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Processing Login...')),
-      );
-      // Add your login logic here
+      setState(() {
+        _isLoading = true;
+      });
+
+      try {
+        await _auth.signInWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
+        );
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Login successful!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          // Navigate to home page after successful login
+          // Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomePage()));
+        }
+      } on FirebaseAuthException catch (e) {
+        String errorMessage;
+        switch (e.code) {
+          case 'user-not-found':
+            errorMessage = 'No user found with this email.';
+            break;
+          case 'wrong-password':
+            errorMessage = 'Wrong password provided.';
+            break;
+          case 'invalid-email':
+            errorMessage = 'Invalid email address.';
+            break;
+          case 'user-disabled':
+            errorMessage = 'This user account has been disabled.';
+            break;
+          case 'invalid-credential':
+            errorMessage = 'Invalid credentials. Please check your email and password.';
+            break;
+          default:
+            errorMessage = 'An error occurred. Please try again.';
+        }
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('An unexpected error occurred: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
     }
+  }
+
+  Future<void> _signUp() async {
+    if (_formKey.currentState!.validate()) {
+      setState(() {
+        _isLoading = true;
+      });
+
+      try {
+        await _auth.createUserWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text.trim(),
+        );
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Account created successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } on FirebaseAuthException catch (e) {
+        String errorMessage;
+        switch (e.code) {
+          case 'weak-password':
+            errorMessage = 'The password provided is too weak.';
+            break;
+          case 'email-already-in-use':
+            errorMessage = 'An account already exists with this email.';
+            break;
+          case 'invalid-email':
+            errorMessage = 'Invalid email address.';
+            break;
+          default:
+            errorMessage = 'An error occurred. Please try again.';
+        }
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('An unexpected error occurred: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
+    }
+  }
+
+  void _submitForm() {
+    _signIn();
   }
 
   @override
@@ -67,7 +198,6 @@ class _LoginPageState extends State<LoginPage> {
               key: _formKey,
               child: Column(
                 children: [
-                  // Top purple section
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 30),
@@ -115,6 +245,7 @@ class _LoginPageState extends State<LoginPage> {
                       keyboardType: TextInputType.emailAddress,
                       validator: _validateEmail,
                       autovalidateMode: AutovalidateMode.onUserInteraction,
+                      enabled: !_isLoading,
                       decoration: InputDecoration(
                         hintText: 'Email',
                         prefixIcon: const Icon(Icons.email_outlined),
@@ -145,6 +276,7 @@ class _LoginPageState extends State<LoginPage> {
                       obscureText: _obscurePassword,
                       validator: _validatePassword,
                       autovalidateMode: AutovalidateMode.onUserInteraction,
+                      enabled: !_isLoading,
                       decoration: InputDecoration(
                         hintText: 'Password',
                         prefixIcon: const Icon(Icons.lock_outline),
@@ -199,17 +331,27 @@ class _LoginPageState extends State<LoginPage> {
                       width: double.infinity,
                       height: 50,
                       child: ElevatedButton(
-                        onPressed: _submitForm,
+                        onPressed: _isLoading ? null : _submitForm,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF9C7DD6),
+                          disabledBackgroundColor: const Color(0xFF9C7DD6).withOpacity(0.6),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                           ),
                         ),
-                        child: const Text(
-                          'Sign in',
-                          style: TextStyle(fontSize: 18),
-                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 24,
+                                width: 24,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text(
+                                'Sign in',
+                                style: TextStyle(fontSize: 18, color: Colors.white),
+                              ),
                       ),
                     ),
                   ),
@@ -218,13 +360,16 @@ class _LoginPageState extends State<LoginPage> {
 
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Text("Don't have an account? "),
-                      Text(
-                        "Sign up",
-                        style: TextStyle(
-                          color: Color(0xFF9C7DD6),
-                          fontWeight: FontWeight.bold,
+                    children: [
+                      const Text("Don't have an account? "),
+                      GestureDetector(
+                        onTap: _isLoading ? null : _signUp,
+                        child: const Text(
+                          "Sign up",
+                          style: TextStyle(
+                            color: Color(0xFF9C7DD6),
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ],
