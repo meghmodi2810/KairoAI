@@ -1,26 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'signup_page.dart';
 
-class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+class SignUpPage extends StatefulWidget {
+  const SignUpPage({super.key});
 
   @override
-  State<LoginPage> createState() => _LoginPageState();
+  State<SignUpPage> createState() => _SignUpPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
+class _SignUpPageState extends State<SignUpPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  bool _obscurePassword = true;
   bool _isLoading = false;
-  final _auth = FirebaseAuth.instance;
 
   @override
   void dispose() {
     _emailController.dispose();
-    _passwordController.dispose();
     super.dispose();
   }
 
@@ -35,96 +29,25 @@ class _LoginPageState extends State<LoginPage> {
     return null;
   }
 
-  String? _validatePassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Password is required';
-    }
-    if (value.length < 8) {
-      return 'Password must be at least 8 characters';
-    }
-    return null;
-  }
-
-  Future<void> _signIn() async {
+  void _submitForm() {
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
       });
 
-      try {
-        await _auth.signInWithEmailAndPassword(
-          email: _emailController.text.trim(),
-          password: _passwordController.text.trim(),
-        );
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Login successful!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          // Navigate to home page after successful login
-          // Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomePage()));
-        }
-      } on FirebaseAuthException catch (e) {
-        String errorMessage;
-        switch (e.code) {
-          case 'user-not-found':
-            errorMessage = 'No user found with this email.';
-            break;
-          case 'wrong-password':
-            errorMessage = 'Wrong password provided.';
-            break;
-          case 'invalid-email':
-            errorMessage = 'Invalid email address.';
-            break;
-          case 'user-disabled':
-            errorMessage = 'This user account has been disabled.';
-            break;
-          case 'invalid-credential':
-            errorMessage = 'Invalid credentials. Please check your email and password.';
-            break;
-          default:
-            errorMessage = 'An error occurred. Please try again.';
-        }
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(errorMessage),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('An unexpected error occurred: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      } finally {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-        }
-      }
+      // TODO: Add sign up logic here
+      // For now, just show a success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Email submitted successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      setState(() {
+        _isLoading = false;
+      });
     }
-  }
-
-  void _navigateToSignUp() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const SignUpPage()),
-    );
-  }
-
-  void _submitForm() {
-    _signIn();
   }
 
   @override
@@ -174,7 +97,7 @@ class _LoginPageState extends State<LoginPage> {
                   const SizedBox(height: 25),
 
                   const Text(
-                    'Sign in',
+                    'Sign up',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
@@ -212,62 +135,6 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
 
-                  const SizedBox(height: 15),
-
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: TextFormField(
-                      controller: _passwordController,
-                      obscureText: _obscurePassword,
-                      validator: _validatePassword,
-                      autovalidateMode: AutovalidateMode.onUserInteraction,
-                      enabled: !_isLoading,
-                      decoration: InputDecoration(
-                        hintText: 'Password',
-                        prefixIcon: const Icon(Icons.lock_outline),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
-                        ),
-                        filled: true,
-                        fillColor: const Color(0xFFF5F5F5),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide.none,
-                        ),
-                        errorBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: Colors.red),
-                        ),
-                        focusedErrorBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: Colors.red),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  Padding(
-                    padding: const EdgeInsets.only(right: 24),
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: Text(
-                        'Forgot password',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ),
-                  ),
-
                   const SizedBox(height: 20),
 
                   Padding(
@@ -294,7 +161,7 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                               )
                             : const Text(
-                                'Sign in',
+                                'Continue',
                                 style: TextStyle(fontSize: 18, color: Colors.white),
                               ),
                       ),
@@ -306,11 +173,15 @@ class _LoginPageState extends State<LoginPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text("Don't have an account? "),
+                      const Text("Already have an account? "),
                       GestureDetector(
-                        onTap: _isLoading ? null : _navigateToSignUp,
+                        onTap: _isLoading
+                            ? null
+                            : () {
+                                Navigator.pop(context);
+                              },
                         child: const Text(
-                          "Sign up",
+                          "Sign in",
                           style: TextStyle(
                             color: Color(0xFF9C7DD6),
                             fontWeight: FontWeight.bold,
