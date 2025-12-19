@@ -38,8 +38,27 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    // Required for TFLite and MediaPipe model files
+    aaptOptions {
+        noCompress("tflite", "task")
+    }
 }
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // MediaPipe Tasks Vision (Hand Landmark Detection)
+    implementation("com.google.mediapipe:tasks-vision:0.10.14")
+    
+    // CameraX (Camera API)
+    implementation("androidx.camera:camera-core:1.3.1")
+    implementation("androidx.camera:camera-camera2:1.3.1")
+    implementation("androidx.camera:camera-lifecycle:1.3.1")
+    implementation("androidx.camera:camera-view:1.3.1")
+    
+    // Coroutines for async operations
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 }

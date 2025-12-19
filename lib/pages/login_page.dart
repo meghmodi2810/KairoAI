@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'signup_page.dart';
+import 'home_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -65,7 +66,10 @@ class _LoginPageState extends State<LoginPage> {
             ),
           );
           // Navigate to home page after successful login
-          // Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomePage()));
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const HomePage()),
+          );
         }
       } on FirebaseAuthException catch (e) {
         String errorMessage;
