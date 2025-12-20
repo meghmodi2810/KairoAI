@@ -41,46 +41,46 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyD2tT6zKfVCErjb7S6Yo_gmSk0rbEPR7TM',
-    appId: '1:775271281144:web:YOUR_WEB_APP_ID',
-    messagingSenderId: '775271281144',
-    projectId: 'kairoai-041828',
-    authDomain: 'kairoai-041828.firebaseapp.com',
-    storageBucket: 'kairoai-041828.firebasestorage.app',
+    apiKey: 'AIzaSyCYLK75UJ1cN12CC_x6hICGDkIm6khPC4s',
+    appId: '1:15850903584:web:YOUR_WEB_APP_ID',
+    messagingSenderId: '15850903584',
+    projectId: 'kairo-ai-041828',
+    authDomain: 'kairo-ai-041828.firebaseapp.com',
+    storageBucket: 'kairo-ai-041828.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyD2tT6zKfVCErjb7S6Yo_gmSk0rbEPR7TM',
-    appId: '1:775271281144:android:e3d85114d3f8cfe7e1a60d',
-    messagingSenderId: '775271281144',
-    projectId: 'kairoai-041828',
-    storageBucket: 'kairoai-041828.firebasestorage.app',
+    apiKey: 'AIzaSyCYLK75UJ1cN12CC_x6hICGDkIm6khPC4s',
+    appId: '1:15850903584:android:6aaf804ebb28d65b234445',
+    messagingSenderId: '15850903584',
+    projectId: 'kairo-ai-041828',
+    storageBucket: 'kairo-ai-041828.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyD2tT6zKfVCErjb7S6Yo_gmSk0rbEPR7TM',
-    appId: '1:775271281144:ios:YOUR_IOS_APP_ID',
-    messagingSenderId: '775271281144',
-    projectId: 'kairoai-041828',
-    storageBucket: 'kairoai-041828.firebasestorage.app',
+    apiKey: 'AIzaSyCYLK75UJ1cN12CC_x6hICGDkIm6khPC4s',
+    appId: '1:15850903584:ios:YOUR_IOS_APP_ID',
+    messagingSenderId: '15850903584',
+    projectId: 'kairo-ai-041828',
+    storageBucket: 'kairo-ai-041828.firebasestorage.app',
     iosBundleId: 'com.kairo.ai',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyD2tT6zKfVCErjb7S6Yo_gmSk0rbEPR7TM',
-    appId: '1:775271281144:ios:YOUR_MACOS_APP_ID',
-    messagingSenderId: '775271281144',
-    projectId: 'kairoai-041828',
-    storageBucket: 'kairoai-041828.firebasestorage.app',
+    apiKey: 'AIzaSyCYLK75UJ1cN12CC_x6hICGDkIm6khPC4s',
+    appId: '1:15850903584:ios:YOUR_MACOS_APP_ID',
+    messagingSenderId: '15850903584',
+    projectId: 'kairo-ai-041828',
+    storageBucket: 'kairo-ai-041828.firebasestorage.app',
     iosBundleId: 'com.kairo.ai',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyD2tT6zKfVCErjb7S6Yo_gmSk0rbEPR7TM',
-    appId: '1:775271281144:web:YOUR_WINDOWS_APP_ID',
-    messagingSenderId: '775271281144',
-    projectId: 'kairoai-041828',
-    authDomain: 'kairoai-041828.firebaseapp.com',
-    storageBucket: 'kairoai-041828.firebasestorage.app',
+    apiKey: 'AIzaSyCYLK75UJ1cN12CC_x6hICGDkIm6khPC4s',
+    appId: '1:15850903584:web:YOUR_WINDOWS_APP_ID',
+    messagingSenderId: '15850903584',
+    projectId: 'kairo-ai-041828',
+    authDomain: 'kairo-ai-041828.firebaseapp.com',
+    storageBucket: 'kairo-ai-041828.firebasestorage.app',
   );
 }
