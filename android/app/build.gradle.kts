@@ -53,6 +53,10 @@ dependencies {
     // MediaPipe Tasks Vision (Hand Landmark Detection)
     implementation("com.google.mediapipe:tasks-vision:0.10.14")
     
+    // TensorFlow Lite for Sign Classification
+    implementation("org.tensorflow:tensorflow-lite:2.14.0")
+    implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+    
     // CameraX (Camera API)
     implementation("androidx.camera:camera-core:1.3.1")
     implementation("androidx.camera:camera-camera2:1.3.1")
