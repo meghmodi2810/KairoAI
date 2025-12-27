@@ -75,12 +75,12 @@ class MainActivity : FlutterActivity() {
     private var isTfliteReady = false
     
     // Sign language labels (35 classes to match ISL model output)
-    // ISL includes A-Z (26) + numbers 0-9 (10) - 1 = 35, or specific ISL gestures
+    // MUST MATCH the LABELS in landmark_model.py: A-Z (26) + 1-9 (9) = 35
     private val signLabels = listOf(
         "A", "B", "C", "D", "E", "F", "G", "H", "I", "J",
         "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T",
-        "U", "V", "W", "X", "Y", "Z", "0", "1", "2", "3",
-        "4", "5", "6", "7", "8"
+        "U", "V", "W", "X", "Y", "Z", "1", "2", "3", "4",
+        "5", "6", "7", "8", "9"
     )
     
     // Handler for UI thread operations
@@ -532,24 +532,28 @@ class MainActivity : FlutterActivity() {
             val rotation = imageProxy.imageInfo.rotationDegrees
             Log.d(TAG, "📐 Image rotation: $rotation degrees, frontCamera: $useFrontCamera, size: ${bitmap.width}x${bitmap.height}")
             
-            if (rotation != 0) {
+            if (rotation != 0 || useFrontCamera) {
                 val matrix = Matrix()
                 matrix.postRotate(rotation.toFloat())
                 
-                val rotatedBitmap = Bitmap.createBitmap(
+                // Mirror horizontally for front camera to match Python test behavior
+                // The Python test does cv2.flip(frame, 1) which is a horizontal flip
+                if (useFrontCamera) {
+                    matrix.postScale(-1f, 1f, bitmap.width / 2f, bitmap.height / 2f)
+                    Log.d(TAG, "📐 Applied horizontal flip for front camera")
+                }
+                
+                val transformedBitmap = Bitmap.createBitmap(
                     bitmap, 0, 0,
                     bitmap.width, bitmap.height,
                     matrix, true
                 )
-                if (rotatedBitmap != bitmap) {
+                if (transformedBitmap != bitmap) {
                     bitmap.recycle()
                 }
-                bitmap = rotatedBitmap
-                Log.d(TAG, "📐 After rotation: ${bitmap.width}x${bitmap.height}")
+                bitmap = transformedBitmap
+                Log.d(TAG, "📐 After transformation: ${bitmap.width}x${bitmap.height}")
             }
-            
-            // Note: Do NOT mirror for MediaPipe - it needs the raw orientation
-            // Mirroring only matters for display, not detection
             
             bitmap
         } catch (e: Exception) {
@@ -616,7 +620,7 @@ class MainActivity : FlutterActivity() {
                     val dx = middleMcp.x() - wristX
                     val dy = middleMcp.y() - wristY
                     val dz = middleMcp.z() - wristZ
-                    sqrt(dx * dx + dy * dy + dz * dz).coerceAtLeast(0.01f)
+                    sqrt(dx * dx + dy * dy + dz * dz).coerceAtLeast(0.001f)  // Match Python threshold
                 } else {
                     0.1f  // Default scale if middle MCP not found
                 }
