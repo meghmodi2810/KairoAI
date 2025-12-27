@@ -18,6 +18,7 @@ import android.graphics.YuvImage
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.Surface
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import java.util.concurrent.ExecutorService
@@ -35,6 +36,8 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
+import kotlin.math.sqrt
+import kotlin.math.abs
 
 class MainActivity : FlutterActivity() {
     
@@ -43,6 +46,12 @@ class MainActivity : FlutterActivity() {
         private const val METHOD_CHANNEL = "com.kairo.ai/detection"
         private const val EVENT_CHANNEL = "com.kairo.ai/detection_stream"
         private const val CAMERA_PERMISSION_CODE = 100
+        
+        // Confidence threshold - predictions below this are ignored
+        private const val MIN_CONFIDENCE_THRESHOLD = 0.15f  // Very low threshold to show all predictions
+        
+        // Prediction stability - how many consistent predictions needed
+        private const val PREDICTION_STABILITY_COUNT = 1  // Immediate response (no stabilization)
     }
     
     // Event sink for streaming data to Flutter
@@ -51,9 +60,11 @@ class MainActivity : FlutterActivity() {
     // Camera related
     private var cameraProvider: ProcessCameraProvider? = null
     private var imageAnalysis: ImageAnalysis? = null
+    private var preview: Preview? = null
     private lateinit var cameraExecutor: ExecutorService
     private var isDetectionActive = false
     private var useFrontCamera = true
+    private var camera: Camera? = null
     
     // MediaPipe HandLandmarker
     private var handLandmarker: HandLandmarker? = null
@@ -77,9 +88,18 @@ class MainActivity : FlutterActivity() {
     
     // Frame processing control
     private var frameCounter = 0
-    private val PROCESS_EVERY_N_FRAMES = 3
+    private val PROCESS_EVERY_N_FRAMES = 2  // Process more frames for responsiveness
     private var lastProcessTime = 0L
-    private val MIN_PROCESS_INTERVAL_MS = 100L
+    private val MIN_PROCESS_INTERVAL_MS = 66L  // ~15 FPS for detection
+    
+    // Prediction stabilization
+    private var lastPredictions = mutableListOf<String>()
+    private var stablePrediction = ""
+    private var stableConfidence = 0f
+    
+    // Frame data for Flutter (to show camera preview)
+    private var lastFrameBitmap: Bitmap? = null
+    private var isProcessingFrame = false
     
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -88,8 +108,9 @@ class MainActivity : FlutterActivity() {
         Log.d(TAG, "🚀 KairoAI MainActivity initializing...")
         Log.d(TAG, "========================================")
         
-        // Initialize camera executor
-        cameraExecutor = Executors.newSingleThreadExecutor()
+        // Initialize camera executor with more capacity
+        cameraExecutor = Executors.newFixedThreadPool(2)
+        Log.d(TAG, "📷 Camera executor created with 2 threads")
         
         // Initialize ML models
         initializeHandLandmarker()
@@ -136,6 +157,10 @@ class MainActivity : FlutterActivity() {
                         "useFrontCamera" to useFrontCamera
                     ))
                 }
+                "resetPrediction" -> {
+                    resetPredictionState()
+                    result.success(true)
+                }
                 else -> result.notImplemented()
             }
         }
@@ -159,6 +184,12 @@ class MainActivity : FlutterActivity() {
         Log.d(TAG, "✅ KairoAI MainActivity initialized")
     }
     
+    private fun resetPredictionState() {
+        lastPredictions.clear()
+        stablePrediction = ""
+        stableConfidence = 0f
+    }
+    
     private fun initializeHandLandmarker() {
         try {
             Log.d(TAG, "🔄 Initializing MediaPipe HandLandmarker...")
@@ -169,10 +200,10 @@ class MainActivity : FlutterActivity() {
             
             val options = HandLandmarker.HandLandmarkerOptions.builder()
                 .setBaseOptions(baseOptions)
-                .setNumHands(2)
-                .setMinHandDetectionConfidence(0.5f)
-                .setMinHandPresenceConfidence(0.5f)
-                .setMinTrackingConfidence(0.5f)
+                .setNumHands(2)  // Model expects 2 hands (126 = 2 * 21 * 3)
+                .setMinHandDetectionConfidence(0.3f)  // Lower threshold for better detection
+                .setMinHandPresenceConfidence(0.3f)   // Lower threshold for better detection
+                .setMinTrackingConfidence(0.3f)       // Lower threshold for better detection
                 .setRunningMode(com.google.mediapipe.tasks.vision.core.RunningMode.IMAGE)
                 .build()
             
@@ -180,6 +211,8 @@ class MainActivity : FlutterActivity() {
             isHandLandmarkerReady = true
             
             Log.d(TAG, "✅ MediaPipe HandLandmarker initialized successfully!")
+            Log.d(TAG, "   Detection confidence: 0.3, Presence confidence: 0.3, Tracking: 0.3")
+            Log.d(TAG, "   Max hands: 2, Running mode: IMAGE")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error initializing HandLandmarker: ${e.message}")
             e.printStackTrace()
@@ -245,8 +278,15 @@ class MainActivity : FlutterActivity() {
         isDetectionActive = true
         frameCounter = 0
         lastProcessTime = 0L
+        isProcessingFrame = false
+        resetPredictionState()
         
         Log.d(TAG, "🎥 Starting native camera for detection...")
+        
+        // Test that executor is working
+        cameraExecutor.execute {
+            Log.d(TAG, "✅ CameraExecutor test task executed successfully on thread: ${Thread.currentThread().name}")
+        }
         
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
         cameraProviderFuture.addListener({
@@ -256,6 +296,7 @@ class MainActivity : FlutterActivity() {
             } catch (e: Exception) {
                 Log.e(TAG, "❌ Error getting camera provider: ${e.message}")
                 sendError("Failed to access camera")
+                isDetectionActive = false
             }
         }, ContextCompat.getMainExecutor(this))
     }
@@ -269,26 +310,65 @@ class MainActivity : FlutterActivity() {
         // Unbind all first
         provider.unbindAll()
         
-        val cameraSelector = if (useFrontCamera) {
-            CameraSelector.DEFAULT_FRONT_CAMERA
-        } else {
-            CameraSelector.DEFAULT_BACK_CAMERA
+        // Check if the desired camera is available
+        val hasBackCamera = try {
+            provider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)
+        } catch (e: Exception) { false }
+        
+        val hasFrontCamera = try {
+            provider.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)
+        } catch (e: Exception) { false }
+        
+        Log.d(TAG, "📷 Available cameras - Front: $hasFrontCamera, Back: $hasBackCamera")
+        
+        // Select camera based on availability
+        val cameraSelector = when {
+            useFrontCamera && hasFrontCamera -> CameraSelector.DEFAULT_FRONT_CAMERA
+            !useFrontCamera && hasBackCamera -> CameraSelector.DEFAULT_BACK_CAMERA
+            hasFrontCamera -> {
+                useFrontCamera = true
+                CameraSelector.DEFAULT_FRONT_CAMERA
+            }
+            hasBackCamera -> {
+                useFrontCamera = false
+                CameraSelector.DEFAULT_BACK_CAMERA
+            }
+            else -> {
+                Log.e(TAG, "❌ No camera available")
+                sendError("No camera available on device")
+                return
+            }
         }
         
-        // Use smaller resolution for faster processing
+        // Use moderate resolution for balance between quality and performance
+        Log.d(TAG, "🎥 Setting up ImageAnalysis...")
+        Log.d(TAG, "🔧 CameraExecutor status: ${if (::cameraExecutor.isInitialized) "initialized" else "NOT initialized"}")
+        
         imageAnalysis = ImageAnalysis.Builder()
-            .setTargetResolution(android.util.Size(320, 240))
+            .setTargetResolution(android.util.Size(640, 480))  // Standard VGA for better detection
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
             .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
             .build()
             .also { analysis ->
+                Log.d(TAG, "📷 Setting analyzer on cameraExecutor...")
                 analysis.setAnalyzer(cameraExecutor) { imageProxy ->
-                    processFrame(imageProxy)
+                    try {
+                        Log.d(TAG, "📷 ANALYZER CALLBACK - frame ${imageProxy.width}x${imageProxy.height}, isDetectionActive=$isDetectionActive")
+                        if (frameCounter == 0) {
+                            Log.d(TAG, "📹 First frame: ${imageProxy.width}x${imageProxy.height}, format=${imageProxy.format}, rotation=${imageProxy.imageInfo.rotationDegrees}")
+                        }
+                        processFrame(imageProxy)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "❌ ANALYZER CALLBACK ERROR: ${e.message}")
+                        e.printStackTrace()
+                        try { imageProxy.close() } catch (_: Exception) {}
+                    }
                 }
+                Log.d(TAG, "✅ Analyzer set successfully")
             }
         
         try {
-            provider.bindToLifecycle(
+            camera = provider.bindToLifecycle(
                 this,
                 cameraSelector,
                 imageAnalysis
@@ -301,102 +381,180 @@ class MainActivity : FlutterActivity() {
             
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to bind camera: ${e.message}")
-            sendError("Failed to start camera: ${e.message}")
+            e.printStackTrace()
+            
+            // Try the other camera if this one fails
+            if (useFrontCamera && hasBackCamera) {
+                useFrontCamera = false
+                Log.d(TAG, "⚠️ Trying back camera instead...")
+                bindCameraForAnalysis()
+            } else if (!useFrontCamera && hasFrontCamera) {
+                useFrontCamera = true
+                Log.d(TAG, "⚠️ Trying front camera instead...")
+                bindCameraForAnalysis()
+            } else {
+                sendError("Failed to start camera: ${e.message}")
+                isDetectionActive = false
+            }
         }
     }
     
     private fun processFrame(imageProxy: ImageProxy) {
+        Log.d(TAG, "🔄 processFrame called - isDetectionActive=$isDetectionActive")
+        
         if (!isDetectionActive) {
+            Log.d(TAG, "⏹️ Frame skipped - detection not active")
             imageProxy.close()
             return
         }
         
-        // Frame rate control
+        // Prevent concurrent processing
+        if (isProcessingFrame) {
+            imageProxy.close()
+            return
+        }
+        
+        // Frame rate control - only log occasionally
         val currentTime = System.currentTimeMillis()
-        if (currentTime - lastProcessTime < MIN_PROCESS_INTERVAL_MS) {
+        val timeSinceLastProcess = currentTime - lastProcessTime
+        if (timeSinceLastProcess < MIN_PROCESS_INTERVAL_MS) {
             imageProxy.close()
             return
         }
         
         frameCounter++
-        if (frameCounter % PROCESS_EVERY_N_FRAMES != 0) {
-            imageProxy.close()
-            return
-        }
         
+        // Process every frame now for debugging
+        // if (frameCounter % PROCESS_EVERY_N_FRAMES != 0) {
+        //     imageProxy.close()
+        //     return
+        // }
+        
+        isProcessingFrame = true
         lastProcessTime = currentTime
+        
+        // Log every 10th frame to avoid flooding
+        if (frameCounter % 10 == 1) {
+            Log.d(TAG, "📸 Processing frame #$frameCounter (${imageProxy.width}x${imageProxy.height})")
+        }
         
         try {
             val bitmap = convertToBitmap(imageProxy)
             if (bitmap != null) {
+                Log.d(TAG, "✅ Bitmap created: ${bitmap.width}x${bitmap.height}")
                 detectHands(bitmap)
+                bitmap.recycle()
             } else {
                 Log.w(TAG, "⚠️ Failed to convert frame to bitmap")
+                sendNoHandDetected()
             }
         } catch (e: Exception) {
             Log.e(TAG, "❌ Frame processing error: ${e.message}")
+            e.printStackTrace()
+            sendNoHandDetected()
         } finally {
+            isProcessingFrame = false
             imageProxy.close()
         }
     }
     
     private fun convertToBitmap(imageProxy: ImageProxy): Bitmap? {
         return try {
+            val width = imageProxy.width
+            val height = imageProxy.height
+            
             val planes = imageProxy.planes
-            val yBuffer = planes[0].buffer
-            val uBuffer = planes[1].buffer
-            val vBuffer = planes[2].buffer
             
-            val ySize = yBuffer.remaining()
-            val uSize = uBuffer.remaining()
-            val vSize = vBuffer.remaining()
+            // Get plane buffers and properties
+            val yPlane = planes[0]
+            val uPlane = planes[1]
+            val vPlane = planes[2]
             
-            val nv21 = ByteArray(ySize + uSize + vSize)
-            yBuffer.get(nv21, 0, ySize)
-            vBuffer.get(nv21, ySize, vSize)
-            uBuffer.get(nv21, ySize + vSize, uSize)
+            val yBuffer = yPlane.buffer
+            val uBuffer = uPlane.buffer
+            val vBuffer = vPlane.buffer
             
-            val yuvImage = YuvImage(
-                nv21,
-                ImageFormat.NV21,
-                imageProxy.width,
-                imageProxy.height,
-                null
-            )
+            val yRowStride = yPlane.rowStride
+            val uvRowStride = uPlane.rowStride
+            val uvPixelStride = uPlane.pixelStride
             
+            // Create NV21 byte array (Y + interleaved VU)
+            val nv21Size = width * height + width * height / 2
+            val nv21 = ByteArray(nv21Size)
+            
+            // Copy Y plane
+            var destPos = 0
+            if (yRowStride == width) {
+                // Fast path - no row padding
+                yBuffer.position(0)
+                yBuffer.get(nv21, 0, width * height)
+                destPos = width * height
+            } else {
+                // Handle row stride padding
+                for (row in 0 until height) {
+                    yBuffer.position(row * yRowStride)
+                    yBuffer.get(nv21, destPos, width)
+                    destPos += width
+                }
+            }
+            
+            // Copy UV planes interleaved as VU (NV21 format)
+            val uvHeight = height / 2
+            val uvWidth = width / 2
+            
+            for (row in 0 until uvHeight) {
+                for (col in 0 until uvWidth) {
+                    val uvOffset = row * uvRowStride + col * uvPixelStride
+                    
+                    // NV21 format: V first, then U
+                    nv21[destPos++] = vBuffer.get(uvOffset)
+                    nv21[destPos++] = uBuffer.get(uvOffset)
+                }
+            }
+            
+            // Convert NV21 to JPEG then to Bitmap
+            val yuvImage = YuvImage(nv21, ImageFormat.NV21, width, height, null)
             val out = ByteArrayOutputStream()
-            yuvImage.compressToJpeg(
-                Rect(0, 0, imageProxy.width, imageProxy.height),
-                85,
-                out
-            )
+            yuvImage.compressToJpeg(Rect(0, 0, width, height), 100, out)
             
-            var bitmap = BitmapFactory.decodeByteArray(out.toByteArray(), 0, out.size())
+            val options = BitmapFactory.Options().apply {
+                inPreferredConfig = Bitmap.Config.ARGB_8888
+            }
+            var bitmap = BitmapFactory.decodeByteArray(out.toByteArray(), 0, out.size(), options)
+            out.close()
             
-            // Apply rotation and mirroring
-            val matrix = Matrix()
+            if (bitmap == null) {
+                Log.e(TAG, "❌ Failed to decode bitmap from JPEG")
+                return null
+            }
+            
+            // Apply rotation to make image upright for MediaPipe
             val rotation = imageProxy.imageInfo.rotationDegrees
+            Log.d(TAG, "📐 Image rotation: $rotation degrees, frontCamera: $useFrontCamera, size: ${bitmap.width}x${bitmap.height}")
             
             if (rotation != 0) {
+                val matrix = Matrix()
                 matrix.postRotate(rotation.toFloat())
-            }
-            
-            // Mirror front camera for natural selfie view
-            if (useFrontCamera) {
-                matrix.postScale(-1f, 1f)
-            }
-            
-            if (rotation != 0 || useFrontCamera) {
-                bitmap = Bitmap.createBitmap(
+                
+                val rotatedBitmap = Bitmap.createBitmap(
                     bitmap, 0, 0,
                     bitmap.width, bitmap.height,
                     matrix, true
                 )
+                if (rotatedBitmap != bitmap) {
+                    bitmap.recycle()
+                }
+                bitmap = rotatedBitmap
+                Log.d(TAG, "📐 After rotation: ${bitmap.width}x${bitmap.height}")
             }
+            
+            // Note: Do NOT mirror for MediaPipe - it needs the raw orientation
+            // Mirroring only matters for display, not detection
             
             bitmap
         } catch (e: Exception) {
             Log.e(TAG, "❌ Bitmap conversion error: ${e.message}")
+            e.printStackTrace()
             null
         }
     }
@@ -408,42 +566,91 @@ class MainActivity : FlutterActivity() {
         }
         
         try {
+            Log.d(TAG, "🔍 Processing frame: ${bitmap.width}x${bitmap.height}")
             val mpImage = BitmapImageBuilder(bitmap).build()
             val result = handLandmarker?.detect(mpImage)
             
-            if (result != null && result.landmarks().isNotEmpty()) {
-                processDetectedHand(result)
+            if (result != null) {
+                val numHands = result.landmarks().size
+                Log.d(TAG, "🖐️ MediaPipe result: $numHands hand(s) detected")
+                
+                if (numHands > 0) {
+                    processDetectedHand(result)
+                } else {
+                    Log.d(TAG, "👋 No hands in frame")
+                    sendNoHandDetected()
+                }
             } else {
+                Log.w(TAG, "⚠️ MediaPipe returned null result")
                 sendNoHandDetected()
             }
         } catch (e: Exception) {
             Log.e(TAG, "❌ Hand detection error: ${e.message}")
+            e.printStackTrace()
             sendNoHandDetected()
         }
     }
     
     private fun processDetectedHand(result: HandLandmarkerResult) {
-        // Always provide 2 hands (126 floats) to TFLite, pad with zeros if only 1 hand detected
         val numHands = result.landmarks().size
-        val landmarkArray = FloatArray(126) { 0f } // 2 hands x 21 x 3
-        for (h in 0 until minOf(numHands, 2)) {
-            val handLandmarks = result.landmarks()[h]
-            handLandmarks.forEachIndexed { index, landmark ->
-                if (index < 21) {
-                    val base = h * 63 + index * 3
-                    landmarkArray[base] = landmark.x()
-                    landmarkArray[base + 1] = landmark.y()
-                    landmarkArray[base + 2] = landmark.z()
+        Log.d(TAG, "🖐️ Processing $numHands hand(s)")
+        
+        // Model expects 126 floats = 2 hands × 21 landmarks × 3 coords
+        // If only 1 hand detected, pad the second hand with zeros
+        val landmarkArray = FloatArray(126) { 0f }
+        
+        // Fill NORMALIZED landmarks for each detected hand
+        result.landmarks().forEachIndexed { handIndex, handLandmarks ->
+            if (handIndex < 2) {  // Max 2 hands
+                val handOffset = handIndex * 63  // Each hand = 21 landmarks × 3 coords
+                
+                // Get wrist position as reference point
+                val wrist = handLandmarks[0]
+                val wristX = wrist.x()
+                val wristY = wrist.y()
+                val wristZ = wrist.z()
+                
+                // Calculate hand size using distance from wrist to middle finger MCP (landmark 9)
+                val middleMcp = handLandmarks.getOrNull(9)
+                val handSize = if (middleMcp != null) {
+                    val dx = middleMcp.x() - wristX
+                    val dy = middleMcp.y() - wristY
+                    val dz = middleMcp.z() - wristZ
+                    sqrt(dx * dx + dy * dy + dz * dz).coerceAtLeast(0.01f)
+                } else {
+                    0.1f  // Default scale if middle MCP not found
+                }
+                
+                // Normalize all landmarks relative to wrist and scale by hand size
+                handLandmarks.forEachIndexed { lmIndex, landmark ->
+                    if (lmIndex < 21) {
+                        val base = handOffset + lmIndex * 3
+                        // Normalize: subtract wrist position and divide by hand size
+                        landmarkArray[base] = (landmark.x() - wristX) / handSize
+                        landmarkArray[base + 1] = (landmark.y() - wristY) / handSize
+                        landmarkArray[base + 2] = (landmark.z() - wristZ) / handSize
+                    }
                 }
             }
         }
-        // Use the first detected hand's landmarks for logging (or empty list)
-        val primaryHandLandmarks = if (result.landmarks().isNotEmpty()) result.landmarks()[0] else listOf<NormalizedLandmark>()
-        // Classify the sign
-        val (detectedSign, confidence) = classifySign(landmarkArray)
         
-        // Build landmarks log
-        val landmarksLog = buildLandmarksLog(primaryHandLandmarks, detectedSign, confidence)
+        // Log normalized landmark info (wrist should be at 0,0,0 after normalization)
+        Log.d(TAG, "📐 Created NORMALIZED 126-float input for $numHands hand(s)")
+        Log.d(TAG, "📍 Hand 1 wrist (normalized): x=${String.format("%.3f", landmarkArray[0])}, y=${String.format("%.3f", landmarkArray[1])}, z=${String.format("%.3f", landmarkArray[2])}")
+        Log.d(TAG, "📍 Hand 1 index tip (normalized): x=${String.format("%.3f", landmarkArray[24])}, y=${String.format("%.3f", landmarkArray[25])}, z=${String.format("%.3f", landmarkArray[26])}")
+        if (numHands > 1) {
+            Log.d(TAG, "📍 Hand 2 wrist (normalized): x=${String.format("%.3f", landmarkArray[63])}, y=${String.format("%.3f", landmarkArray[64])}, z=${String.format("%.3f", landmarkArray[65])}")
+        }
+        
+        // Classify the sign
+        val (rawSign, rawConfidence) = classifySign(landmarkArray)
+        
+        // Apply confidence threshold and stabilization
+        val (detectedSign, confidence) = stabilizePrediction(rawSign, rawConfidence)
+        
+        // Build landmarks log using first hand
+        val primaryHandLandmarks = result.landmarks()[0]
+        val landmarksLog = buildLandmarksLog(primaryHandLandmarks, detectedSign, confidence, rawSign, rawConfidence)
         
         // Send to Flutter
         val data = mapOf(
@@ -453,33 +660,110 @@ class MainActivity : FlutterActivity() {
             "confidence" to confidence.toDouble(),
             "timestamp" to System.currentTimeMillis(),
             "isFrontCamera" to useFrontCamera,
-            "numHands" to result.landmarks().size
+            "numHands" to numHands
         )
         
         mainHandler.post {
             eventSink?.success(data)
         }
         
-        Log.d(TAG, "🖐️ Hand detected! Sign: $detectedSign (${String.format("%.1f", confidence * 100)}%)")
+        Log.d(TAG, "✅ Sign: $detectedSign (${String.format("%.1f", confidence * 100)}%) - $numHands hand(s)")
+    }
+    
+    /**
+     * Normalize landmarks relative to wrist position and hand size.
+     * This makes the model invariant to hand position in frame and hand size/distance.
+     */
+    private fun normalizeLandmarks(landmarks: List<NormalizedLandmark>): List<FloatArray> {
+        if (landmarks.isEmpty()) return emptyList()
+        
+        // Use wrist (landmark 0) as the reference point
+        val wrist = landmarks[0]
+        val wristX = wrist.x()
+        val wristY = wrist.y()
+        val wristZ = wrist.z()
+        
+        // Calculate hand size using distance from wrist to middle finger MCP (landmark 9)
+        val middleMcp = landmarks.getOrNull(9)
+        val handSize = if (middleMcp != null) {
+            val dx = middleMcp.x() - wristX
+            val dy = middleMcp.y() - wristY
+            val dz = middleMcp.z() - wristZ
+            sqrt(dx * dx + dy * dy + dz * dz).coerceAtLeast(0.001f)
+        } else {
+            0.1f  // Default scale if middle MCP not found
+        }
+        
+        // Normalize all landmarks relative to wrist and scale by hand size
+        return landmarks.map { landmark ->
+            floatArrayOf(
+                (landmark.x() - wristX) / handSize,
+                (landmark.y() - wristY) / handSize,
+                (landmark.z() - wristZ) / handSize
+            )
+        }
+    }
+    
+    /**
+     * Stabilize predictions to avoid flickering between signs.
+     * Requires consistent predictions over multiple frames.
+     */
+    private fun stabilizePrediction(sign: String, confidence: Float): Pair<String, Float> {
+        // If confidence is too low, don't count this prediction
+        if (confidence < MIN_CONFIDENCE_THRESHOLD) {
+            // Still track low-confidence predictions but don't update stable prediction
+            return Pair(stablePrediction, stableConfidence)
+        }
+        
+        // Add to prediction history
+        lastPredictions.add(sign)
+        
+        // Keep only recent predictions
+        if (lastPredictions.size > PREDICTION_STABILITY_COUNT * 2) {
+            lastPredictions.removeAt(0)
+        }
+        
+        // Count occurrences of each sign in recent predictions
+        val recentPredictions = lastPredictions.takeLast(PREDICTION_STABILITY_COUNT)
+        val signCounts = recentPredictions.groupingBy { it }.eachCount()
+        val mostCommon = signCounts.maxByOrNull { it.value }
+        
+        // Only update stable prediction if we have enough consistent predictions
+        if (mostCommon != null && mostCommon.value >= PREDICTION_STABILITY_COUNT - 1) {
+            stablePrediction = mostCommon.key
+            stableConfidence = confidence
+        }
+        
+        return Pair(stablePrediction, stableConfidence)
     }
     
     private fun buildLandmarksLog(
         landmarks: List<NormalizedLandmark>,
         sign: String,
-        confidence: Float
+        confidence: Float,
+        rawSign: String,
+        rawConfidence: Float
     ): String {
         return buildString {
             appendLine("🖐️ HAND DETECTED!")
             appendLine("========================================")
-            appendLine("📝 Detected Sign: $sign")
+            appendLine("📝 Stable Sign: ${if (sign.isEmpty()) "Analyzing..." else sign}")
             appendLine("📊 Confidence: ${String.format("%.1f", confidence * 100)}%")
+            appendLine("----------------------------------------")
+            appendLine("🔄 Raw Prediction: $rawSign (${String.format("%.1f", rawConfidence * 100)}%)")
+            appendLine("📈 Min Threshold: ${String.format("%.0f", MIN_CONFIDENCE_THRESHOLD * 100)}%")
             appendLine("========================================")
             appendLine("📍 Landmarks (21 points):")
-            landmarks.forEachIndexed { index, lm ->
-                appendLine(String.format(
-                    "  [%02d] x=%.3f, y=%.3f, z=%.3f",
-                    index, lm.x(), lm.y(), lm.z()
-                ))
+            val keyPoints = listOf(0 to "Wrist", 4 to "Thumb Tip", 8 to "Index Tip", 
+                                   12 to "Middle Tip", 16 to "Ring Tip", 20 to "Pinky Tip")
+            keyPoints.forEach { (index, name) ->
+                if (index < landmarks.size) {
+                    val lm = landmarks[index]
+                    appendLine(String.format(
+                        "  [%02d] %s: x=%.3f, y=%.3f, z=%.3f",
+                        index, name, lm.x(), lm.y(), lm.z()
+                    ))
+                }
             }
             appendLine("========================================")
         }
@@ -492,57 +776,101 @@ class MainActivity : FlutterActivity() {
         }
         
         return try {
-            // Prepare input (always 126 floats)
-            val inputBuffer = ByteBuffer.allocateDirect(126 * 4).apply {
+            // Get actual input size from the model
+            val inputTensor = tfliteInterpreter!!.getInputTensor(0)
+            val inputShape = inputTensor.shape()
+            val inputSize = if (inputShape.size > 1) inputShape[1] else landmarks.size
+            
+            Log.d(TAG, "🔢 Model input shape: ${inputShape.contentToString()}, using size: $inputSize")
+            
+            // Prepare input buffer with the correct size
+            val inputBuffer = ByteBuffer.allocateDirect(inputSize * 4).apply {
                 order(ByteOrder.nativeOrder())
-                landmarks.forEach { putFloat(it) }
+                for (i in 0 until inputSize) {
+                    putFloat(landmarks.getOrElse(i) { 0f })
+                }
                 rewind()
             }
+            
             // Get actual output size from the model
             val outputTensor = tfliteInterpreter!!.getOutputTensor(0)
-            val outputSize = outputTensor.shape()[1] // Get the number of classes from model
+            val outputShape = outputTensor.shape()
+            val outputSize = if (outputShape.size > 1) outputShape[1] else outputShape[0]
+            
+            Log.d(TAG, "🔢 Model output shape: ${outputShape.contentToString()}, using size: $outputSize")
             
             // Prepare output buffer with actual model output size
             val outputBuffer = ByteBuffer.allocateDirect(outputSize * 4).apply {
                 order(ByteOrder.nativeOrder())
             }
+            
             // Run inference
             tfliteInterpreter?.run(inputBuffer, outputBuffer)
             
-            // Find max probability and log top predictions for debugging
+            // Find max probability and apply softmax for better probability distribution
             outputBuffer.rewind()
-            val probabilities = mutableListOf<Pair<Int, Float>>()
-            
+            val rawOutputs = FloatArray(outputSize)
             for (i in 0 until outputSize) {
-                val prob = outputBuffer.float
-                probabilities.add(Pair(i, prob))
+                rawOutputs[i] = outputBuffer.float
             }
             
-            // Sort by probability descending
-            probabilities.sortByDescending { it.second }
+            // Apply softmax to get proper probabilities
+            val probabilities = softmax(rawOutputs)
+            
+            // Create indexed list and sort by probability
+            val indexedProbs = probabilities.mapIndexed { idx, prob -> Pair(idx, prob) }
+                .sortedByDescending { it.second }
             
             // Log top 5 predictions for debugging
-            val top5 = probabilities.take(5).map { (idx, prob) ->
+            val top5 = indexedProbs.take(5).map { (idx, prob) ->
                 "${signLabels.getOrElse(idx) { "Class_$idx" }}(${String.format("%.1f", prob * 100)}%)"
             }.joinToString(", ")
             Log.d(TAG, "📊 Top 5 predictions: $top5")
             
-            val maxIndex = probabilities[0].first
-            val maxProb = probabilities[0].second
+            val maxIndex = indexedProbs[0].first
+            val maxProb = indexedProbs[0].second
+            
+            // Check if there's ambiguity (second highest is too close)
+            val secondProb = indexedProbs.getOrNull(1)?.second ?: 0f
+            val confidenceGap = maxProb - secondProb
+            
+            // Reduce confidence if there's high ambiguity
+            val adjustedConfidence = if (confidenceGap < 0.1f) {
+                maxProb * 0.7f  // Reduce confidence if top 2 are close
+            } else {
+                maxProb
+            }
             
             val sign = signLabels.getOrElse(maxIndex) { "Class_$maxIndex" }
-            Pair(sign, maxProb)
+            Pair(sign, adjustedConfidence)
             
         } catch (e: Exception) {
             Log.e(TAG, "❌ Classification error: ${e.message}")
+            e.printStackTrace()
             Pair("?", 0.0f)
         }
     }
     
+    /**
+     * Apply softmax to convert raw model outputs to probabilities
+     */
+    private fun softmax(input: FloatArray): FloatArray {
+        val max = input.maxOrNull() ?: 0f
+        val exps = input.map { kotlin.math.exp((it - max).toDouble()).toFloat() }
+        val sum = exps.sum()
+        return exps.map { it / sum }.toFloatArray()
+    }
+    
     private fun sendNoHandDetected() {
+        // Clear prediction history when no hand is detected
+        if (lastPredictions.isNotEmpty()) {
+            lastPredictions.clear()
+            // Don't clear stable prediction immediately - keep showing last detected sign briefly
+        }
+        
         val data = mapOf(
             "handDetected" to false,
-            "landmarksLog" to "👋 No hand detected\n\nShow your hand clearly to the camera",
+            "landmarksLog" to "👋 No hand detected\n\nShow your hand clearly to the camera\n\nTips:\n• Ensure good lighting\n• Keep hand within frame\n• Show palm facing camera",
             "detectedSign" to "",
             "confidence" to 0.0,
             "timestamp" to System.currentTimeMillis(),
@@ -551,7 +879,11 @@ class MainActivity : FlutterActivity() {
         )
         
         mainHandler.post {
-            eventSink?.success(data)
+            if (eventSink != null) {
+                eventSink?.success(data)
+            } else {
+                Log.w(TAG, "⚠️ EventSink is null - Flutter not listening")
+            }
         }
     }
     
@@ -579,20 +911,27 @@ class MainActivity : FlutterActivity() {
     
     private fun switchCamera() {
         useFrontCamera = !useFrontCamera
+        resetPredictionState()
         Log.d(TAG, "📷 Switching to ${if (useFrontCamera) "FRONT" else "BACK"} camera")
         
         if (isDetectionActive) {
-            bindCameraForAnalysis()
+            // Rebind camera with new selection
+            mainHandler.post {
+                bindCameraForAnalysis()
+            }
         }
     }
     
     private fun stopDetection() {
         Log.d(TAG, "🛑 Stopping detection...")
         isDetectionActive = false
+        isProcessingFrame = false
+        resetPredictionState()
         
         try {
             cameraProvider?.unbindAll()
             imageAnalysis = null
+            camera = null
         } catch (e: Exception) {
             Log.e(TAG, "Error stopping detection: ${e.message}")
         }
