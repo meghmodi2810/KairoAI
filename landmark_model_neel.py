@@ -6,13 +6,7 @@ This script converts a CNN image dataset to MediaPipe landmarks and trains
 a DNN model for Indian Sign Language recognition.
 
 YOUR APP EXPECTS:
-- Input:  130 floats (2 hands × 21 landmarks × 3 coords + 4 handedness/palm features)
-  - [0-62]   Hand 1: 21 landmarks × 3 coords (normalized)
-  - [63-125] Hand 2: 21 landmarks × 3 coords (normalized)
-  - [126]    Hand 1 handedness (0=Left, 1=Right)
-  - [127]    Hand 1 palm_facing (0=Back, 1=Palm)
-  - [128]    Hand 2 handedness (0=Left, 1=Right)
-  - [129]    Hand 2 palm_facing (0=Back, 1=Palm)
+- Input:  126 floats (2 hands × 21 landmarks × 3 coords)
 - Output: 35 classes (A-Z + 0-8)
 
 USAGE:
@@ -56,7 +50,7 @@ OUTPUT_H5 = "isl_model.h5"
 OUTPUT_LABELS = "labels.json"
 
 # Model configuration (MUST MATCH YOUR APP)
-INPUT_SIZE = 130      # 2 hands × 21 landmarks × 3 coords + 4 handedness/palm features
+INPUT_SIZE = 126      # 2 hands × 21 landmarks × 3 coords
 NUM_CLASSES = 35      # A-Z (26) + 0-8 (9) = 35
 
 # Training configuration
@@ -100,59 +94,20 @@ def setup_mediapipe():
     return hands
 
 
-def is_palm_facing_camera(hand_landmarks, handedness_label):
-    """
-    Determine if the palm is facing the camera or the back of hand is showing.
-    Uses the cross product of vectors from wrist to thumb base and wrist to pinky base.
-    
-    Returns: 1.0 if palm facing camera, 0.0 if back of hand facing camera
-    """
-    # Key landmarks
-    wrist = hand_landmarks[0]
-    thumb_cmc = hand_landmarks[1]   # Thumb base
-    pinky_mcp = hand_landmarks[17]  # Pinky base
-    
-    # Create vectors from wrist to thumb and wrist to pinky
-    vec_thumb = np.array([thumb_cmc[0] - wrist[0], thumb_cmc[1] - wrist[1], thumb_cmc[2] - wrist[2]])
-    vec_pinky = np.array([pinky_mcp[0] - wrist[0], pinky_mcp[1] - wrist[1], pinky_mcp[2] - wrist[2]])
-    
-    # Cross product gives us the normal vector of the palm plane
-    cross = np.cross(vec_thumb, vec_pinky)
-    
-    # The z-component of the cross product tells us palm orientation
-    # For a right hand: positive z means palm facing camera
-    # For a left hand: negative z means palm facing camera
-    if handedness_label == "Right":
-        return 1.0 if cross[2] > 0 else 0.0
-    else:  # Left hand
-        return 1.0 if cross[2] < 0 else 0.0
-
-
-def normalize_landmarks(landmarks_list, handedness_list):
+def normalize_landmarks(landmarks_list):
     """
     Normalize landmarks exactly as your app does in MainActivity.kt:
     - Subtract wrist position (make relative to wrist)
     - Divide by hand size (scale invariance)
-    - Include handedness and palm-facing features
     
     This MUST match the normalization in processDetectedHand() in your app!
-    
-    Output format (130 features total):
-    - Hand 1 landmarks: 63 normalized coords (21 landmarks × 3)
-    - Hand 2 landmarks: 63 normalized coords (21 landmarks × 3)
-    - Hand 1 handedness: 1 value (0=Left, 1=Right)
-    - Hand 1 palm_facing: 1 value (0=Back, 1=Palm)
-    - Hand 2 handedness: 1 value (0=Left, 1=Right)
-    - Hand 2 palm_facing: 1 value (0=Back, 1=Palm)
     """
-    normalized = []      # Will hold 126 landmark values
-    handedness_features = []  # Will hold 4 handedness/palm values
+    normalized = []
     
-    for idx, hand_landmarks in enumerate(landmarks_list):
+    for hand_landmarks in landmarks_list:
         if hand_landmarks is None:
             # Pad with zeros for missing hand
             normalized.extend([0.0] * 63)
-            handedness_features.extend([0.0, 0.0])  # No hand = 0 for both
             continue
         
         # Get wrist position (landmark 0)
@@ -181,26 +136,14 @@ def normalize_landmarks(landmarks_list, handedness_list):
             norm_y = (lm[1] - wrist_y) / hand_size
             norm_z = (lm[2] - wrist_z) / hand_size
             normalized.extend([norm_x, norm_y, norm_z])
-        
-        # Get handedness features
-        if handedness_list and idx < len(handedness_list) and handedness_list[idx] is not None:
-            handedness_label = handedness_list[idx]
-            handedness_value = 1.0 if handedness_label == "Right" else 0.0
-            palm_facing = is_palm_facing_camera(hand_landmarks, handedness_label)
-        else:
-            handedness_value = 0.0
-            palm_facing = 0.0
-        
-        handedness_features.extend([handedness_value, palm_facing])
     
-    # Combine: landmarks first (126), then handedness features (4) = 130 total
-    return normalized + handedness_features
+    return normalized
 
 
 def extract_landmarks_from_image(hands, image_path):
     """
     Extract hand landmarks from an image using MediaPipe.
-    Returns 130 normalized floats (126 landmarks + 4 handedness/palm features) or None if no hand detected.
+    Returns 126 normalized floats or None if no hand detected.
     """
     # Read image
     image = cv2.imread(image_path)
@@ -217,32 +160,22 @@ def extract_landmarks_from_image(hands, image_path):
     if not results.multi_hand_landmarks:
         return None
     
-    # Extract landmarks and handedness for up to 2 hands
+    # Extract landmarks for up to 2 hands
     hands_data = []
-    handedness_data = []
-    
-    for idx, hand_landmarks in enumerate(results.multi_hand_landmarks[:2]):
+    for hand_landmarks in results.multi_hand_landmarks[:2]:
         hand_data = []
         for lm in hand_landmarks.landmark:
             hand_data.append([lm.x, lm.y, lm.z])
         hands_data.append(hand_data)
-        
-        # Get handedness label (Left or Right)
-        if results.multi_handedness and idx < len(results.multi_handedness):
-            handedness_label = results.multi_handedness[idx].classification[0].label
-            handedness_data.append(handedness_label)
-        else:
-            handedness_data.append(None)
     
     # Pad with None if only 1 hand detected
     while len(hands_data) < 2:
         hands_data.append(None)
-        handedness_data.append(None)
     
-    # Normalize landmarks and add handedness features
-    normalized = normalize_landmarks(hands_data, handedness_data)
+    # Normalize landmarks
+    normalized = normalize_landmarks(hands_data)
     
-    # Ensure we have exactly 130 values (126 landmarks + 4 handedness/palm features)
+    # Ensure we have exactly 126 values
     if len(normalized) != INPUT_SIZE:
         return None
     
@@ -352,10 +285,8 @@ def save_landmarks_csv(X, y):
     with open(OUTPUT_CSV, 'w', newline='') as f:
         writer = csv.writer(f)
         
-        # Header: 126 landmark coords + 4 handedness/palm features + label
-        header = [f'lm{i}_{c}' for i in range(42) for c in ['x', 'y', 'z']]
-        header += ['hand1_handedness', 'hand1_palm_facing', 'hand2_handedness', 'hand2_palm_facing']
-        header += ['label']
+        # Header
+        header = [f'lm{i}_{c}' for i in range(42) for c in ['x', 'y', 'z']] + ['label']
         writer.writerow(header)
         
         # Data
@@ -378,38 +309,22 @@ def load_landmarks_from_csv():
         header = next(reader)  # Skip header
         
         for row in reader:
-            # Last column is label, rest are landmarks (130 features)
+            # Last column is label, rest are landmarks
             landmarks = [float(x) for x in row[:-1]]
             label_str = row[-1]
             
             if label_str in LABELS:
                 label_idx = LABELS.index(label_str)
-                
-                # Handle old CSV format (126 features) by padding with zeros
-                if len(landmarks) == 126:
-                    print("⚠️  Warning: Old CSV format detected (126 features). Adding zeros for handedness features.")
-                    landmarks.extend([0.0, 0.0, 0.0, 0.0])  # Pad with zeros
-                
-                if len(landmarks) == INPUT_SIZE:
-                    X.append(landmarks)
-                    y.append(label_idx)
+                X.append(landmarks)
+                y.append(label_idx)
     
     print(f"   Loaded {len(X)} samples from CSV")
-    print(f"   Feature count per sample: {len(X[0]) if X else 0}")
     
     # Check class distribution
     unique, counts = np.unique(y, return_counts=True)
     print(f"\n📈 Class distribution:")
     for idx, count in zip(unique, counts):
         print(f"   {LABELS[idx]}: {count} samples")
-    
-    # Show palm detection stats
-    if X:
-        palm_count = sum(1 for x in X if x[127] == 1.0)  # Hand 1 palm facing
-        back_count = len(X) - palm_count
-        print(f"\n🖐️  Palm Detection Stats (Hand 1):")
-        print(f"   Palm facing camera: {palm_count} ({100*palm_count/len(X):.1f}%)")
-        print(f"   Back facing camera: {back_count} ({100*back_count/len(X):.1f}%)")
     
     return np.array(X, dtype=np.float32), np.array(y, dtype=np.int32)
 
