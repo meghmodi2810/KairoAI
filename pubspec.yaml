@@ -48,6 +48,7 @@ dependencies:
   
   # Permissions (camera handled natively via CameraX)
   permission_handler: ^11.3.1
+  shared_preferences: ^2.5.4
 
 dev_dependencies:
   flutter_test:

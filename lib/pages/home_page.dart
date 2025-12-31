@@ -297,7 +297,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (mounted) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const LoginPage()),
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => const LoginPage(),
+          transitionDuration: Duration.zero,
+          reverseTransitionDuration: Duration.zero,
+        ),
       );
     }
   }
