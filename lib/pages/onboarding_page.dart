@@ -22,7 +22,6 @@ class _OnboardingPageState extends State<OnboardingPage> {
   static const Color primaryBlue = Color(0xFF1A2151);
   static const Color darkBlue = Color(0xFF141938);
   static const Color accentYellow = Color(0xFFFFD93D);
-  static const Color lightYellow = Color(0xFFFFF3B0);
 
   final List<String> _goals = [
     'Communicate with family',

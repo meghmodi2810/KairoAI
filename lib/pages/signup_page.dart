@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'home_page.dart';
+import '../main_navigation.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -93,7 +93,7 @@ class _SignUpPageState extends State<SignUpPage> {
           Navigator.pushReplacement(
             context,
             PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) => const HomePage(),
+              pageBuilder: (context, animation, secondaryAnimation) => const MainNavigation(),
               transitionDuration: Duration.zero,
               reverseTransitionDuration: Duration.zero,
             ),
@@ -185,7 +185,7 @@ class _SignUpPageState extends State<SignUpPage> {
         Navigator.pushReplacement(
           context,
           PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => const HomePage(),
+            pageBuilder: (context, animation, secondaryAnimation) => const MainNavigation(),
             transitionDuration: Duration.zero,
             reverseTransitionDuration: Duration.zero,
           ),
