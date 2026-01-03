@@ -23,11 +23,15 @@ class _NewHomePageState extends State<NewHomePage> {
   LessonModel? _nextLesson;
   String? _nextLessonCategoryId;
   bool _isLoading = true;
+  bool _isAudioPlaying = false;
+  int _selectedCategoryIndex = 0;
 
-  // Theme colors
-  static const Color darkBlue = Color(0xFF141938);
+  // Theme colors matching the design
+  static const Color darkBlue = Color(0xFF1A1F38);
+  static const Color cardBg = Color(0xFF252B4D);
   static const Color accentYellow = Color(0xFFFFD93D);
-  static const Color cardBg = Color(0xFF252A5E);
+  static const Color gemPurple = Color(0xFF8B7BF7);
+  static const Color coinGold = Color(0xFFFFAA00);
 
   @override
   void initState() {
@@ -122,7 +126,8 @@ class _NewHomePageState extends State<NewHomePage> {
                 child: SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   child: Padding(
-                    padding: const EdgeInsets.all(20.0),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20.0, vertical: 16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -147,55 +152,65 @@ class _NewHomePageState extends State<NewHomePage> {
   Widget _buildTopBar() {
     return Row(
       children: [
-        // User greeting
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Hello,',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
-                  fontSize: 14,
-                ),
-              ),
-              Text(
-                _user?.displayName ?? 'Learner',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+        // Back button
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: IconButton(
+            onPressed: () {
+              // Navigate back or show menu
+            },
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: Colors.white,
+              size: 18,
+            ),
+            padding: EdgeInsets.zero,
           ),
         ),
-        // Gems and Coins
-        _buildStatChip('💎', _user?.gems ?? 0, const Color(0xFF6C5CE7)),
-        const SizedBox(width: 8),
-        _buildStatChip('🪙', _user?.coins ?? 0, const Color(0xFFFFAA00)),
+        const Spacer(),
+        // Gems
+        _buildStatChip(
+          icon: Icons.diamond_rounded,
+          value: _user?.gems ?? 144,
+          color: gemPurple,
+        ),
+        const SizedBox(width: 12),
+        // Coins
+        _buildStatChip(
+          icon: Icons.monetization_on_rounded,
+          value: _user?.coins ?? 2321,
+          color: coinGold,
+        ),
       ],
     );
   }
 
-  Widget _buildStatChip(String emoji, int value, Color bgColor) {
+  Widget _buildStatChip({
+    required IconData icon,
+    required int value,
+    required Color color,
+  }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: bgColor.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: bgColor.withOpacity(0.3)),
+        color: cardBg,
+        borderRadius: BorderRadius.circular(24),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 16)),
-          const SizedBox(width: 6),
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 8),
           Text(
             _formatNumber(value),
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 14,
+              fontSize: 15,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -206,7 +221,10 @@ class _NewHomePageState extends State<NewHomePage> {
 
   String _formatNumber(int number) {
     if (number >= 1000) {
-      return '${(number / 1000).toStringAsFixed(1)}k';
+      return number.toString().replaceAllMapped(
+            RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+            (Match m) => '${m[1]},',
+          );
     }
     return number.toString();
   }
@@ -215,74 +233,232 @@ class _NewHomePageState extends State<NewHomePage> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            cardBg,
-            cardBg.withOpacity(0.8),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        color: cardBg,
+        borderRadius: BorderRadius.circular(24),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Robot mascot
+          // Robot mascot image
           Container(
-            width: 70,
-            height: 70,
+            width: 100,
+            height: 130,
             decoration: BoxDecoration(
-              color: accentYellow.withOpacity(0.2),
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Center(
-              child: Text('🤖', style: TextStyle(fontSize: 40)),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // Robot styled container
+                Container(
+                  width: 100,
+                  height: 130,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        const Color(0xFF4ECDC4).withOpacity(0.2),
+                        const Color(0xFF4ECDC4).withOpacity(0.05),
+                      ],
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Robot head with goggles
+                      Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Container(
+                            width: 55,
+                            height: 45,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF5A6A7A),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          // Goggles/Eyes
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 18,
+                                height: 18,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFD93D),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: const Color(0xFF8B6914),
+                                    width: 2,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: const BoxDecoration(
+                                      color: Colors.black,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                width: 18,
+                                height: 18,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFD93D),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: const Color(0xFF8B6914),
+                                    width: 2,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: const BoxDecoration(
+                                      color: Colors.black,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      // Robot body
+                      Container(
+                        width: 45,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF4ECDC4),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF2A8A82),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF2A8A82),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(width: 16),
-          // Content
+          // Day Insight content
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    const Text(
-                      'Day Insight',
-                      style: TextStyle(
-                        color: accentYellow,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: accentYellow.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.volume_up_rounded,
-                        color: accentYellow,
-                        size: 20,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _dailyInsight?.message ?? 'Learn something new today! Practice makes perfect.',
+                const Text(
+                  'Day Insight',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.8),
+                    color: accentYellow,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Listen every Day Insight\nabout your education',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.7),
                     fontSize: 14,
                     height: 1.4,
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
+                const SizedBox(height: 16),
+                // Audio player
+                _buildAudioPlayer(),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAudioPlayer() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: darkBlue,
+        borderRadius: BorderRadius.circular(30),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Play/Pause button
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _isAudioPlaying = !_isAudioPlaying;
+              });
+            },
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: const BoxDecoration(
+                color: accentYellow,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                _isAudioPlaying
+                    ? Icons.pause_rounded
+                    : Icons.graphic_eq_rounded,
+                color: darkBlue,
+                size: 20,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Audio waveform visualization
+          Row(
+            children: List.generate(
+              8,
+              (index) {
+                final heights = [12.0, 20.0, 8.0, 24.0, 14.0, 22.0, 10.0, 18.0];
+                return Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                  width: 3,
+                  height: heights[index],
+                  decoration: BoxDecoration(
+                    color: accentYellow.withOpacity(_isAudioPlaying ? 1.0 : 0.6),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                );
+              },
             ),
           ),
         ],
@@ -298,34 +474,47 @@ class _NewHomePageState extends State<NewHomePage> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const Text(
-              'Categories',
+              'Category',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            TextButton(
-              onPressed: () {
+            GestureDetector(
+              onTap: () {
                 // Navigate to all categories
               },
-              child: const Text(
-                'See All',
-                style: TextStyle(color: accentYellow, fontSize: 14),
+              child: Row(
+                children: [
+                  Text(
+                    'View all',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.6),
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    color: Colors.white.withOpacity(0.6),
+                    size: 14,
+                  ),
+                ],
               ),
             ),
           ],
         ),
         const SizedBox(height: 16),
         _categories.isEmpty
-            ? _buildEmptyCategoriesState()
+            ? _buildDefaultCategories()
             : SizedBox(
-                height: 120,
+                height: 100,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   itemCount: _categories.length,
                   itemBuilder: (context, index) {
-                    return _buildCategoryCard(_categories[index]);
+                    return _buildCategoryCard(_categories[index], index);
                   },
                 ),
               ),
@@ -333,28 +522,80 @@ class _NewHomePageState extends State<NewHomePage> {
     );
   }
 
-  Widget _buildEmptyCategoriesState() {
-    return Container(
-      height: 120,
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+  Widget _buildDefaultCategories() {
+    // Default categories matching the design
+    final defaultCategories = [
+      {'name': 'Greetings', 'icon': Icons.waving_hand_rounded, 'color': accentYellow},
+      {'name': 'Numbers', 'icon': Icons.groups_rounded, 'color': const Color(0xFF6C9EFF)},
+      {'name': 'History', 'icon': Icons.access_time_rounded, 'color': const Color(0xFF6C9EFF)},
+      {'name': 'Animals', 'icon': Icons.pets_rounded, 'color': const Color(0xFF4ECDC4)},
+    ];
+
+    return SizedBox(
+      height: 100,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: defaultCategories.length,
+        itemBuilder: (context, index) {
+          final category = defaultCategories[index];
+          return _buildDefaultCategoryCard(
+            name: category['name'] as String,
+            icon: category['icon'] as IconData,
+            color: category['color'] as Color,
+            index: index,
+          );
+        },
       ),
-      child: Center(
+    );
+  }
+
+  Widget _buildDefaultCategoryCard({
+    required String name,
+    required IconData icon,
+    required Color color,
+    required int index,
+  }) {
+    final bool isSelected = _selectedCategoryIndex == index;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedCategoryIndex = index;
+        });
+      },
+      child: Container(
+        width: 85,
+        margin: const EdgeInsets.only(right: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? accentYellow : cardBg,
+          borderRadius: BorderRadius.circular(20),
+        ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.category_outlined, color: Colors.white.withOpacity(0.4), size: 32),
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? Colors.white.withOpacity(0.3)
+                    : color.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                color: isSelected ? darkBlue : color,
+                size: 26,
+              ),
+            ),
             const SizedBox(height: 8),
             Text(
-              'No categories yet',
-              style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 14),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Tap menu → Load Sample Data',
-              style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 12),
+              name,
+              style: TextStyle(
+                color: isSelected ? darkBlue : Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
@@ -362,15 +603,19 @@ class _NewHomePageState extends State<NewHomePage> {
     );
   }
 
-  Widget _buildCategoryCard(CategoryModel category) {
+  Widget _buildCategoryCard(CategoryModel category, int index) {
     final Color categoryColor = _parseColor(category.color);
-    
+    final bool isSelected = _selectedCategoryIndex == index;
+
     return GestureDetector(
       onTap: () {
+        setState(() {
+          _selectedCategoryIndex = index;
+        });
         if (!category.isLocked) {
           Navigator.of(context).push(
             PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) => 
+              pageBuilder: (context, animation, secondaryAnimation) =>
                   CategoryPage(category: category),
               transitionDuration: Duration.zero,
               reverseTransitionDuration: Duration.zero,
@@ -379,63 +624,56 @@ class _NewHomePageState extends State<NewHomePage> {
         }
       },
       child: Container(
-        width: 100,
+        width: 85,
         margin: const EdgeInsets.only(right: 12),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              categoryColor.withOpacity(0.3),
-              categoryColor.withOpacity(0.1),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: categoryColor.withOpacity(0.4)),
+          color: isSelected ? accentYellow : cardBg,
+          borderRadius: BorderRadius.circular(20),
         ),
         child: Stack(
           children: [
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    category.iconEmoji,
-                    style: const TextStyle(fontSize: 32),
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? Colors.white.withOpacity(0.3)
+                        : categoryColor.withOpacity(0.2),
+                    shape: BoxShape.circle,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    category.name,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${category.totalSigns} signs',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.6),
-                      fontSize: 11,
+                  child: Center(
+                    child: Text(
+                      category.iconEmoji,
+                      style: const TextStyle(fontSize: 24),
                     ),
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  category.name,
+                  style: TextStyle(
+                    color: isSelected ? darkBlue : Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
             if (category.isLocked)
               Positioned.fill(
                 child: Container(
                   decoration: BoxDecoration(
                     color: Colors.black.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Center(
-                    child: Icon(Icons.lock, color: Colors.white54, size: 28),
+                    child: Icon(Icons.lock, color: Colors.white54, size: 24),
                   ),
                 ),
               ),
@@ -454,129 +692,91 @@ class _NewHomePageState extends State<NewHomePage> {
   }
 
   Widget _buildDailyLessonCard() {
-    if (_nextLesson == null) {
-      return _buildNoLessonCard();
-    }
-
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF2D3368),
-            Color(0xFF252A5E),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        color: cardBg,
+        borderRadius: BorderRadius.circular(24),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: accentYellow.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.local_fire_department, color: accentYellow, size: 18),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${_user?.streakDays ?? 0} Day Streak',
-                      style: const TextStyle(
-                        color: accentYellow,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Spacer(),
-              Text(
-                'Unit ${_nextLesson!.unitNumber}',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
-                  fontSize: 14,
-                ),
-              ),
-            ],
+          const Text(
+            'Daily Lesson',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 16),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Lesson info
+              // Hand gesture image
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF3A4070),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Center(
+                  child: Text(
+                    '👋',
+                    style: TextStyle(fontSize: 52),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              // Lesson details
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Daily Lesson',
-                      style: TextStyle(
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: accentYellow.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        'Unit ${_nextLesson?.unitNumber ?? 1}:',
+                        style: TextStyle(
+                          color: accentYellow.withOpacity(0.9),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      _nextLesson?.title ?? 'Greetings',
+                      style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 22,
+                        fontSize: 24,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _nextLesson!.title,
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.7),
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 14),
+                    // Rewards row
                     Row(
                       children: [
-                        Icon(
-                          Icons.access_time,
-                          color: Colors.white.withOpacity(0.5),
-                          size: 16,
+                        _buildRewardChip(
+                          icon: Icons.diamond_rounded,
+                          value: '+5',
+                          color: gemPurple,
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${_nextLesson!.estimatedMinutes} min',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.5),
-                            fontSize: 13,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Icon(
-                          Icons.front_hand,
-                          color: accentYellow,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${_nextLesson!.totalSigns} signs',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.5),
-                            fontSize: 13,
-                          ),
+                        const SizedBox(width: 10),
+                        _buildRewardChip(
+                          icon: Icons.monetization_on_rounded,
+                          value: '+50 Coins',
+                          color: coinGold,
                         ),
                       ],
                     ),
                   ],
-                ),
-              ),
-              // Hand gesture illustration
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF3D4478),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Center(
-                  child: Text('🤟', style: TextStyle(fontSize: 40)),
                 ),
               ),
             ],
@@ -606,24 +806,46 @@ class _NewHomePageState extends State<NewHomePage> {
                 foregroundColor: darkBlue,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 elevation: 0,
               ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Continue',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(width: 8),
-                  Icon(Icons.arrow_forward_rounded, size: 20),
-                ],
+              child: const Text(
+                'Continue',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRewardChip({
+    required IconData icon,
+    required String value,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 16),
+          const SizedBox(width: 4),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ],
@@ -636,8 +858,7 @@ class _NewHomePageState extends State<NewHomePage> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: cardBg,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        borderRadius: BorderRadius.circular(24),
       ),
       child: Column(
         children: [
@@ -677,7 +898,7 @@ class _NewHomePageState extends State<NewHomePage> {
           foregroundColor: darkBlue,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
           ),
         ),
       ),

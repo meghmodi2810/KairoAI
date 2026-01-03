@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 
-class QuizPage extends StatefulWidget {
-  const QuizPage({super.key});
+class DuolingoHomePage extends StatefulWidget {
+  const DuolingoHomePage({super.key});
 
   @override
-  State<QuizPage> createState() => _QuizPageState();
+  State<DuolingoHomePage> createState() => _DuolingoHomePageState();
 }
 
-class _QuizPageState extends State<QuizPage>
+class _DuolingoHomePageState extends State<DuolingoHomePage>
     with TickerProviderStateMixin {
-  // Theme Colors - Matching the Duolingo-style design with Pink accent
+  // Theme Colors - Matching the Duolingo-style design
   static const Color primaryBg = Color(0xFF181E34);
   static const Color cardBg = Color(0xFF262F4D);
-  static const Color accentPink = Color(0xFFFF4B8C); // Primary Pink Accent
-  static const Color accentPinkLight = Color(0xFFFF6B9D); // Lighter Pink
+  static const Color accentYellow = Color(0xFFFFC800);
   static const Color accentBlue = Color(0xFF5CB6F9);
   static const Color lockedBlue = Color(0xFF3A4A6B);
   static const Color pathColor = Color(0xFF2A3A5A);
@@ -28,44 +28,38 @@ class _QuizPageState extends State<QuizPage>
   int gems = 144;
   int coins = 2321;
   int streakDays = 12;
-  int quizScore = 850;
 
-  // Quiz data with ISL-specific icons
-  final List<QuizNodeData> _quizzes = [
-    QuizNodeData(
+  // Lesson data with ISL-specific icons
+  final List<LessonNodeData> _lessons = [
+    LessonNodeData(
       id: 1,
-      iconType: QuizIconType.basicSigns,
-      title: 'Basic Signs Quiz',
-      status: QuizStatus.completed,
-      questionsCount: 10,
+      iconType: LessonIconType.waveHand,
+      title: 'Greetings',
+      status: LessonStatus.completed,
     ),
-    QuizNodeData(
+    LessonNodeData(
       id: 2,
-      iconType: QuizIconType.alphabet,
-      title: 'Alphabet Challenge',
-      status: QuizStatus.completed,
-      questionsCount: 26,
+      iconType: LessonIconType.alphabet,
+      title: 'Alphabet A-Z',
+      status: LessonStatus.completed,
     ),
-    QuizNodeData(
+    LessonNodeData(
       id: 3,
-      iconType: QuizIconType.numbers,
-      title: 'Numbers Quiz',
-      status: QuizStatus.active,
-      questionsCount: 15,
+      iconType: LessonIconType.handSign,
+      title: 'Basic Signs',
+      status: LessonStatus.active,
     ),
-    QuizNodeData(
+    LessonNodeData(
       id: 4,
-      iconType: QuizIconType.greetings,
-      title: 'Greetings Test',
-      status: QuizStatus.locked,
-      questionsCount: 12,
+      iconType: LessonIconType.numbers,
+      title: 'Numbers 1-10',
+      status: LessonStatus.locked,
     ),
-    QuizNodeData(
+    LessonNodeData(
       id: 5,
-      iconType: QuizIconType.phrases,
-      title: 'Daily Phrases',
-      status: QuizStatus.locked,
-      questionsCount: 20,
+      iconType: LessonIconType.conversation,
+      title: 'Simple Phrases',
+      status: LessonStatus.locked,
     ),
   ];
 
@@ -109,11 +103,11 @@ class _QuizPageState extends State<QuizPage>
             children: [
               _buildTopBar(),
               const SizedBox(height: 16),
-              _buildQuizHeader(),
+              _buildUnitHeader(),
               const SizedBox(height: 10),
-              _buildQuizPath(),
+              _buildLessonPath(),
               const SizedBox(height: 20),
-              _buildNextQuizPreview(),
+              _buildNextUnitPreview(),
               const SizedBox(height: 30),
             ],
           ),
@@ -127,37 +121,45 @@ class _QuizPageState extends State<QuizPage>
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Row(
         children: [
-          // Quiz icon badge
+          // User Avatar with robot mascot
           Container(
             width: 44,
             height: 44,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: cardBg,
-              border: Border.all(color: accentPink.withOpacity(0.5), width: 2),
+              border: Border.all(color: accentYellow.withOpacity(0.5), width: 2),
             ),
-            child: const Icon(
-              Icons.quiz,
-              color: accentPink,
-              size: 26,
+            child: ClipOval(
+              child: Image.network(
+                'https://api.dicebear.com/7.x/bottts/png?seed=kairo&backgroundColor=262F4D',
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return const Icon(
+                    Icons.smart_toy,
+                    color: accentYellow,
+                    size: 28,
+                  );
+                },
+              ),
             ),
           ),
           const Spacer(),
           // Streak Counter (Fire icon)
           _buildStreakPill(),
           const SizedBox(width: 10),
-          // Quiz Score Pill
-          _buildStatPill(
-            icon: Icons.star,
-            value: quizScore.toString(),
-            iconColor: accentPink,
-          ),
-          const SizedBox(width: 10),
           // Gems Pill
           _buildStatPill(
             icon: Icons.diamond,
             value: gems.toString(),
             iconColor: accentBlue,
+          ),
+          const SizedBox(width: 10),
+          // Coins Pill
+          _buildStatPill(
+            icon: Icons.monetization_on,
+            value: _formatNumber(coins),
+            iconColor: const Color(0xFFFFAA00),
           ),
         ],
       ),
@@ -218,7 +220,14 @@ class _QuizPageState extends State<QuizPage>
     );
   }
 
-  Widget _buildQuizHeader() {
+  String _formatNumber(int number) {
+    if (number >= 1000) {
+      return '${(number / 1000).toStringAsFixed(1)}k';
+    }
+    return number.toString();
+  }
+
+  Widget _buildUnitHeader() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Container(
@@ -226,14 +235,14 @@ class _QuizPageState extends State<QuizPage>
         height: 140,
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [accentPink, accentPinkLight],
+            colors: [accentBlue, accentBlue.withOpacity(0.8)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: accentPink.withOpacity(0.3),
+              color: accentBlue.withOpacity(0.3),
               blurRadius: 15,
               offset: const Offset(0, 8),
             ),
@@ -254,18 +263,6 @@ class _QuizPageState extends State<QuizPage>
                 ),
               ),
             ),
-            Positioned(
-              left: -30,
-              bottom: -30,
-              child: Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.08),
-                ),
-              ),
-            ),
             // Content
             Padding(
               padding: const EdgeInsets.all(20),
@@ -274,7 +271,7 @@ class _QuizPageState extends State<QuizPage>
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text(
-                    'Quiz Section:',
+                    'Unit 1:',
                     style: TextStyle(
                       color: Colors.white70,
                       fontSize: 14,
@@ -283,7 +280,7 @@ class _QuizPageState extends State<QuizPage>
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'ISL Challenges',
+                    'Basics',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 28,
@@ -305,14 +302,14 @@ class _QuizPageState extends State<QuizPage>
                           ),
                           child: FractionallySizedBox(
                             alignment: Alignment.centerLeft,
-                            widthFactor: 0.4, // 40% progress
+                            widthFactor: 0.6,
                             child: Container(
                               decoration: BoxDecoration(
-                                color: Colors.white,
+                                color: accentYellow,
                                 borderRadius: BorderRadius.circular(5),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.white.withOpacity(0.5),
+                                    color: accentYellow.withOpacity(0.5),
                                     blurRadius: 6,
                                   ),
                                 ],
@@ -327,13 +324,26 @@ class _QuizPageState extends State<QuizPage>
                 ],
               ),
             ),
-            // Quiz mascot/icon
+            // Robot Mascot
             Positioned(
               right: 15,
               top: 0,
               bottom: 0,
               child: Center(
-                child: _buildQuizMascot(),
+                child: Container(
+                  width: 100,
+                  height: 110,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Image.network(
+                    'https://i.imgur.com/placeholder.png',
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return _buildRobotMascot();
+                    },
+                  ),
+                ),
               ),
             ),
           ],
@@ -342,76 +352,110 @@ class _QuizPageState extends State<QuizPage>
     );
   }
 
-  Widget _buildQuizMascot() {
+  Widget _buildRobotMascot() {
     return Container(
       width: 90,
       height: 100,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
+        color: cardBg.withOpacity(0.5),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Quiz trophy/brain icon representation
+          // Robot body
           Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // Head with eyes
               Container(
-                width: 55,
-                height: 55,
+                width: 50,
+                height: 45,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.9),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
+                  color: const Color(0xFF8B7355),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Stack(
+                  children: [
+                    // Eyes
+                    Positioned(
+                      top: 12,
+                      left: 8,
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: accentYellow,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: accentYellow.withOpacity(0.5),
+                              blurRadius: 4,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 12,
+                      right: 8,
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: accentYellow,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: accentYellow.withOpacity(0.5),
+                              blurRadius: 4,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // Antenna
+                    Positioned(
+                      top: -8,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: Container(
+                          width: 4,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF6B5545),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
-                child: const Icon(
-                  Icons.psychology,
-                  color: accentPink,
-                  size: 35,
-                ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
+              // Body
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                width: 40,
+                height: 30,
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: accentBlue.withOpacity(0.8),
                   borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text(
-                  'QUIZ',
-                  style: TextStyle(
-                    color: accentPink,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
                 ),
               ),
             ],
           ),
-          // Sparkle decorations
+          // Waving hand
           Positioned(
-            top: 10,
-            right: 10,
-            child: Icon(
-              Icons.auto_awesome,
-              color: Colors.white.withOpacity(0.8),
-              size: 16,
-            ),
-          ),
-          Positioned(
-            bottom: 15,
-            left: 8,
-            child: Icon(
-              Icons.star,
-              color: Colors.white.withOpacity(0.6),
-              size: 12,
+            right: 5,
+            top: 25,
+            child: Transform.rotate(
+              angle: 0.3,
+              child: const Icon(
+                Icons.pan_tool,
+                color: Color(0xFF8B7355),
+                size: 24,
+              ),
             ),
           ),
         ],
@@ -419,7 +463,7 @@ class _QuizPageState extends State<QuizPage>
     );
   }
 
-  Widget _buildQuizPath() {
+  Widget _buildLessonPath() {
     return Container(
       height: 580,
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -428,14 +472,14 @@ class _QuizPageState extends State<QuizPage>
           // The curved path behind nodes
           Positioned.fill(
             child: CustomPaint(
-              painter: QuizPathPainter(
+              painter: LessonPathPainter(
                 pathColor: pathColor,
                 nodePositions: _getNodePositions(),
               ),
             ),
           ),
-          // Quiz nodes
-          ..._buildQuizNodes(),
+          // Lesson nodes
+          ..._buildLessonNodes(),
         ],
       ),
     );
@@ -452,20 +496,20 @@ class _QuizPageState extends State<QuizPage>
     ];
   }
 
-  List<Widget> _buildQuizNodes() {
+  List<Widget> _buildLessonNodes() {
     final positions = _getNodePositions();
     final widgets = <Widget>[];
     final screenWidth = MediaQuery.of(context).size.width - 40; // Account for padding
 
-    for (int i = 0; i < _quizzes.length; i++) {
-      final quiz = _quizzes[i];
+    for (int i = 0; i < _lessons.length; i++) {
+      final lesson = _lessons[i];
       final position = positions[i];
 
       widgets.add(
         Positioned(
           left: position.dx * screenWidth - 40,
           top: position.dy * 580 - 40,
-          child: _buildQuizNode(quiz),
+          child: _buildLessonNode(lesson),
         ),
       );
     }
@@ -473,13 +517,13 @@ class _QuizPageState extends State<QuizPage>
     return widgets;
   }
 
-  Widget _buildQuizNode(QuizNodeData quiz) {
-    final isActive = quiz.status == QuizStatus.active;
-    final isCompleted = quiz.status == QuizStatus.completed;
-    final isLocked = quiz.status == QuizStatus.locked;
+  Widget _buildLessonNode(LessonNodeData lesson) {
+    final isActive = lesson.status == LessonStatus.active;
+    final isCompleted = lesson.status == LessonStatus.completed;
+    final isLocked = lesson.status == LessonStatus.locked;
 
     return GestureDetector(
-      onTap: () => _onQuizTap(quiz),
+      onTap: () => _onLessonTap(lesson),
       child: AnimatedBuilder(
         animation: isActive ? _bounceAnimation : const AlwaysStoppedAnimation(0),
         builder: (context, child) {
@@ -503,7 +547,7 @@ class _QuizPageState extends State<QuizPage>
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: accentPink.withOpacity(0.4),
+                          color: accentYellow.withOpacity(0.4),
                           blurRadius: 25,
                           spreadRadius: 8,
                         ),
@@ -518,17 +562,17 @@ class _QuizPageState extends State<QuizPage>
               height: 80,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: isCompleted || isActive ? accentPink : lockedBlue,
+                color: isCompleted || isActive ? accentYellow : lockedBlue,
                 border: Border.all(
                   color: isCompleted || isActive
-                      ? accentPink.withOpacity(0.8)
+                      ? accentYellow.withOpacity(0.8)
                       : lockedBlue.withOpacity(0.6),
                   width: 4,
                 ),
                 boxShadow: isActive || isCompleted
                     ? [
                         BoxShadow(
-                          color: accentPink.withOpacity(0.4),
+                          color: accentYellow.withOpacity(0.4),
                           blurRadius: 12,
                           offset: const Offset(0, 4),
                         ),
@@ -542,7 +586,7 @@ class _QuizPageState extends State<QuizPage>
                       ],
               ),
               child: Center(
-                child: _buildQuizIcon(quiz),
+                child: _buildLessonIcon(lesson),
               ),
             ),
             // Checkmark badge for completed
@@ -571,85 +615,66 @@ class _QuizPageState extends State<QuizPage>
                   ),
                 ),
               ),
-            // Question count badge
-            if (!isLocked)
-              Positioned(
-                left: 0,
-                top: 0,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 4,
-                      ),
-                    ],
-                  ),
-                  child: Text(
-                    '${quiz.questionsCount}Q',
-                    style: TextStyle(
-                      color: isCompleted || isActive ? accentPink : lockedBlue,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildQuizIcon(QuizNodeData quiz) {
-    final isLocked = quiz.status == QuizStatus.locked;
+  Widget _buildLessonIcon(LessonNodeData lesson) {
+    final isLocked = lesson.status == LessonStatus.locked;
     final color = isLocked ? Colors.white.withOpacity(0.5) : Colors.white;
 
-    switch (quiz.iconType) {
-      case QuizIconType.basicSigns:
-        return Icon(Icons.pan_tool, color: color, size: 32);
-      case QuizIconType.alphabet:
+    switch (lesson.iconType) {
+      case LessonIconType.waveHand:
+        return Icon(Icons.waving_hand, color: color, size: 32);
+      case LessonIconType.alphabet:
         return Text(
-          'ABC',
+          'ABZ',
           style: TextStyle(
             color: color,
             fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
         );
-      case QuizIconType.numbers:
+      case LessonIconType.handSign:
+        return Icon(Icons.pan_tool, color: color, size: 32);
+      case LessonIconType.numbers:
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              '123',
+              '1²3',
               style: TextStyle(
                 color: color,
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
             ),
+            Text(
+              '₆',
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ],
         );
-      case QuizIconType.greetings:
-        return Icon(Icons.waving_hand, color: color, size: 32);
-      case QuizIconType.phrases:
+      case LessonIconType.conversation:
         return Icon(Icons.chat_bubble, color: color, size: 30);
     }
   }
 
-  void _onQuizTap(QuizNodeData quiz) {
-    if (quiz.status == QuizStatus.locked) {
+  void _onLessonTap(LessonNodeData lesson) {
+    if (lesson.status == LessonStatus.locked) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Row(
+          content: Row(
             children: [
-              Icon(Icons.lock, color: Colors.white70, size: 20),
-              SizedBox(width: 12),
-              Text('Complete previous quizzes first!'),
+              const Icon(Icons.lock, color: Colors.white70, size: 20),
+              const SizedBox(width: 12),
+              const Text('Complete previous lessons first!'),
             ],
           ),
           backgroundColor: cardBg,
@@ -664,16 +689,16 @@ class _QuizPageState extends State<QuizPage>
       return;
     }
 
-    // Navigate to quiz
+    // Navigate to lesson
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) => _buildQuizBottomSheet(quiz),
+      builder: (context) => _buildLessonBottomSheet(lesson),
     );
   }
 
-  Widget _buildQuizBottomSheet(QuizNodeData quiz) {
+  Widget _buildLessonBottomSheet(LessonNodeData lesson) {
     return Container(
       decoration: const BoxDecoration(
         color: cardBg,
@@ -697,20 +722,20 @@ class _QuizPageState extends State<QuizPage>
             height: 90,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: accentPink,
+              color: accentYellow,
               boxShadow: [
                 BoxShadow(
-                  color: accentPink.withOpacity(0.4),
+                  color: accentYellow.withOpacity(0.4),
                   blurRadius: 15,
                   offset: const Offset(0, 5),
                 ),
               ],
             ),
-            child: Center(child: _buildQuizIcon(quiz)),
+            child: Center(child: _buildLessonIcon(lesson)),
           ),
           const SizedBox(height: 20),
           Text(
-            quiz.title,
+            lesson.title,
             style: const TextStyle(
               color: Colors.white,
               fontSize: 24,
@@ -719,7 +744,7 @@ class _QuizPageState extends State<QuizPage>
           ),
           const SizedBox(height: 8),
           Text(
-            'Quiz ${quiz.id} • ${quiz.questionsCount} Questions',
+            'Lesson ${lesson.id} • ${lesson.status == LessonStatus.completed ? "Completed" : "5 exercises"}',
             style: const TextStyle(
               color: Colors.white60,
               fontSize: 15,
@@ -729,43 +754,23 @@ class _QuizPageState extends State<QuizPage>
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.star, color: accentPink, size: 18),
+              Icon(Icons.star, color: accentYellow, size: 18),
               const SizedBox(width: 4),
               const Text(
-                '+50 XP',
+                '+10 XP',
                 style: TextStyle(
                   color: Colors.white70,
                   fontSize: 14,
                 ),
               ),
               const SizedBox(width: 16),
-              const Icon(Icons.access_time, color: accentBlue, size: 18),
+              Icon(Icons.access_time, color: accentBlue, size: 18),
               const SizedBox(width: 4),
-              Text(
-                '~${quiz.questionsCount} min',
-                style: const TextStyle(
+              const Text(
+                '~5 min',
+                style: TextStyle(
                   color: Colors.white70,
                   fontSize: 14,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          // Quiz difficulty indicator
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildDifficultyDot(true),
-              const SizedBox(width: 4),
-              _buildDifficultyDot(quiz.id > 1),
-              const SizedBox(width: 4),
-              _buildDifficultyDot(quiz.id > 3),
-              const SizedBox(width: 8),
-              Text(
-                quiz.id <= 2 ? 'Easy' : quiz.id <= 4 ? 'Medium' : 'Hard',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
-                  fontSize: 12,
                 ),
               ),
             ],
@@ -776,11 +781,11 @@ class _QuizPageState extends State<QuizPage>
             child: ElevatedButton(
               onPressed: () {
                 Navigator.pop(context);
-                // Navigate to quiz detail
+                // Navigate to lesson detail
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: accentPink,
-                foregroundColor: Colors.white,
+                backgroundColor: accentYellow,
+                foregroundColor: primaryBg,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 elevation: 0,
                 shape: RoundedRectangleBorder(
@@ -788,9 +793,9 @@ class _QuizPageState extends State<QuizPage>
                 ),
               ),
               child: Text(
-                quiz.status == QuizStatus.completed
-                    ? 'RETAKE QUIZ'
-                    : 'START QUIZ',
+                lesson.status == LessonStatus.completed
+                    ? 'PRACTICE AGAIN'
+                    : 'START LESSON',
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
@@ -805,18 +810,7 @@ class _QuizPageState extends State<QuizPage>
     );
   }
 
-  Widget _buildDifficultyDot(bool active) {
-    return Container(
-      width: 8,
-      height: 8,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: active ? accentPink : Colors.white.withOpacity(0.3),
-      ),
-    );
-  }
-
-  Widget _buildNextQuizPreview() {
+  Widget _buildNextUnitPreview() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Container(
@@ -834,7 +828,7 @@ class _QuizPageState extends State<QuizPage>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Next Challenge:',
+                    'Unit 2:',
                     style: TextStyle(
                       color: Colors.white.withOpacity(0.5),
                       fontSize: 14,
@@ -842,7 +836,7 @@ class _QuizPageState extends State<QuizPage>
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'Advanced Signs',
+                    'Daily Life',
                     style: TextStyle(
                       color: Colors.white70,
                       fontSize: 22,
@@ -873,11 +867,11 @@ class _QuizPageState extends State<QuizPage>
 }
 
 // Custom Painter for the winding S-shaped path
-class QuizPathPainter extends CustomPainter {
+class LessonPathPainter extends CustomPainter {
   final Color pathColor;
   final List<Offset> nodePositions;
 
-  QuizPathPainter({
+  LessonPathPainter({
     required this.pathColor,
     required this.nodePositions,
   });
@@ -930,28 +924,26 @@ class QuizPathPainter extends CustomPainter {
 }
 
 // Data models
-enum QuizStatus { locked, active, completed }
+enum LessonStatus { locked, active, completed }
 
-enum QuizIconType {
-  basicSigns,
+enum LessonIconType {
+  waveHand,
   alphabet,
+  handSign,
   numbers,
-  greetings,
-  phrases,
+  conversation,
 }
 
-class QuizNodeData {
+class LessonNodeData {
   final int id;
-  final QuizIconType iconType;
+  final LessonIconType iconType;
   final String title;
-  final QuizStatus status;
-  final int questionsCount;
+  final LessonStatus status;
 
-  QuizNodeData({
+  LessonNodeData({
     required this.id,
     required this.iconType,
     required this.title,
     required this.status,
-    required this.questionsCount,
   });
 }

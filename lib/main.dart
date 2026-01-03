@@ -24,8 +24,8 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primaryColor: const Color(0xFF1A2151),
-        scaffoldBackgroundColor: const Color(0xFF141938),
+        primaryColor: const Color(0xFF1A1F38),
+        scaffoldBackgroundColor: const Color(0xFF1A1F38),
         fontFamily: 'Roboto',
       ),
       home: const AuthWrapper(),
