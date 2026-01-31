@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import '../models/app_models.dart';
 import '../services/database_service.dart';
+import 'lesson_detail_page.dart';
 
 class DuolingoHomePage extends StatefulWidget {
   const DuolingoHomePage({super.key});
@@ -710,6 +711,140 @@ class _DuolingoHomePageState extends State<DuolingoHomePage>
     }
   }
 
+  // Mapping from static lesson IDs to Firebase category/lesson IDs
+  Map<int, Map<String, String>> get _lessonMapping => {
+    1: {'categoryId': 'greetings', 'lessonId': 'greetings_unit1'},
+    2: {'categoryId': 'alphabets', 'lessonId': 'alphabets_unit1'},
+    3: {'categoryId': 'family', 'lessonId': 'family_unit1'},
+    4: {'categoryId': 'numbers', 'lessonId': 'numbers_unit1'},
+    5: {'categoryId': 'colors', 'lessonId': 'colors_unit1'},
+  };
+
+  // Create a fallback LessonModel when Firebase returns null
+  LessonModel _createFallbackLesson(int lessonId, String categoryId, String lessonDbId) {
+    final lessonData = {
+      1: {
+        'title': 'Hello & Greetings',
+        'subtitle': 'Basic greetings',
+        'description': 'Learn to say hello, thank you, and more!',
+        'totalSigns': 4,
+      },
+      2: {
+        'title': 'Alphabet A-D',
+        'subtitle': 'First letters',
+        'description': 'Master the first four letters of ISL!',
+        'totalSigns': 4,
+      },
+      3: {
+        'title': 'My Family',
+        'subtitle': 'Family members',
+        'description': 'Learn signs for family members!',
+        'totalSigns': 4,
+      },
+      4: {
+        'title': 'Numbers 1-5',
+        'subtitle': 'Counting basics',
+        'description': 'Count from one to five in ISL!',
+        'totalSigns': 5,
+      },
+      5: {
+        'title': 'Basic Colors',
+        'subtitle': 'Color vocabulary',
+        'description': 'Learn colorful ISL signs!',
+        'totalSigns': 4,
+      },
+    };
+
+    final data = lessonData[lessonId] ?? {
+      'title': 'ISL Lesson',
+      'subtitle': 'Sign Language',
+      'description': 'Learn Indian Sign Language!',
+      'totalSigns': 3,
+    };
+
+    return LessonModel(
+      id: lessonDbId,
+      categoryId: categoryId,
+      unitNumber: 1,
+      title: data['title'] as String,
+      subtitle: data['subtitle'] as String,
+      description: data['description'] as String,
+      order: lessonId,
+      totalSigns: data['totalSigns'] as int,
+      estimatedMinutes: 5,
+      difficulty: 'beginner',
+      gemsReward: 5,
+      coinsReward: 50,
+      xpReward: 25,
+      isLocked: false,
+      focusPoints: ['Hand shapes', 'Movement', 'Expression'],
+    );
+  }
+
+  Future<void> _startLesson(LessonNodeData lessonNode) async {
+    final mapping = _lessonMapping[lessonNode.id];
+    if (mapping == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Lesson not available yet')),
+      );
+      return;
+    }
+
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: accentYellow),
+      ),
+    );
+
+    try {
+      var lesson = await _databaseService.getLesson(
+        mapping['categoryId']!,
+        mapping['lessonId']!,
+      );
+
+      if (!mounted) return;
+      Navigator.pop(context); // Close loading
+
+      // Use fallback lesson if Firebase returns null
+      lesson ??= _createFallbackLesson(
+        lessonNode.id,
+        mapping['categoryId']!,
+        mapping['lessonId']!,
+      );
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => LessonDetailPage(
+            lesson: lesson!,
+            categoryId: mapping['categoryId']!,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context); // Close loading
+      
+      // Even on error, use fallback and continue
+      final fallbackLesson = _createFallbackLesson(
+        lessonNode.id,
+        mapping['categoryId']!,
+        mapping['lessonId']!,
+      );
+      
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => LessonDetailPage(
+            lesson: fallbackLesson,
+            categoryId: mapping['categoryId']!,
+          ),
+        ),
+      );
+    }
+  }
+
   void _onLessonTap(LessonNodeData lesson) {
     if (lesson.status == LessonStatus.locked) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -825,7 +960,7 @@ class _DuolingoHomePageState extends State<DuolingoHomePage>
             child: ElevatedButton(
               onPressed: () {
                 Navigator.pop(context);
-                // Navigate to lesson detail
+                _startLesson(lesson);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: accentYellow,

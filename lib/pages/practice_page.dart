@@ -188,12 +188,24 @@ class _PracticePageState extends State<PracticePage> with WidgetsBindingObserver
   void _onSignCorrect() {
     _stopDetection();
     
+    // Encouraging messages for children
+    final encouragements = [
+      'Perfect! 🎉',
+      'Amazing! ⭐',
+      'You got it! 🌟',
+      'Wonderful! 🎊',
+      'Super! 💪',
+      'Fantastic! 🥳',
+      'Great job! 👏',
+      'Awesome! 🔥',
+    ];
+    
     setState(() {
       _results[_currentSignIndex] = true;
       _correctCount++;
       _showFeedback = true;
       _isCorrect = true;
-      _feedbackMessage = 'Perfect! 🎉';
+      _feedbackMessage = encouragements[_currentSignIndex % encouragements.length];
     });
 
     // Mark sign as completed
@@ -210,11 +222,19 @@ class _PracticePageState extends State<PracticePage> with WidgetsBindingObserver
   void _skipSign() {
     _stopDetection();
     
+    // Kind skip messages for children
+    final skipMessages = [
+      'No worries! 💙',
+      'Let\'s try another! 🌈',
+      'Keep going! 💪',
+      'Practice later! 📚',
+    ];
+    
     setState(() {
       _results[_currentSignIndex] = false;
       _showFeedback = true;
       _isCorrect = false;
-      _feedbackMessage = 'Skipped';
+      _feedbackMessage = skipMessages[_currentSignIndex % skipMessages.length];
     });
 
     Future.delayed(const Duration(seconds: 1), () {
@@ -269,6 +289,29 @@ class _PracticePageState extends State<PracticePage> with WidgetsBindingObserver
   void _showCompletionDialog() {
     final accuracy = (_correctCount / widget.signs.length * 100).toInt();
     
+    // Choose celebration based on performance
+    String celebrationEmoji;
+    String celebrationMessage;
+    String motivationalText;
+    
+    if (accuracy >= 90) {
+      celebrationEmoji = '🏆';
+      celebrationMessage = 'Outstanding!';
+      motivationalText = 'You\'re a sign language superstar! 🌟';
+    } else if (accuracy >= 70) {
+      celebrationEmoji = '🎉';
+      celebrationMessage = 'Great Job!';
+      motivationalText = 'You\'re doing amazing! Keep it up! 💪';
+    } else if (accuracy >= 50) {
+      celebrationEmoji = '⭐';
+      celebrationMessage = 'Good Effort!';
+      motivationalText = 'Practice makes perfect! You\'re getting better! 📈';
+    } else {
+      celebrationEmoji = '💙';
+      celebrationMessage = 'Nice Try!';
+      motivationalText = 'Don\'t give up! Try again and you\'ll get it! 🌈';
+    }
+    
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -280,23 +323,74 @@ class _PracticePageState extends State<PracticePage> with WidgetsBindingObserver
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('🎉', style: TextStyle(fontSize: 64)),
-              const SizedBox(height: 16),
-              const Text(
-                'Lesson Complete!',
-                style: TextStyle(
+              // Celebration emoji
+              Text(celebrationEmoji, style: const TextStyle(fontSize: 72)),
+              const SizedBox(height: 12),
+              
+              // Main message
+              Text(
+                celebrationMessage,
+                style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 24,
+                  fontSize: 28,
                   fontWeight: FontWeight.bold,
                 ),
               ),
+              const SizedBox(height: 8),
+              
+              // Motivational text
+              Text(
+                motivationalText,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.8),
+                  fontSize: 14,
+                ),
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 24),
-              _buildStatRow('Accuracy', '$accuracy%'),
-              _buildStatRow('Correct', '$_correctCount/${widget.signs.length}'),
-              _buildStatRow('Gems', '+${widget.lesson.gemsReward}'),
-              _buildStatRow('Coins', '+${widget.lesson.coinsReward}'),
-              _buildStatRow('XP', '+${widget.lesson.xpReward}'),
+              
+              // Stats container
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: darkBlue,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  children: [
+                    _buildStatRow('✅ Accuracy', '$accuracy%'),
+                    const Divider(color: Colors.white12, height: 16),
+                    _buildStatRow('🎯 Correct', '$_correctCount/${widget.signs.length}'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Rewards container
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      accentYellow.withOpacity(0.2),
+                      const Color(0xFFFF6B9D).withOpacity(0.2),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: accentYellow.withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildRewardChip('💎', '+${widget.lesson.gemsReward}'),
+                    _buildRewardChip('🪙', '+${widget.lesson.coinsReward}'),
+                    _buildRewardChip('⭐', '+${widget.lesson.xpReward} XP'),
+                  ],
+                ),
+              ),
               const SizedBox(height: 24),
+              
+              // Continue button
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -308,14 +402,21 @@ class _PracticePageState extends State<PracticePage> with WidgetsBindingObserver
                   style: ElevatedButton.styleFrom(
                     backgroundColor: accentYellow,
                     foregroundColor: darkBlue,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    padding: const EdgeInsets.symmetric(vertical: 18),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
                     ),
                   ),
-                  child: const Text(
-                    'Continue',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Continue',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                      ),
+                      SizedBox(width: 8),
+                      Text('🚀', style: TextStyle(fontSize: 20)),
+                    ],
                   ),
                 ),
               ),
@@ -323,6 +424,23 @@ class _PracticePageState extends State<PracticePage> with WidgetsBindingObserver
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildRewardChip(String emoji, String value) {
+    return Column(
+      children: [
+        Text(emoji, style: const TextStyle(fontSize: 28)),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
     );
   }
 
@@ -555,45 +673,107 @@ class _PracticePageState extends State<PracticePage> with WidgetsBindingObserver
     
     final currentSign = widget.signs[_currentSignIndex];
     
+    // Hand emojis for variety
+    final handEmojis = ['🤟', '👋', '✋', '🖐️', '👍', '🤙', '✌️', '🤞'];
+    final emoji = handEmojis[_currentSignIndex % handEmojis.length];
+    
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      child: Row(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Center(
-              child: Text('🤟', style: TextStyle(fontSize: 32)),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Sign "${currentSign.word}"',
+          Row(
+            children: [
+              // Sign emoji
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: accentYellow.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: accentYellow.withOpacity(0.3)),
+                ),
+                child: Center(
+                  child: Text(emoji, style: const TextStyle(fontSize: 28)),
+                ),
+              ),
+              const SizedBox(width: 14),
+              // Sign info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Sign "${currentSign.word}"',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (currentSign.wordInHindi != null)
+                      Text(
+                        currentSign.wordInHindi!,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.6),
+                          fontSize: 13,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              // Progress indicator
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: accentYellow.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '${_currentSignIndex + 1}/${widget.signs.length}',
                   style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
+                    color: accentYellow,
+                    fontSize: 13,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                if (currentSign.wordInHindi != null)
-                  Text(
-                    currentSign.wordInHindi!,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.6),
-                      fontSize: 14,
+              ),
+            ],
+          ),
+          // Quick tip
+          if (currentSign.tips != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: darkBlue,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  const Text('💡', style: TextStyle(fontSize: 14)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      currentSign.tips!.length > 60 
+                          ? '${currentSign.tips!.substring(0, 60)}...'
+                          : currentSign.tips!,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.8),
+                        fontSize: 12,
+                      ),
                     ),
                   ),
-              ],
+                ],
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -601,22 +781,23 @@ class _PracticePageState extends State<PracticePage> with WidgetsBindingObserver
 
   Widget _buildControls() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       child: Row(
         children: [
           // Skip button
           Expanded(
-            child: OutlinedButton(
+            child: OutlinedButton.icon(
               onPressed: _skipSign,
+              icon: const Icon(Icons.skip_next, size: 20),
+              label: const Text('Skip'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.white70,
                 side: BorderSide(color: Colors.white.withOpacity(0.3)),
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                 ),
               ),
-              child: const Text('Skip'),
             ),
           ),
           const SizedBox(width: 12),
@@ -628,20 +809,26 @@ class _PracticePageState extends State<PracticePage> with WidgetsBindingObserver
               style: ElevatedButton.styleFrom(
                 backgroundColor: _isDetecting ? errorRed : accentYellow,
                 foregroundColor: _isDetecting ? Colors.white : darkBlue,
-                padding: const EdgeInsets.symmetric(vertical: 16),
+                padding: const EdgeInsets.symmetric(vertical: 18),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                 ),
+                elevation: _isDetecting ? 0 : 4,
+                shadowColor: accentYellow.withOpacity(0.4),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(_isDetecting ? Icons.stop : Icons.videocam),
-                  const SizedBox(width: 8),
+                  Icon(_isDetecting ? Icons.stop_circle : Icons.play_circle, size: 24),
+                  const SizedBox(width: 10),
                   Text(
-                    _isDetecting ? 'Stop' : 'Start Detection',
+                    _isDetecting ? 'Stop' : 'Start Practice',
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
+                  if (!_isDetecting) ...[
+                    const SizedBox(width: 6),
+                    const Text('🤟', style: TextStyle(fontSize: 18)),
+                  ],
                 ],
               ),
             ),

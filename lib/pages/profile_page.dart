@@ -104,8 +104,17 @@ class _ProfilePageState extends State<ProfilePage> {
   void _seedData() async {
     setState(() => _isLoading = true);
     try {
-      await _databaseService.seedInitialData();
+      // Use forceReseedData to replace old data with comprehensive new lessons
+      await _databaseService.forceReseedData();
       await _refreshUser();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Lesson data refreshed successfully!'),
+            backgroundColor: Color(0xFF27AE60),
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -267,9 +276,9 @@ class _ProfilePageState extends State<ProfilePage> {
               },
             ),
             _buildMenuOption(
-              icon: Icons.cloud_download,
-              title: 'Load Sample Data',
-              subtitle: 'Seed categories and lessons',
+              icon: Icons.refresh,
+              title: 'Refresh Lesson Data',
+              subtitle: 'Reload all lessons & signs (tap if lessons won\'t start)',
               onTap: _seedData,
             ),
             _buildMenuOption(
