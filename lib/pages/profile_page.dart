@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/app_models.dart';
@@ -17,6 +18,9 @@ class _ProfilePageState extends State<ProfilePage> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   UserModel? _user;
   bool _isLoading = true;
+  bool _hasError = false;
+  String _errorMessage = '';
+  StreamSubscription<UserModel?>? _userSubscription;
 
   // Theme colors
   static const Color darkBlue = Color(0xFF141938);
@@ -26,17 +30,61 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
-    _loadUser();
+    _initializeUser();
   }
 
-  Future<void> _loadUser() async {
-    final user = await _databaseService.getCurrentUser();
-    if (mounted) {
-      setState(() {
-        _user = user;
-        _isLoading = false;
-      });
+  @override
+  void dispose() {
+    _userSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _initializeUser() async {
+    try {
+      // Ensure user document exists first
+      final currentUser = _auth.currentUser;
+      if (currentUser != null) {
+        await _databaseService.createUserDocument(currentUser);
+      }
+      
+      // Subscribe to user stream for real-time updates
+      _userSubscription = _databaseService.userStream().listen(
+        (user) {
+          if (mounted) {
+            setState(() {
+              _user = user;
+              _isLoading = false;
+              _hasError = false;
+            });
+          }
+        },
+        onError: (error) {
+          if (mounted) {
+            setState(() {
+              _isLoading = false;
+              _hasError = true;
+              _errorMessage = 'Failed to load profile data';
+            });
+          }
+        },
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+          _errorMessage = 'Failed to initialize profile: ${e.toString()}';
+        });
+      }
     }
+  }
+
+  Future<void> _refreshUser() async {
+    setState(() {
+      _isLoading = true;
+      _hasError = false;
+    });
+    await _initializeUser();
   }
 
   Future<void> _signOut() async {
@@ -55,8 +103,18 @@ class _ProfilePageState extends State<ProfilePage> {
 
   void _seedData() async {
     setState(() => _isLoading = true);
-    await _databaseService.seedInitialData();
-    await _loadUser();
+    try {
+      await _databaseService.seedInitialData();
+      await _refreshUser();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasError = true;
+          _errorMessage = 'Failed to seed data: ${e.toString()}';
+        });
+      }
+    }
   }
 
   @override
@@ -72,127 +130,181 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
         centerTitle: true,
         automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: _refreshUser,
+          ),
+        ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: accentYellow))
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  // Profile Avatar
-                  Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      color: cardBg,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: accentYellow, width: 3),
-                    ),
-                    child: _auth.currentUser?.photoURL != null
-                        ? ClipOval(
-                            child: Image.network(
-                              _auth.currentUser!.photoURL!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Icon(
-                                Icons.person,
-                                color: Colors.white60,
-                                size: 50,
-                              ),
-                            ),
-                          )
-                        : const Icon(Icons.person, color: Colors.white60, size: 50),
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // User Name
-                  Text(
-                    _user?.displayName ?? 'Learner',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _user?.email ?? '',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.6),
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // Stats Row
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildStatCard('💎', '${_user?.gems ?? 0}', 'Gems'),
-                      _buildStatCard('🪙', '${_user?.coins ?? 0}', 'Coins'),
-                      _buildStatCard('🔥', '${_user?.streakDays ?? 0}', 'Streak'),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // Progress Stats
-                  _buildProgressCard(),
-                  const SizedBox(height: 16),
-                  
-                  // Menu Options
-                  _buildMenuOption(
-                    icon: Icons.sign_language,
-                    title: 'Test ISL',
-                    subtitle: 'Test Indian Sign Language detection',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        PageRouteBuilder(
-                          pageBuilder: (context, animation, secondaryAnimation) => const HomePage(),
-                          transitionDuration: Duration.zero,
-                          reverseTransitionDuration: Duration.zero,
-                        ),
-                      );
-                    },
-                  ),
-                  _buildMenuOption(
-                    icon: Icons.cloud_download,
-                    title: 'Load Sample Data',
-                    subtitle: 'Seed categories and lessons',
-                    onTap: _seedData,
-                  ),
-                  _buildMenuOption(
-                    icon: Icons.help_outline,
-                    title: 'Help & Support',
-                    subtitle: 'Get help with the app',
-                    onTap: () {},
-                  ),
-                  _buildMenuOption(
-                    icon: Icons.info_outline,
-                    title: 'About',
-                    subtitle: 'Learn about KairoAI',
-                    onTap: () {},
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  // Sign Out Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: _signOut,
-                      icon: const Icon(Icons.logout, color: Colors.redAccent),
-                      label: const Text('Sign Out', style: TextStyle(color: Colors.redAccent)),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Colors.redAccent),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: accentYellow),
+      );
+    }
+
+    if (_hasError) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.error_outline,
+                color: Colors.redAccent,
+                size: 60,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                _errorMessage,
+                style: const TextStyle(color: Colors.white70),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: _refreshUser,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Retry'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: accentYellow,
+                  foregroundColor: darkBlue,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _refreshUser,
+      color: accentYellow,
+      backgroundColor: cardBg,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            // Profile Avatar
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                color: cardBg,
+                shape: BoxShape.circle,
+                border: Border.all(color: accentYellow, width: 3),
+              ),
+              child: _auth.currentUser?.photoURL != null
+                  ? ClipOval(
+                      child: Image.network(
+                        _auth.currentUser!.photoURL!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.person,
+                          color: Colors.white60,
+                          size: 50,
                         ),
                       ),
-                    ),
-                  ),
-                ],
+                    )
+                  : const Icon(Icons.person, color: Colors.white60, size: 50),
+            ),
+            const SizedBox(height: 16),
+            
+            // User Name
+            Text(
+              _user?.displayName ?? _auth.currentUser?.displayName ?? 'Learner',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
               ),
             ),
+            const SizedBox(height: 4),
+            Text(
+              _user?.email ?? _auth.currentUser?.email ?? '',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.6),
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 24),
+            
+            // Stats Row - Connected to real Firebase data
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildStatCard('💎', '${_user?.gems ?? 0}', 'Gems'),
+                _buildStatCard('🪙', '${_user?.coins ?? 0}', 'Coins'),
+                _buildStatCard('🔥', '${_user?.streakDays ?? 0}', 'Streak'),
+              ],
+            ),
+            const SizedBox(height: 24),
+            
+            // Progress Stats
+            _buildProgressCard(),
+            const SizedBox(height: 16),
+            
+            // Menu Options
+            _buildMenuOption(
+              icon: Icons.sign_language,
+              title: 'Test ISL',
+              subtitle: 'Test Indian Sign Language detection',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  PageRouteBuilder(
+                    pageBuilder: (context, animation, secondaryAnimation) => const HomePage(),
+                    transitionDuration: Duration.zero,
+                    reverseTransitionDuration: Duration.zero,
+                  ),
+                );
+              },
+            ),
+            _buildMenuOption(
+              icon: Icons.cloud_download,
+              title: 'Load Sample Data',
+              subtitle: 'Seed categories and lessons',
+              onTap: _seedData,
+            ),
+            _buildMenuOption(
+              icon: Icons.help_outline,
+              title: 'Help & Support',
+              subtitle: 'Get help with the app',
+              onTap: () {},
+            ),
+            _buildMenuOption(
+              icon: Icons.info_outline,
+              title: 'About',
+              subtitle: 'Learn about KairoAI',
+              onTap: () {},
+            ),
+            const SizedBox(height: 16),
+            
+            // Sign Out Button
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _signOut,
+                icon: const Icon(Icons.logout, color: Colors.redAccent),
+                label: const Text('Sign Out', style: TextStyle(color: Colors.redAccent)),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.redAccent),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

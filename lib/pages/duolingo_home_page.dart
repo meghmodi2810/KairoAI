@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:async';
 import 'dart:math' as math;
+import '../models/app_models.dart';
+import '../services/database_service.dart';
 
 class DuolingoHomePage extends StatefulWidget {
   const DuolingoHomePage({super.key});
@@ -24,10 +28,16 @@ class _DuolingoHomePageState extends State<DuolingoHomePage>
   late Animation<double> _pulseAnimation;
   late Animation<double> _bounceAnimation;
 
-  // User stats
-  int gems = 144;
-  int coins = 2321;
-  int streakDays = 12;
+  // Firebase services
+  final DatabaseService _databaseService = DatabaseService();
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  
+  // User stats - will be loaded from Firebase
+  UserModel? _user;
+  StreamSubscription<UserModel?>? _userSubscription;
+  int gems = 0;
+  int coins = 0;
+  int streakDays = 0;
 
   // Lesson data with ISL-specific icons
   final List<LessonNodeData> _lessons = [
@@ -83,10 +93,44 @@ class _DuolingoHomePageState extends State<DuolingoHomePage>
     _bounceAnimation = Tween<double>(begin: 0, end: -6).animate(
       CurvedAnimation(parent: _bounceController, curve: Curves.easeInOut),
     );
+
+    // Load user data from Firebase
+    _initializeUserData();
+  }
+
+  Future<void> _initializeUserData() async {
+    try {
+      // Ensure user document exists
+      final currentUser = _auth.currentUser;
+      if (currentUser != null) {
+        await _databaseService.createUserDocument(currentUser);
+      }
+
+      // Subscribe to real-time user updates
+      _userSubscription = _databaseService.userStream().listen(
+        (user) {
+          if (mounted && user != null) {
+            setState(() {
+              _user = user;
+              gems = user.gems;
+              coins = user.coins;
+              streakDays = user.streakDays;
+            });
+          }
+        },
+        onError: (error) {
+          // Keep default values on error
+          debugPrint('Error loading user data: $error');
+        },
+      );
+    } catch (e) {
+      debugPrint('Error initializing user data: $e');
+    }
   }
 
   @override
   void dispose() {
+    _userSubscription?.cancel();
     _pulseController.dispose();
     _bounceController.dispose();
     super.dispose();

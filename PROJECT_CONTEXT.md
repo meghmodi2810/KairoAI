@@ -67,7 +67,7 @@ Combines three technologies:
 |--------|----------|
 | **Authentication** | Email/Password signup, Google Sign-In, Password reset |
 | **Onboarding** | First-time user setup, Learning goal selection, Daily practice duration |
-| **Learning System** | Categorized lessons (Alphabets, Numbers, Greetings, etc.), Step-by-step sign instructions, Images/GIFs/Videos for each sign |
+| **Learning System** | Categorized lessons (Alphabets, Numbers, etc.), Step-by-step sign instructions, Images/GIFs/Videos for each sign |
 | **Practice Mode** | Real-time camera-based sign detection, Visual feedback (correct/incorrect), Confidence score display |
 | **Quiz Mode** | Random sign challenges, Accuracy tracking, Timed quizzes |
 | **Gamification** | XP & Levels, Gems & Coins, Daily streaks, Achievements/Badges, Leaderboards |
@@ -80,9 +80,7 @@ Combines three technologies:
 | Category | Content |
 |----------|---------|
 | **Alphabets** | ISL A-Z (26 signs) |
-| **Numbers** | 1-20 initially (expandable to 100) |
-| **Greetings** | Hello, Goodbye, Thank you, Sorry, Please |
-| **Basic Words** | Family, Emotions, Colors, Animals, Food |
+| **Numbers** | 1-20 initially |
 
 ### Platforms In Scope
 
