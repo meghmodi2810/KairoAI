@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'signup_page.dart';
 import '../main_navigation.dart';
+import '../admin/pages/admin_dashboard_page.dart';
+import '../admin/models/admin_models.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -64,15 +67,43 @@ class _LoginPageState extends State<LoginPage> {
       });
 
       try {
-        await _auth.signInWithEmailAndPassword(
+        final userCredential = await _auth.signInWithEmailAndPassword(
           email: _emailController.text.trim(),
           password: _passwordController.text.trim(),
         );
         
-        if (mounted) {
+        if (mounted && userCredential.user != null) {
+          Widget destination = const MainNavigation();
+          String message = 'Login successful!';
+
+          // Check if user is an admin
+          try {
+            debugPrint('Checking admin status for UID: ${userCredential.user!.uid}');
+            final adminDoc = await FirebaseFirestore.instance
+                .collection('admins')
+                .doc(userCredential.user!.uid)
+                .get();
+
+            debugPrint('Admin doc exists: ${adminDoc.exists}');
+            
+            if (adminDoc.exists) {
+              final admin = AdminModel.fromFirestore(adminDoc);
+              debugPrint('Admin isActive: ${admin.isActive}');
+              if (admin.isActive) {
+                destination = AdminDashboardPage(admin: admin);
+                message = 'Welcome back, Admin!';
+              }
+            }
+          } catch (e) {
+            // If admin check fails (e.g., permission denied), proceed as regular user
+            debugPrint('Admin check failed: $e');
+          }
+
+          if (!mounted) return;
+          
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('Login successful!'),
+              content: Text(message),
               backgroundColor: Colors.green.shade600,
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -81,7 +112,7 @@ class _LoginPageState extends State<LoginPage> {
           Navigator.pushReplacement(
             context,
             PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) => const MainNavigation(),
+              pageBuilder: (context, animation, secondaryAnimation) => destination,
               transitionDuration: Duration.zero,
               reverseTransitionDuration: Duration.zero,
             ),
@@ -176,12 +207,35 @@ class _LoginPageState extends State<LoginPage> {
         idToken: googleAuth.idToken,
       );
 
-      await _auth.signInWithCredential(credential);
+      final userCredential = await _auth.signInWithCredential(credential);
 
-      if (mounted) {
+      if (mounted && userCredential.user != null) {
+        // Check if user is an admin
+        final adminDoc = await FirebaseFirestore.instance
+            .collection('admins')
+            .doc(userCredential.user!.uid)
+            .get();
+
+        Widget destination;
+        String message;
+
+        if (adminDoc.exists) {
+          final admin = AdminModel.fromFirestore(adminDoc);
+          if (admin.isActive) {
+            destination = AdminDashboardPage(admin: admin);
+            message = 'Welcome back, Admin!';
+          } else {
+            destination = const MainNavigation();
+            message = 'Google sign in successful!';
+          }
+        } else {
+          destination = const MainNavigation();
+          message = 'Google sign in successful!';
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Google sign in successful!'),
+            content: Text(message),
             backgroundColor: Colors.green.shade600,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -190,7 +244,7 @@ class _LoginPageState extends State<LoginPage> {
         Navigator.pushReplacement(
           context,
           PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => const MainNavigation(),
+            pageBuilder: (context, animation, secondaryAnimation) => destination,
             transitionDuration: Duration.zero,
             reverseTransitionDuration: Duration.zero,
           ),

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'pages/onboarding_page.dart';
 import 'pages/login_page.dart';
 import 'main_navigation.dart';
+import 'admin/pages/admin_dashboard_page.dart';
+import 'admin/models/admin_models.dart';
 
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
@@ -34,6 +37,22 @@ class _AuthWrapperState extends State<AuthWrapper> {
         _onboardingComplete = onboardingComplete;
         _isLoading = false;
       });
+    }
+  }
+
+  /// Check if user is an admin - handles permission errors gracefully
+  Future<DocumentSnapshot?> _checkAdminStatus(String uid) async {
+    try {
+      debugPrint('AuthWrapper: Checking admin status for UID: $uid');
+      final doc = await FirebaseFirestore.instance
+          .collection('admins')
+          .doc(uid)
+          .get();
+      debugPrint('AuthWrapper: Admin doc exists: ${doc.exists}');
+      return doc;
+    } catch (e) {
+      debugPrint('AuthWrapper: Admin check failed (permission denied?): $e');
+      return null; // Return null on error - user will be treated as regular learner
     }
   }
 
@@ -134,9 +153,46 @@ class _AuthWrapperState extends State<AuthWrapper> {
           );
         }
 
-        // User is logged in
+        // User is logged in - check if admin or learner
         if (snapshot.hasData) {
-          return const MainNavigation();
+          return FutureBuilder<DocumentSnapshot?>(
+            future: _checkAdminStatus(snapshot.data!.uid),
+            builder: (context, adminSnapshot) {
+              if (adminSnapshot.connectionState == ConnectionState.waiting) {
+                return Scaffold(
+                  body: Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [primaryBlue, darkBlue],
+                      ),
+                    ),
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFFD93D)),
+                      ),
+                    ),
+                  ),
+                );
+              }
+
+              // Check if user is an admin
+              if (adminSnapshot.hasData && adminSnapshot.data != null && adminSnapshot.data!.exists) {
+                try {
+                  final admin = AdminModel.fromFirestore(adminSnapshot.data!);
+                  if (admin.isActive) {
+                    return AdminDashboardPage(admin: admin);
+                  }
+                } catch (e) {
+                  debugPrint('Error parsing admin data: $e');
+                }
+              }
+
+              // Regular user - go to main navigation
+              return const MainNavigation();
+            },
+          );
         }
 
         // User is not logged in
