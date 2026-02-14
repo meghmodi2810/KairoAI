@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/admin_models.dart';
 import '../../services/admin_database_service.dart';
 import '../../widgets/admin_widgets.dart';
@@ -14,10 +15,13 @@ class AnalyticsPage extends StatefulWidget {
 
 class _AnalyticsPageState extends State<AnalyticsPage> {
   final AdminDatabaseService _dbService = AdminDatabaseService();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   
   bool _isLoading = true;
   Map<String, dynamic> _analytics = {};
+  Map<String, int> _contentCounts = {};
   List<SignPracticeLogModel> _recentPractices = [];
+  Map<String, double> _signAccuracy = {};
   String _selectedTimeRange = '7d';
 
   @override
@@ -31,12 +35,16 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
     
     try {
       final analytics = await _dbService.getAnalyticsSummary();
-      final practices = await _dbService.getSignPracticeLogs(limit: 20);
+      final practices = await _dbService.getSignPracticeLogs(limit: 50);
+      final contentCounts = await _loadContentCounts();
+      final signAccuracy = _calculateSignAccuracy(practices);
       
       if (mounted) {
         setState(() {
           _analytics = analytics;
           _recentPractices = practices;
+          _contentCounts = contentCounts;
+          _signAccuracy = signAccuracy;
           _isLoading = false;
         });
       }
@@ -46,6 +54,39 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
+  }
+
+  Future<Map<String, int>> _loadContentCounts() async {
+    try {
+      final results = await Future.wait([
+        _firestore.collection('categories').get(),
+        _firestore.collection('signs').get(),
+        _firestore.collectionGroup('lessons').get(),
+        _firestore.collection('word_groups').get(),
+      ]);
+      return {
+        'categories': results[0].docs.length,
+        'signs': results[1].docs.length,
+        'lessons': results[2].docs.length,
+        'wordGroups': results[3].docs.length,
+      };
+    } catch (_) {
+      return {'categories': 0, 'signs': 0, 'lessons': 0, 'wordGroups': 0};
+    }
+  }
+
+  Map<String, double> _calculateSignAccuracy(List<SignPracticeLogModel> practices) {
+    if (practices.isEmpty) return {};
+    final Map<String, List<bool>> perSign = {};
+    for (final p in practices) {
+      perSign.putIfAbsent(p.signId, () => []).add(p.isCorrect);
+    }
+    final sorted = perSign.entries.toList()
+      ..sort((a, b) => b.value.length.compareTo(a.value.length));
+    final top = sorted.take(8);
+    return {
+      for (final e in top) e.key: e.value.where((v) => v).length / e.value.length,
+    };
   }
 
   @override
@@ -67,7 +108,11 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                     const SizedBox(height: 16),
                     _buildOverviewStats(),
                     const SizedBox(height: 16),
+                    _buildContentOverview(),
+                    const SizedBox(height: 16),
                     _buildEngagementStats(),
+                    const SizedBox(height: 16),
+                    _buildSignAccuracy(),
                     const SizedBox(height: 16),
                     _buildRecentActivity(),
                     const SizedBox(height: 16),
@@ -223,6 +268,137 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildContentOverview() {
+    final items = [
+      _StatData('Categories', '${_contentCounts['categories'] ?? 0}', Icons.category_rounded, AdminTheme.accentPink),
+      _StatData('Signs', '${_contentCounts['signs'] ?? 0}', Icons.sign_language_rounded, AdminTheme.success),
+      _StatData('Lessons', '${_contentCounts['lessons'] ?? 0}', Icons.school_rounded, AdminTheme.info),
+      _StatData('Word Groups', '${_contentCounts['wordGroups'] ?? 0}', Icons.text_fields_rounded, AdminTheme.accentYellow),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: AdminTheme.cardBg, borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.inventory_2_rounded, color: AdminTheme.accentPink, size: 18),
+              SizedBox(width: 8),
+              Text('Content Overview', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AdminTheme.textPrimary)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: items.map((item) {
+              return Expanded(
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: item.color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: item.color.withOpacity(0.2)),
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(item.icon, color: item.color, size: 20),
+                      const SizedBox(height: 6),
+                      Text(item.value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: item.color)),
+                      const SizedBox(height: 2),
+                      Text(item.label, style: const TextStyle(fontSize: 9, color: AdminTheme.textSecondary), textAlign: TextAlign.center),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSignAccuracy() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: AdminTheme.cardBg, borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.sign_language_rounded, color: AdminTheme.success, size: 18),
+              SizedBox(width: 8),
+              Text('Sign Recognition Accuracy', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AdminTheme.textPrimary)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text('Top practiced signs', style: TextStyle(fontSize: 11, color: AdminTheme.textSecondary)),
+          const SizedBox(height: 12),
+          if (_signAccuracy.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Center(child: Text('No practice data yet', style: TextStyle(color: AdminTheme.textSecondary))),
+            )
+          else
+            ..._signAccuracy.entries.map((e) {
+              final accuracy = e.value;
+              final color = accuracy >= 0.8
+                  ? AdminTheme.success
+                  : accuracy >= 0.5
+                      ? AdminTheme.accentYellow
+                      : AdminTheme.error;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                color: color.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  e.key.length == 1 ? e.key.toUpperCase() : e.key[0].toUpperCase(),
+                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: color),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(e.key, style: const TextStyle(fontSize: 12, color: AdminTheme.textPrimary)),
+                          ],
+                        ),
+                        Text('${(accuracy * 100).toStringAsFixed(0)}%', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color)),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: accuracy,
+                        minHeight: 6,
+                        backgroundColor: color.withOpacity(0.15),
+                        valueColor: AlwaysStoppedAnimation<Color>(color),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+        ],
+      ),
     );
   }
 

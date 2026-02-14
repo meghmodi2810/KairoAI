@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'pages/duolingo_home_page.dart';
-import 'pages/quiz_page.dart';
+import 'pages/home_page_new.dart';
+import 'pages/learn_page.dart';
+import 'pages/words_page.dart';
 import 'pages/profile_page.dart';
 
 class MainNavigation extends StatefulWidget {
@@ -13,37 +14,35 @@ class MainNavigation extends StatefulWidget {
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
 
-  // Theme colors - matching design
-  static const Color darkBlue = Color(0xFF181E34);
-  static const Color accentYellow = Color(0xFFFFC800);
-  static const Color accentPink = Color(0xFFFF6B9D);
-  static const Color cardBg = Color(0xFF262F4D);
+  final List<Widget> _pages = const [
+    HomePage(),
+    LearnPage(),
+    WordsPage(),
+    ProfilePage(),
+  ];
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: darkBlue,
-      body: _buildCurrentPage(),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: IndexedStack(index: _currentIndex, children: _pages),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: cardBg,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.3),
-              blurRadius: 10,
-              offset: const Offset(0, -5),
-            ),
-          ],
+          color: cs.surface,
+          border: Border(top: BorderSide(color: cs.onSurface.withOpacity(0.08))),
         ),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildNavItem(0, Icons.home_rounded, 'Home', accentYellow),
-                _buildNavItem(1, Icons.quiz_rounded, 'Quiz', accentPink),
-                _buildNavItem(2, Icons.person_rounded, 'Profile', accentYellow),
+                _buildNavItem(0, Icons.home_rounded, 'Home', cs),
+                _buildNavItem(1, Icons.school_rounded, 'Learn', cs),
+                _buildNavItem(2, Icons.text_fields_rounded, 'Words', cs),
+                _buildNavItem(3, Icons.person_rounded, 'Profile', cs),
               ],
             ),
           ),
@@ -52,46 +51,29 @@ class _MainNavigationState extends State<MainNavigation> {
     );
   }
 
-  Widget _buildCurrentPage() {
-    switch (_currentIndex) {
-      case 0:
-        return const DuolingoHomePage();
-      case 1:
-        return const QuizPage();
-      case 2:
-        return const ProfilePage();
-      default:
-        return const DuolingoHomePage();
-    }
-  }
-
-  Widget _buildNavItem(int index, IconData icon, String label, Color activeColor) {
+  Widget _buildNavItem(int index, IconData icon, String label, ColorScheme cs) {
     final isSelected = _currentIndex == index;
-    
+
     return GestureDetector(
       onTap: () => setState(() => _currentIndex = index),
       behavior: HitTestBehavior.opaque,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? activeColor.withOpacity(0.15) : Colors.transparent,
+          color: isSelected ? cs.primary.withOpacity(0.1) : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              color: isSelected ? activeColor : Colors.white54,
-              size: 26,
-            ),
+            Icon(icon, color: isSelected ? cs.primary : cs.onSurface.withOpacity(0.4), size: 22),
             const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
-                color: isSelected ? activeColor : Colors.white54,
+                color: isSelected ? cs.primary : cs.onSurface.withOpacity(0.4),
                 fontSize: 11,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
               ),
             ),
           ],

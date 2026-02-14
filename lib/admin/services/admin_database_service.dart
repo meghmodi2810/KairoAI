@@ -1,34 +1,57 @@
+import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:math';
 import '../models/admin_models.dart';
 import '../../models/app_models.dart';
 
 class AdminDatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
 
   // ==================== LESSON OPERATIONS ====================
+  // Lessons are stored in categories/{categoryId}/lessons subcollection
+  // so learner side can read them from the same path.
 
-  /// Get all lessons (admin view)
+  /// Get all lessons for a specific category (admin view)
   Stream<List<AdminLessonModel>> lessonsStream() {
-    return _db
-        .collection('admin_lessons')
-        .orderBy('order')
-        .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => AdminLessonModel.fromFirestore(doc)).toList());
+    // Returns an empty stream — use lessonsByCategoryStream instead
+    return Stream.value([]);
   }
 
   /// Get lesson by ID
-  Future<AdminLessonModel?> getLesson(String lessonId) async {
-    final doc = await _db.collection('admin_lessons').doc(lessonId).get();
+  Future<AdminLessonModel?> getLesson(String categoryId, String lessonId) async {
+    final doc = await _db
+        .collection('categories')
+        .doc(categoryId)
+        .collection('lessons')
+        .doc(lessonId)
+        .get();
     if (doc.exists) {
       return AdminLessonModel.fromFirestore(doc);
     }
     return null;
   }
 
-  /// Create new lesson
+  /// Create new lesson — writes to categories/{categoryId}/lessons
   Future<String?> createLesson(AdminLessonModel lesson) async {
     try {
-      final docRef = await _db.collection('admin_lessons').add(lesson.toFirestore());
+      final docRef = await _db
+          .collection('categories')
+          .doc(lesson.categoryId)
+          .collection('lessons')
+          .add({
+        ...lesson.toFirestore(),
+        'totalSigns': lesson.signs.length,
+        'subtitle': lesson.description,
+      });
+
+      // Sync embedded signs to the signs subcollection for learner access
+      if (lesson.signs.isNotEmpty) {
+        await _syncSignsToSubcollection(
+            lesson.categoryId, docRef.id, lesson.signs);
+      }
+
       await _logAuditAction(
         action: 'create',
         entityType: 'lesson',
@@ -42,11 +65,32 @@ class AdminDatabaseService {
     }
   }
 
-  /// Update lesson
-  Future<bool> updateLesson(String lessonId, Map<String, dynamic> updates) async {
+  /// Update lesson — updates in categories/{categoryId}/lessons
+  Future<bool> updateLesson(
+      String categoryId, String lessonId, Map<String, dynamic> updates) async {
     try {
       updates['updatedAt'] = FieldValue.serverTimestamp();
-      await _db.collection('admin_lessons').doc(lessonId).update(updates);
+      await _db
+          .collection('categories')
+          .doc(categoryId)
+          .collection('lessons')
+          .doc(lessonId)
+          .update(updates);
+
+      // If signs were updated, sync them to subcollection
+      if (updates.containsKey('signs')) {
+        final signsList = (updates['signs'] as List<dynamic>)
+            .map((s) => AdminSignItem.fromMap(s as Map<String, dynamic>))
+            .toList();
+        await _syncSignsToSubcollection(categoryId, lessonId, signsList);
+        await _db
+            .collection('categories')
+            .doc(categoryId)
+            .collection('lessons')
+            .doc(lessonId)
+            .update({'totalSigns': signsList.length});
+      }
+
       await _logAuditAction(
         action: 'update',
         entityType: 'lesson',
@@ -60,10 +104,29 @@ class AdminDatabaseService {
     }
   }
 
-  /// Delete lesson
-  Future<bool> deleteLesson(String lessonId) async {
+  /// Delete lesson — deletes from categories/{categoryId}/lessons + signs subcollection
+  Future<bool> deleteLesson(String categoryId, String lessonId) async {
     try {
-      await _db.collection('admin_lessons').doc(lessonId).delete();
+      // Delete signs subcollection first
+      final signsSnapshot = await _db
+          .collection('categories')
+          .doc(categoryId)
+          .collection('lessons')
+          .doc(lessonId)
+          .collection('signs')
+          .get();
+      for (final doc in signsSnapshot.docs) {
+        await doc.reference.delete();
+      }
+
+      // Delete the lesson document
+      await _db
+          .collection('categories')
+          .doc(categoryId)
+          .collection('lessons')
+          .doc(lessonId)
+          .delete();
+
       await _logAuditAction(
         action: 'delete',
         entityType: 'lesson',
@@ -73,6 +136,65 @@ class AdminDatabaseService {
     } catch (e) {
       print('Error deleting lesson: $e');
       return false;
+    }
+  }
+
+  /// Sync embedded signs from a lesson to the signs subcollection
+  /// so the learner side can read individual sign documents.
+  Future<void> _syncSignsToSubcollection(
+    String categoryId,
+    String lessonId,
+    List<AdminSignItem> signs,
+  ) async {
+    try {
+      final signsCollection = _db
+          .collection('categories')
+          .doc(categoryId)
+          .collection('lessons')
+          .doc(lessonId)
+          .collection('signs');
+
+      // Delete existing signs in subcollection
+      final existing = await signsCollection.get();
+      for (final doc in existing.docs) {
+        await doc.reference.delete();
+      }
+
+      // Try to get enriched sign data from global signs collection
+      List<AdminSignModel>? globalSigns;
+      try {
+        globalSigns = await getAllSigns();
+      } catch (_) {}
+
+      // Write each sign as a document
+      for (final sign in signs) {
+        // Look up enriched data from global signs collection
+        AdminSignModel? globalSign;
+        if (globalSigns != null) {
+          for (final gs in globalSigns) {
+            if (gs.word.toLowerCase() == sign.character.toLowerCase()) {
+              globalSign = gs;
+              break;
+            }
+          }
+        }
+
+        await signsCollection.add({
+          'lessonId': lessonId,
+          'word': sign.character,
+          'wordInHindi': null,
+          'order': sign.order,
+          'imageUrl': sign.pictureUrl ?? globalSign?.imageUrl,
+          'gifUrl': sign.animationUrl ?? globalSign?.gifUrl,
+          'videoUrl': globalSign?.videoUrl,
+          'description': sign.description ?? globalSign?.description ?? '',
+          'instructions': <String>[],
+          'tips': null,
+          'difficulty': 'easy',
+        });
+      }
+    } catch (e) {
+      print('Error syncing signs to subcollection: $e');
     }
   }
 
@@ -429,7 +551,7 @@ class AdminDatabaseService {
 
   /// Get all issues
   Stream<List<IssueModel>> issuesStream({String? status, String? priority}) {
-    Query query = _db.collection('issues').orderBy('createdAt', descending: true);
+    Query query = _db.collection('issues');
     
     if (status != null) {
       query = query.where('status', isEqualTo: status);
@@ -438,9 +560,11 @@ class AdminDatabaseService {
       query = query.where('priority', isEqualTo: priority);
     }
     
-    return query.snapshots().map(
-      (snapshot) => snapshot.docs.map((doc) => IssueModel.fromFirestore(doc)).toList(),
-    );
+    return query.snapshots().map((snapshot) {
+      final list = snapshot.docs.map((doc) => IssueModel.fromFirestore(doc)).toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
+    });
   }
 
   /// Get issue by ID
@@ -860,6 +984,345 @@ class AdminDatabaseService {
       print('Error deleting category: $e');
       return false;
     }
+  }
+
+  // ==================== SIGNS COLLECTION OPERATIONS ====================
+
+  /// Get all signs from the global signs collection
+  Stream<List<AdminSignModel>> signsStream() {
+    return _db
+        .collection('signs')
+        .orderBy('order')
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => AdminSignModel.fromFirestore(doc)).toList());
+  }
+
+  /// Get signs by type (alphabet or number)
+  Stream<List<AdminSignModel>> signsByTypeStream(String type) {
+    return _db
+        .collection('signs')
+        .where('type', isEqualTo: type)
+        .snapshots()
+        .map((snapshot) {
+      final list = snapshot.docs
+          .map((doc) => AdminSignModel.fromFirestore(doc))
+          .toList();
+      list.sort((a, b) => a.order.compareTo(b.order));
+      return list;
+    });
+  }
+
+  /// Get all signs as a one-time fetch
+  Future<List<AdminSignModel>> getAllSigns() async {
+    try {
+      final snapshot =
+          await _db.collection('signs').orderBy('order').get();
+      return snapshot.docs
+          .map((doc) => AdminSignModel.fromFirestore(doc))
+          .toList();
+    } catch (e) {
+      print('Error getting all signs: $e');
+      return [];
+    }
+  }
+
+  /// Create a new sign
+  Future<String?> createSign(AdminSignModel sign) async {
+    try {
+      final docRef = await _db.collection('signs').add(sign.toFirestore());
+      await _logAuditAction(
+        action: 'create',
+        entityType: 'sign',
+        entityId: docRef.id,
+        changes: {'word': sign.word, 'type': sign.type},
+      );
+      return docRef.id;
+    } catch (e) {
+      print('Error creating sign: $e');
+      return null;
+    }
+  }
+
+  /// Update a sign
+  Future<bool> updateSign(String signId, Map<String, dynamic> updates) async {
+    try {
+      updates['updatedAt'] = FieldValue.serverTimestamp();
+      await _db.collection('signs').doc(signId).update(updates);
+      await _logAuditAction(
+        action: 'update',
+        entityType: 'sign',
+        entityId: signId,
+        changes: updates,
+      );
+      return true;
+    } catch (e) {
+      print('Error updating sign: $e');
+      return false;
+    }
+  }
+
+  /// Delete a sign
+  Future<bool> deleteSign(String signId) async {
+    try {
+      await _db.collection('signs').doc(signId).delete();
+      await _logAuditAction(
+        action: 'delete',
+        entityType: 'sign',
+        entityId: signId,
+      );
+      return true;
+    } catch (e) {
+      print('Error deleting sign: $e');
+      return false;
+    }
+  }
+
+  // ==================== IMAGE AUTOMATION ====================
+
+  /// Check Firebase Storage for a matching image for a given word
+  /// Checks paths like: signs/A.png, signs/A.gif, signs/A.jpg
+  Future<String?> findSignImageInStorage(String word) async {
+    final extensions = ['png', 'gif', 'jpg', 'jpeg', 'webp', 'mp4'];
+    final folders = ['signs', 'sign_images', 'ISL'];
+
+    for (final folder in folders) {
+      for (final ext in extensions) {
+        try {
+          final ref = _storage.ref('$folder/$word.$ext');
+          final url = await ref.getDownloadURL();
+          return url;
+        } catch (_) {
+          // File not found, try next
+        }
+      }
+    }
+    return null;
+  }
+
+  /// Upload a sign image/video to Firebase Storage
+  Future<String?> uploadSignMedia(
+      String word, List<int> fileBytes, String fileName) async {
+    try {
+      final ext = fileName.split('.').last;
+      final ref = _storage.ref('signs/$word.$ext');
+      final metadata = SettableMetadata(
+        contentType: _getContentType(ext),
+      );
+      await ref.putData(Uint8List.fromList(fileBytes), metadata);
+      return await ref.getDownloadURL();
+    } catch (e) {
+      print('Error uploading sign media: $e');
+      return null;
+    }
+  }
+
+  /// Simple upload that takes raw bytes
+  Future<String?> uploadSignFile(
+      String word, dynamic fileData, String extension) async {
+    try {
+      final ref = _storage.ref('signs/$word.$extension');
+      final metadata = SettableMetadata(
+        contentType: _getContentType(extension),
+      );
+      final task = ref.putData(fileData, metadata);
+      await task;
+      return await ref.getDownloadURL();
+    } catch (e) {
+      print('Error uploading sign file: $e');
+      return null;
+    }
+  }
+
+  String _getContentType(String ext) {
+    switch (ext.toLowerCase()) {
+      case 'png':
+        return 'image/png';
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'gif':
+        return 'image/gif';
+      case 'webp':
+        return 'image/webp';
+      case 'mp4':
+        return 'video/mp4';
+      case 'webm':
+        return 'video/webm';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
+  // ==================== MCQ AUTOMATION ====================
+
+  /// Automatically generate MCQ questions for a sign
+  /// Fetches 3 random incorrect options from the signs collection
+  Future<MCQQuestion?> generateMCQ(AdminSignModel correctSign) async {
+    try {
+      final allSigns = await getAllSigns();
+
+      // Filter out the correct sign and get candidates of the same type
+      final candidates = allSigns
+          .where((s) => s.id != correctSign.id && s.word != correctSign.word)
+          .toList();
+
+      if (candidates.length < 3) {
+        print('Not enough signs to generate MCQ (need at least 3 distractors)');
+        return null;
+      }
+
+      // Shuffle and pick 3 random wrong options
+      candidates.shuffle(Random());
+      final wrongOptions = candidates.take(3).toList();
+
+      // Combine correct + wrong and shuffle
+      final allOptions = [correctSign, ...wrongOptions];
+      allOptions.shuffle(Random());
+
+      return MCQQuestion(
+        correctSign: correctSign,
+        options: allOptions,
+        questionText:
+            'Which sign represents "${correctSign.word}"?',
+      );
+    } catch (e) {
+      print('Error generating MCQ: $e');
+      return null;
+    }
+  }
+
+  /// Generate multiple MCQ questions for a lesson's signs
+  Future<List<MCQQuestion>> generateMCQsForLesson(
+      List<AdminSignItem> lessonSigns) async {
+    final questions = <MCQQuestion>[];
+    final allSigns = await getAllSigns();
+
+    for (final lessonSign in lessonSigns) {
+      // Find the full sign model from the global collection
+      final fullSign = allSigns.firstWhere(
+        (s) => s.word.toLowerCase() == lessonSign.character.toLowerCase(),
+        orElse: () => AdminSignModel(
+          id: '',
+          word: lessonSign.character,
+          imageUrl: lessonSign.pictureUrl,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      );
+
+      if (fullSign.id.isEmpty) continue;
+
+      final candidates = allSigns
+          .where((s) => s.id != fullSign.id && s.word != fullSign.word)
+          .toList();
+
+      if (candidates.length < 3) continue;
+
+      candidates.shuffle(Random());
+      final wrongOptions = candidates.take(3).toList();
+      final allOptions = [fullSign, ...wrongOptions];
+      allOptions.shuffle(Random());
+
+      questions.add(MCQQuestion(
+        correctSign: fullSign,
+        options: allOptions,
+        questionText:
+            'Which sign represents "${fullSign.word}"?',
+      ));
+    }
+
+    return questions;
+  }
+
+  // ==================== CATEGORY AUTO-CALCULATION ====================
+
+  /// Recalculate total_lessons and total_signs for a category
+  Future<void> recalculateCategoryTotals(String categoryId) async {
+    try {
+      // Count lessons in subcollection
+      final lessonsSnapshot = await _db
+          .collection('categories')
+          .doc(categoryId)
+          .collection('lessons')
+          .get();
+
+      int totalSigns = 0;
+      for (final doc in lessonsSnapshot.docs) {
+        // Count signs in subcollection
+        final signsSnapshot =
+            await doc.reference.collection('signs').get();
+        if (signsSnapshot.docs.isNotEmpty) {
+          totalSigns += signsSnapshot.docs.length;
+        } else {
+          // Fallback to embedded signs array
+          final data = doc.data();
+          final embeddedSigns = data['signs'] as List<dynamic>? ?? [];
+          totalSigns += embeddedSigns.length;
+        }
+      }
+
+      await _db.collection('categories').doc(categoryId).update({
+        'totalLessons': lessonsSnapshot.docs.length,
+        'totalSigns': totalSigns,
+      });
+    } catch (e) {
+      print('Error recalculating category totals: $e');
+    }
+  }
+
+  /// Recalculate totals for all categories
+  Future<void> recalculateAllCategoryTotals() async {
+    try {
+      final categoriesSnapshot = await _db.collection('categories').get();
+      for (final catDoc in categoriesSnapshot.docs) {
+        await recalculateCategoryTotals(catDoc.id);
+      }
+    } catch (e) {
+      print('Error recalculating all category totals: $e');
+    }
+  }
+
+  // ==================== WORD CHARACTER SPLITTING ====================
+
+  /// Split a word into individual characters and validate against signs collection
+  Future<List<WordCharacter>> splitWordIntoCharacters(String word) async {
+    final allSigns = await getAllSigns();
+    final characters = <WordCharacter>[];
+
+    for (final char in word.toUpperCase().split('')) {
+      if (char.trim().isEmpty) continue;
+
+      final matchingSign = allSigns.firstWhere(
+        (s) => s.word.toUpperCase() == char,
+        orElse: () => AdminSignModel(
+          id: '',
+          word: char,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      );
+
+      characters.add(WordCharacter(
+        char: char,
+        signReference: matchingSign.id.isNotEmpty ? matchingSign.id : null,
+      ));
+    }
+
+    return characters;
+  }
+
+  /// Get lessons filtered by category — reads from subcollection
+  Stream<List<AdminLessonModel>> lessonsByCategoryStream(String categoryId) {
+    return _db
+        .collection('categories')
+        .doc(categoryId)
+        .collection('lessons')
+        .orderBy('order')
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => AdminLessonModel.fromFirestore(doc))
+            .toList());
   }
 }
 

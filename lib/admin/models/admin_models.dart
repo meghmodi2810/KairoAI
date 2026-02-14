@@ -78,18 +78,22 @@ class AdminModel {
   }
 }
 
-/// Lesson model for admin management (extends existing LessonModel capabilities)
+/// Lesson model for admin management with full CRUD fields
 class AdminLessonModel {
   final String id;
-  final String name;
-  final String type; // 'alphabet', 'numeric', 'both'
-  final List<AdminSignItem> signs;
-  final List<String> testTypes; // 'mcq', 'match', 'recall'
-  final String? categoryId;
-  final int order;
+  final String title;
   final String description;
+  final String categoryId;
+  final int unitNumber;
+  final String type; // 'alphabet', 'numeric', 'both'
+  final String difficulty; // 'Beginner', 'Intermediate', 'Advanced'
+  final int estimatedMinutes;
   final int gemsReward;
+  final int coinsReward;
   final int xpReward;
+  final List<AdminSignItem> signs;
+  final List<String> testTypes; // 'mcq', 'matching', 'recall'
+  final int order;
   final bool isActive;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -97,37 +101,48 @@ class AdminLessonModel {
 
   AdminLessonModel({
     required this.id,
-    required this.name,
+    required this.title,
+    this.description = '',
+    required this.categoryId,
+    this.unitNumber = 1,
     required this.type,
+    this.difficulty = 'Beginner',
+    this.estimatedMinutes = 5,
+    this.gemsReward = 5,
+    this.coinsReward = 50,
+    this.xpReward = 25,
     required this.signs,
     required this.testTypes,
-    this.categoryId,
     this.order = 0,
-    this.description = '',
-    this.gemsReward = 5,
-    this.xpReward = 25,
     this.isActive = true,
     required this.createdAt,
     required this.updatedAt,
     required this.createdBy,
   });
 
+  /// Alias for backwards compatibility
+  String get name => title;
+
   factory AdminLessonModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     return AdminLessonModel(
       id: doc.id,
-      name: data['name'] ?? '',
+      title: data['title'] ?? data['name'] ?? '',
+      description: data['description'] ?? '',
+      categoryId: data['categoryId'] ?? '',
+      unitNumber: data['unitNumber'] ?? 1,
       type: data['type'] ?? 'alphabet',
+      difficulty: data['difficulty'] ?? 'Beginner',
+      estimatedMinutes: data['estimatedMinutes'] ?? 5,
+      gemsReward: data['gemsReward'] ?? 5,
+      coinsReward: data['coinsReward'] ?? 50,
+      xpReward: data['xpReward'] ?? 25,
       signs: (data['signs'] as List<dynamic>?)
               ?.map((s) => AdminSignItem.fromMap(s as Map<String, dynamic>))
               .toList() ??
           [],
       testTypes: List<String>.from(data['testTypes'] ?? ['mcq']),
-      categoryId: data['categoryId'],
       order: data['order'] ?? 0,
-      description: data['description'] ?? '',
-      gemsReward: data['gemsReward'] ?? 5,
-      xpReward: data['xpReward'] ?? 25,
       isActive: data['isActive'] ?? true,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
@@ -137,15 +152,19 @@ class AdminLessonModel {
 
   Map<String, dynamic> toFirestore() {
     return {
-      'name': name,
+      'title': title,
+      'description': description,
+      'categoryId': categoryId,
+      'unitNumber': unitNumber,
       'type': type,
+      'difficulty': difficulty,
+      'estimatedMinutes': estimatedMinutes,
+      'gemsReward': gemsReward,
+      'coinsReward': coinsReward,
+      'xpReward': xpReward,
       'signs': signs.map((s) => s.toMap()).toList(),
       'testTypes': testTypes,
-      'categoryId': categoryId,
       'order': order,
-      'description': description,
-      'gemsReward': gemsReward,
-      'xpReward': xpReward,
       'isActive': isActive,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
@@ -186,6 +205,96 @@ class AdminSignItem {
       'pictureUrl': pictureUrl,
       'order': order,
       'description': description,
+    };
+  }
+}
+
+/// Admin Sign model for the global SIGNS collection
+class AdminSignModel {
+  final String id;
+  final String word; // The letter or number e.g. "A", "1"
+  final String description;
+  final String? imageUrl;
+  final String? gifUrl;
+  final String? videoUrl;
+  final String type; // 'alphabet', 'number'
+  final int order;
+  final bool isActive;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+
+  AdminSignModel({
+    required this.id,
+    required this.word,
+    this.description = '',
+    this.imageUrl,
+    this.gifUrl,
+    this.videoUrl,
+    this.type = 'alphabet',
+    this.order = 0,
+    this.isActive = true,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  factory AdminSignModel.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return AdminSignModel(
+      id: doc.id,
+      word: data['word'] ?? '',
+      description: data['description'] ?? '',
+      imageUrl: data['imageUrl'],
+      gifUrl: data['gifUrl'],
+      videoUrl: data['videoUrl'],
+      type: data['type'] ?? 'alphabet',
+      order: data['order'] ?? 0,
+      isActive: data['isActive'] ?? true,
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toFirestore() {
+    return {
+      'word': word,
+      'description': description,
+      'imageUrl': imageUrl,
+      'gifUrl': gifUrl,
+      'videoUrl': videoUrl,
+      'type': type,
+      'order': order,
+      'isActive': isActive,
+      'createdAt': Timestamp.fromDate(createdAt),
+      'updatedAt': Timestamp.fromDate(updatedAt),
+    };
+  }
+}
+
+/// MCQ Question model for automated test generation
+class MCQQuestion {
+  final AdminSignModel correctSign;
+  final List<AdminSignModel> options; // correct + 3 wrong
+  final String questionText;
+
+  MCQQuestion({
+    required this.correctSign,
+    required this.options,
+    required this.questionText,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'correctSignId': correctSign.id,
+      'correctWord': correctSign.word,
+      'questionText': questionText,
+      'options': options
+          .map((s) => {
+                'signId': s.id,
+                'word': s.word,
+                'imageUrl': s.imageUrl,
+                'gifUrl': s.gifUrl,
+              })
+          .toList(),
     };
   }
 }

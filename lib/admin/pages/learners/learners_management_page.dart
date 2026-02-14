@@ -236,10 +236,15 @@ class _LearnersManagementPageState extends State<LearnersManagementPage> {
 
   Widget _buildLearnerCard(UserModel learner) {
     final isActive = _isActiveToday(learner);
+    final isAccountActive = learner.isActive;
     
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(color: AdminTheme.cardBg, borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(
+        color: AdminTheme.cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: !isAccountActive ? Border.all(color: AdminTheme.error.withOpacity(0.3), width: 1) : null,
+      ),
       child: InkWell(
         onTap: () => _showLearnerDetails(learner),
         borderRadius: BorderRadius.circular(12),
@@ -251,7 +256,7 @@ class _LearnersManagementPageState extends State<LearnersManagementPage> {
                 children: [
                   CircleAvatar(
                     radius: 24,
-                    backgroundColor: AdminTheme.primaryBlue,
+                    backgroundColor: isAccountActive ? AdminTheme.primaryBlue : Colors.grey,
                     backgroundImage: (learner.photoUrl?.isNotEmpty ?? false) ? NetworkImage(learner.photoUrl!) : null,
                     child: (learner.photoUrl?.isEmpty ?? true)
                         ? Text(
@@ -260,7 +265,7 @@ class _LearnersManagementPageState extends State<LearnersManagementPage> {
                           )
                         : null,
                   ),
-                  if (isActive)
+                  if (isActive && isAccountActive)
                     Positioned(
                       right: 0,
                       bottom: 0,
@@ -274,6 +279,21 @@ class _LearnersManagementPageState extends State<LearnersManagementPage> {
                         ),
                       ),
                     ),
+                  if (!isAccountActive)
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: AdminTheme.error,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AdminTheme.cardBg, width: 2),
+                        ),
+                        child: const Icon(Icons.block, size: 8, color: Colors.white),
+                      ),
+                    ),
                 ],
               ),
               const SizedBox(width: 12),
@@ -281,9 +301,24 @@ class _LearnersManagementPageState extends State<LearnersManagementPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      learner.displayName.isNotEmpty ? learner.displayName : 'Unknown',
-                      style: const TextStyle(fontWeight: FontWeight.bold, color: AdminTheme.textPrimary, fontSize: 14),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            learner.displayName.isNotEmpty ? learner.displayName : 'Unknown',
+                            style: TextStyle(fontWeight: FontWeight.bold, color: isAccountActive ? AdminTheme.textPrimary : Colors.grey, fontSize: 14),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (!isAccountActive) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                            decoration: BoxDecoration(color: AdminTheme.error.withOpacity(0.2), borderRadius: BorderRadius.circular(4)),
+                            child: const Text('DEACTIVATED', style: TextStyle(fontSize: 8, color: AdminTheme.error, fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 2),
                     Text(learner.email, style: const TextStyle(fontSize: 11, color: AdminTheme.textSecondary), overflow: TextOverflow.ellipsis),
@@ -416,6 +451,42 @@ class _LearnersManagementPageState extends State<LearnersManagementPage> {
           _buildDetailRow('Practice Minutes', '${learner.totalPracticeMinutes}'),
           _buildDetailRow('Daily Goal', '${learner.dailyGoalMinutes} min'),
           const SizedBox(height: 20),
+          // Activate / Deactivate Toggle
+          const Text('Account Status', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: learner.isActive ? AdminTheme.success.withOpacity(0.1) : AdminTheme.error.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: learner.isActive ? AdminTheme.success.withOpacity(0.3) : AdminTheme.error.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                Icon(learner.isActive ? Icons.check_circle : Icons.block, color: learner.isActive ? AdminTheme.success : AdminTheme.error, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(learner.isActive ? 'Account Active' : 'Account Deactivated', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: learner.isActive ? AdminTheme.success : AdminTheme.error)),
+                      Text(learner.isActive ? 'User can access the app' : 'User is blocked from accessing', style: const TextStyle(fontSize: 10, color: AdminTheme.textSecondary)),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: learner.isActive,
+                  onChanged: (value) {
+                    Navigator.pop(context);
+                    _toggleLearnerStatus(learner, value);
+                  },
+                  activeColor: AdminTheme.success,
+                  inactiveThumbColor: AdminTheme.error,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
           // Actions
           const Text('Actions', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
           const SizedBox(height: 10),
@@ -484,6 +555,27 @@ class _LearnersManagementPageState extends State<LearnersManagementPage> {
 
   String _formatDate(DateTime date) => '${date.day}/${date.month}/${date.year}';
   String _formatDateTime(DateTime date) => '${_formatDate(date)} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+
+  Future<void> _toggleLearnerStatus(UserModel learner, bool activate) async {
+    final action = activate ? 'activate' : 'deactivate';
+    final confirmed = await AdminConfirmDialog.show(
+      context: context,
+      title: '${activate ? 'Activate' : 'Deactivate'} Account?',
+      message: '${activate ? 'Activate' : 'Deactivate'} ${learner.displayName}\'s account?${!activate ? ' They will not be able to use the app.' : ''}',
+      confirmText: activate ? 'Activate' : 'Deactivate',
+      isDangerous: !activate,
+    );
+
+    if (confirmed) {
+      await _dbService.setLearnerStatus(learner.uid, activate);
+      _loadLearners(refresh: true);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Account ${action}d successfully')),
+        );
+      }
+    }
+  }
 
   void _confirmResetProgress(UserModel learner) async {
     final confirmed = await showDialog<bool>(

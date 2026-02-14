@@ -1,184 +1,61 @@
 import 'package:flutter/material.dart';
 
-/// Admin Portal Theme Constants
+/// Admin Portal Theme Constants – kept for backward compatibility
+/// New code should prefer Theme.of(context).colorScheme
 class AdminTheme {
-  // Primary Colors
+  // Kept as fallback aliases – prefer colorScheme in new code
   static const Color primaryDark = Color(0xFF1A1F38);
   static const Color primaryBlue = Color(0xFF1A2151);
-  static const Color darkBlue = Color(0xFF141938);
+  static const Color darkBlue = Color(0xFF0D1333);
   static const Color cardBg = Color(0xFF252A5E);
-  static const Color cardBgLight = Color(0xFF2D3461);
-  
-  // Accent Colors
+  static const Color cardBgLight = Color(0xFF2E3468);
   static const Color accentYellow = Color(0xFFFFD93D);
   static const Color accentPink = Color(0xFFFF6B9D);
   static const Color accentGreen = Color(0xFF4CAF50);
   static const Color accentRed = Color(0xFFE53935);
   static const Color accentOrange = Color(0xFFFF9800);
-  static const Color accentPurple = Color(0xFF9C27B0);
-  
-  // Text Colors
   static const Color textPrimary = Colors.white;
   static const Color textSecondary = Color(0xFFB0B8C4);
   static const Color textMuted = Color(0xFF6B7280);
-  
-  // Status Colors
   static const Color success = Color(0xFF4CAF50);
   static const Color warning = Color(0xFFFFC107);
   static const Color error = Color(0xFFE53935);
   static const Color info = Color(0xFF2196F3);
-  
-  // Input/Form Colors
-  static const Color inputBg = Color(0xFF252A5E);
   static const Color inputBorder = Color(0xFF3D4470);
-  static const Color inputFocusBorder = accentYellow;
-  static const Color cardBorder = Color(0xFF3D4470);
-  
-  // Shadow
-  static List<BoxShadow> cardShadow = [
-    BoxShadow(
-      color: Colors.black.withOpacity(0.2),
-      blurRadius: 10,
-      offset: const Offset(0, 4),
-    ),
-  ];
-  
-  // Border Radius
+
   static const double borderRadiusSmall = 8.0;
   static const double borderRadiusMedium = 12.0;
   static const double borderRadiusLarge = 16.0;
-  
-  // Spacing
   static const double spacingXs = 4.0;
   static const double spacingSm = 8.0;
   static const double spacingMd = 16.0;
   static const double spacingLg = 24.0;
   static const double spacingXl = 32.0;
 
-  // Get ThemeData for admin portal
-  static ThemeData get theme {
-    return ThemeData(
-      primaryColor: primaryBlue,
-      scaffoldBackgroundColor: primaryDark,
-      fontFamily: 'Roboto',
-      brightness: Brightness.dark,
-      colorScheme: const ColorScheme.dark(
-        primary: accentYellow,
-        secondary: accentPink,
-        surface: cardBg,
-        error: error,
-      ),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: primaryBlue,
-        elevation: 0,
-        centerTitle: false,
-        titleTextStyle: TextStyle(
-          color: textPrimary,
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
-        ),
-        iconTheme: IconThemeData(color: textPrimary),
-      ),
-      cardTheme: CardThemeData(
-        color: cardBg,
-        elevation: 4,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(borderRadiusMedium),
-        ),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: inputBg,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(borderRadiusSmall),
-          borderSide: const BorderSide(color: inputBorder),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(borderRadiusSmall),
-          borderSide: const BorderSide(color: inputBorder),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(borderRadiusSmall),
-          borderSide: const BorderSide(color: inputFocusBorder, width: 2),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(borderRadiusSmall),
-          borderSide: const BorderSide(color: error),
-        ),
-        labelStyle: const TextStyle(color: textSecondary),
-        hintStyle: const TextStyle(color: textMuted),
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: accentYellow,
-          foregroundColor: primaryDark,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(borderRadiusSmall),
-          ),
-          textStyle: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-          ),
-        ),
-      ),
-      textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
-          foregroundColor: accentYellow,
-        ),
-      ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: accentYellow,
-          side: const BorderSide(color: accentYellow),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(borderRadiusSmall),
-          ),
-        ),
-      ),
-      floatingActionButtonTheme: const FloatingActionButtonThemeData(
-        backgroundColor: accentYellow,
-        foregroundColor: primaryDark,
-      ),
-      dividerTheme: const DividerThemeData(
-        color: inputBorder,
-        thickness: 1,
-      ),
-      snackBarTheme: SnackBarThemeData(
-        backgroundColor: cardBg,
-        contentTextStyle: const TextStyle(color: textPrimary),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(borderRadiusSmall),
-        ),
-      ),
-      dialogTheme: DialogThemeData(
-        backgroundColor: cardBg,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(borderRadiusMedium),
-        ),
-      ),
-      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-        backgroundColor: cardBg,
-        selectedItemColor: accentYellow,
-        unselectedItemColor: textSecondary,
-      ),
-      tabBarTheme: const TabBarThemeData(
-        labelColor: accentYellow,
-        unselectedLabelColor: textSecondary,
-        indicatorColor: accentYellow,
-      ),
-      chipTheme: ChipThemeData(
-        backgroundColor: cardBgLight,
-        selectedColor: accentYellow,
-        labelStyle: const TextStyle(color: textPrimary),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(borderRadiusSmall),
-        ),
-      ),
-    );
-  }
+  /// Legacy ThemeData – used by pages not yet migrated to colorScheme
+  static ThemeData get theme => ThemeData(
+    brightness: Brightness.dark,
+    scaffoldBackgroundColor: primaryDark,
+    colorScheme: const ColorScheme.dark(
+      primary: accentYellow,
+      secondary: accentPink,
+      surface: cardBg,
+      error: error,
+    ),
+    appBarTheme: const AppBarTheme(backgroundColor: primaryDark, elevation: 0),
+    cardColor: cardBg,
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: cardBg,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(borderRadiusMedium), borderSide: const BorderSide(color: inputBorder)),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(borderRadiusMedium), borderSide: const BorderSide(color: inputBorder)),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(borderRadiusMedium), borderSide: const BorderSide(color: accentYellow)),
+      labelStyle: const TextStyle(color: textSecondary),
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(backgroundColor: accentYellow, foregroundColor: primaryDark, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(borderRadiusMedium))),
+    ),
+  );
 }
 
 /// Reusable Admin Card Widget
@@ -200,12 +77,13 @@ class AdminCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Container(
       margin: margin ?? const EdgeInsets.only(bottom: AdminTheme.spacingMd),
       decoration: BoxDecoration(
-        color: color ?? AdminTheme.cardBg,
+        color: color ?? cs.surface,
         borderRadius: BorderRadius.circular(AdminTheme.borderRadiusMedium),
-        boxShadow: AdminTheme.cardShadow,
+        border: Border.all(color: cs.onSurface.withOpacity(0.06)),
       ),
       child: Material(
         color: Colors.transparent,
@@ -243,60 +121,28 @@ class StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final color = iconColor ?? cs.primary;
     return AdminCard(
       onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: (iconColor ?? AdminTheme.accentYellow).withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(AdminTheme.borderRadiusSmall),
-                ),
-                child: Icon(
-                  icon,
-                  color: iconColor ?? AdminTheme.accentYellow,
-                  size: 24,
-                ),
-              ),
-              const Spacer(),
-              if (onTap != null)
-                const Icon(
-                  Icons.arrow_forward_ios,
-                  color: AdminTheme.textMuted,
-                  size: 16,
-                ),
-            ],
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(AdminTheme.borderRadiusSmall),
+            ),
+            child: Icon(icon, color: color, size: 22),
           ),
           const SizedBox(height: AdminTheme.spacingMd),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-              color: AdminTheme.textPrimary,
-            ),
-          ),
+          Text(value, style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: cs.onSurface)),
           const SizedBox(height: AdminTheme.spacingXs),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 14,
-              color: AdminTheme.textSecondary,
-            ),
-          ),
+          Text(title, style: TextStyle(fontSize: 14, color: cs.onSurface.withOpacity(0.55))),
           if (subtitle != null) ...[
             const SizedBox(height: AdminTheme.spacingXs),
-            Text(
-              subtitle!,
-              style: const TextStyle(
-                fontSize: 12,
-                color: AdminTheme.textMuted,
-              ),
-            ),
+            Text(subtitle!, style: TextStyle(fontSize: 12, color: cs.onSurface.withOpacity(0.4))),
           ],
         ],
       ),
@@ -385,6 +231,7 @@ class LoadingOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Stack(
       children: [
         child,
@@ -395,18 +242,10 @@ class LoadingOverlay extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(AdminTheme.accentYellow),
-                  ),
+                  CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(cs.primary)),
                   if (message != null) ...[
                     const SizedBox(height: AdminTheme.spacingMd),
-                    Text(
-                      message!,
-                      style: const TextStyle(
-                        color: AdminTheme.textPrimary,
-                        fontSize: 16,
-                      ),
-                    ),
+                    Text(message!, style: TextStyle(color: cs.onSurface, fontSize: 16)),
                   ],
                 ],
               ),
@@ -434,37 +273,19 @@ class EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AdminTheme.spacingXl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 64,
-              color: AdminTheme.textMuted,
-            ),
+            Icon(icon, size: 56, color: cs.onSurface.withOpacity(0.25)),
             const SizedBox(height: AdminTheme.spacingMd),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AdminTheme.textPrimary,
-              ),
-              textAlign: TextAlign.center,
-            ),
+            Text(title, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: cs.onSurface), textAlign: TextAlign.center),
             if (subtitle != null) ...[
               const SizedBox(height: AdminTheme.spacingSm),
-              Text(
-                subtitle!,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: AdminTheme.textSecondary,
-                ),
-                textAlign: TextAlign.center,
-              ),
+              Text(subtitle!, style: TextStyle(fontSize: 14, color: cs.onSurface.withOpacity(0.5)), textAlign: TextAlign.center),
             ],
             if (action != null) ...[
               const SizedBox(height: AdminTheme.spacingLg),
@@ -498,28 +319,17 @@ class AdminConfirmDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return AlertDialog(
-      title: Text(
-        title,
-        style: const TextStyle(
-          fontWeight: FontWeight.bold,
-          color: AdminTheme.textPrimary,
-        ),
-      ),
-      content: Text(
-        message,
-        style: const TextStyle(color: AdminTheme.textSecondary),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: cs.onSurface)),
+      content: Text(message, style: TextStyle(color: cs.onSurface.withOpacity(0.6))),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: Text(cancelText),
-        ),
-        ElevatedButton(
+        TextButton(onPressed: () => Navigator.pop(context, false), child: Text(cancelText)),
+        FilledButton(
           onPressed: () => Navigator.pop(context, true),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: confirmColor ?? (isDangerous ? AdminTheme.error : AdminTheme.accentYellow),
-            foregroundColor: AdminTheme.textPrimary,
+          style: FilledButton.styleFrom(
+            backgroundColor: confirmColor ?? (isDangerous ? Colors.red : cs.primary),
           ),
           child: Text(confirmText),
         ),
@@ -568,21 +378,26 @@ class AdminSearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return TextField(
       controller: controller,
       onChanged: onChanged,
       decoration: InputDecoration(
         hintText: hintText,
-        prefixIcon: const Icon(Icons.search, color: AdminTheme.textMuted),
+        prefixIcon: Icon(Icons.search, color: cs.onSurface.withOpacity(0.35)),
         suffixIcon: controller.text.isNotEmpty
             ? IconButton(
-                icon: const Icon(Icons.clear, color: AdminTheme.textMuted),
+                icon: Icon(Icons.clear, color: cs.onSurface.withOpacity(0.35)),
                 onPressed: () {
                   controller.clear();
                   onClear?.call();
                 },
               )
             : null,
+        filled: true,
+        fillColor: cs.surface,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       ),
     );
   }

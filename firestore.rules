@@ -1,0 +1,139 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ==================== HELPER FUNCTIONS ====================
+
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Check if user is accessing their own document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Check if user is an active admin
+    function isAdmin() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.isActive == true;
+    }
+
+    // ==================== ADMINS COLLECTION ====================
+    match /admins/{adminId} {
+      // Admins can read their own document; active admins can read all
+      allow read: if isOwner(adminId) || isAdmin();
+      // Only admins can update admin docs (e.g. lastLogin)
+      allow write: if isAdmin();
+    }
+
+    // ==================== USERS (LEARNERS) COLLECTION ====================
+    match /users/{userId} {
+      // Users can read/write their own doc; admins can read/write all
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated();
+      allow update, delete: if isOwner(userId) || isAdmin();
+
+      // Progress subcollection
+      match /progress/{progressId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+
+      // Daily insights subcollection (if nested under users)
+      match /daily_insights/{insightId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    // ==================== CATEGORIES COLLECTION ====================
+    match /categories/{categoryId} {
+      // All authenticated users can read; only admins can write
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+
+      // Lessons subcollection (learner-side nested structure)
+      match /lessons/{lessonId} {
+        allow read: if isAuthenticated();
+        allow write: if isAdmin();
+
+        // Signs subcollection nested under lessons
+        match /signs/{signId} {
+          allow read: if isAuthenticated();
+          allow write: if isAdmin();
+        }
+      }
+    }
+
+    // ==================== ADMIN LESSONS COLLECTION ====================
+    // Legacy collection — kept for backward compatibility
+    match /admin_lessons/{lessonId} {
+      // All authenticated users can read; only admins can write
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // ==================== COLLECTION GROUP: LESSONS ====================
+    // Allows collectionGroup('lessons') queries (e.g. analytics count)
+    match /{path=**}/lessons/{lessonId} {
+      allow read: if isAuthenticated();
+    }
+
+    // ==================== SIGNS COLLECTION (GLOBAL) ====================
+    match /signs/{signId} {
+      // All authenticated users can read; only admins can write
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // ==================== WORD GROUPS COLLECTION ====================
+    match /word_groups/{groupId} {
+      // All authenticated users can read; only admins can write
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+
+      // Words subcollection
+      match /words/{wordId} {
+        allow read: if isAuthenticated();
+        allow write: if isAdmin();
+      }
+    }
+
+    // ==================== ISSUES COLLECTION ====================
+    match /issues/{issueId} {
+      // Authenticated users can create issues; admins can do everything
+      allow read: if isAdmin();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    // ==================== SETTINGS COLLECTION ====================
+    match /settings/{settingId} {
+      // All authenticated users can read settings (e.g. maintenance mode)
+      allow read: if isAuthenticated();
+      // Only admins can modify settings
+      allow write: if isAdmin();
+    }
+
+    // ==================== AUDIT LOGS COLLECTION ====================
+    match /audit_logs/{logId} {
+      // Only admins can read/write audit logs
+      allow read, write: if isAdmin();
+    }
+
+    // ==================== SIGN PRACTICE LOGS ====================
+    match /sign_practice_logs/{logId} {
+      // Users can create their own logs; admins can read all
+      allow create: if isAuthenticated();
+      allow read: if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    // ==================== DAILY INSIGHTS (TOP-LEVEL) ====================
+    match /daily_insights/{insightId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+  }
+}
