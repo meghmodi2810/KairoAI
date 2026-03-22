@@ -213,8 +213,8 @@ class MainActivity : FlutterActivity() {
                 .setNumHands(2)  // Model expects 2 hands (126 = 2 * 21 * 3)
                 .setMinHandDetectionConfidence(0.3f)  // Lower threshold for better detection
                 .setMinHandPresenceConfidence(0.3f)   // Lower threshold for better detection
-                .setMinTrackingConfidence(0.3f)       // Lower threshold for better detection
-                .setRunningMode(com.google.mediapipe.tasks.vision.core.RunningMode.IMAGE)
+                .setMinTrackingConfidence(0.5f)       // Match Python
+                .setRunningMode(com.google.mediapipe.tasks.vision.core.RunningMode.VIDEO)
                 .build()
             
             handLandmarker = HandLandmarker.createFromOptions(this, options)
@@ -537,7 +537,9 @@ class MainActivity : FlutterActivity() {
         try {
             Log.d(TAG, "🔍 Processing frame: ${bitmap.width}x${bitmap.height}")
             val mpImage = BitmapImageBuilder(bitmap).build()
-            val result = handLandmarker?.detect(mpImage)
+            // MediaPipe VIDEO mode requires strictly increasing timestamps in milliseconds
+            val timestampMs = System.currentTimeMillis()
+            val result = handLandmarker?.detectForVideo(mpImage, timestampMs)
             
             if (result != null) {
                 val numHands = result.landmarks().size
@@ -603,7 +605,9 @@ class MainActivity : FlutterActivity() {
                 handLandmarks.forEachIndexed { lmIndex, landmark ->
                     if (lmIndex < 21) {
                         val base = handOffset + lmIndex * 3
-                        landmarkArray[base] = (landmark.x() - wristX) / handSize
+                        val normX = (landmark.x() - wristX) / handSize
+                        
+                        landmarkArray[base] = normX
                         landmarkArray[base + 1] = (landmark.y() - wristY) / handSize
                         landmarkArray[base + 2] = (landmark.z() - wristZ) / handSize
                     }
