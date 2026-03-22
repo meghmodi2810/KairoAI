@@ -618,7 +618,7 @@ class _WordGroupsManagementPageState extends State<WordGroupsManagementPage> {
                       color: AdminTheme.textSecondary, fontSize: 10)),
               value: autoSplit,
               onChanged: (v) => setDialogState(() => autoSplit = v),
-              activeColor: AdminTheme.accentYellow,
+              activeThumbColor: AdminTheme.accentYellow,
               contentPadding: EdgeInsets.zero,
             ),
           ]),

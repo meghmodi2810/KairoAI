@@ -320,7 +320,7 @@ class _SignsManagementPageState extends State<SignsManagementPage>
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: type,
+                  initialValue: type,
                   dropdownColor: AdminTheme.cardBg,
                   decoration: const InputDecoration(labelText: 'Type'),
                   items: const [

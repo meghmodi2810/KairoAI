@@ -480,7 +480,7 @@ class _LearnersManagementPageState extends State<LearnersManagementPage> {
                     Navigator.pop(context);
                     _toggleLearnerStatus(learner, value);
                   },
-                  activeColor: AdminTheme.success,
+                  activeThumbColor: AdminTheme.success,
                   inactiveThumbColor: AdminTheme.error,
                 ),
               ],

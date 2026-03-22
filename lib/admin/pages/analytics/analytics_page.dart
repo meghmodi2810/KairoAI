@@ -501,7 +501,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
               child: Center(child: Text('No data yet', style: TextStyle(color: AdminTheme.textSecondary))),
             )
           else
-            ...topLearners.take(5).toList().asMap().entries.map((e) => _buildPerformerRow(e.value, e.key + 1)).toList(),
+            ...topLearners.take(5).toList().asMap().entries.map((e) => _buildPerformerRow(e.value, e.key + 1)),
         ],
       ),
     );

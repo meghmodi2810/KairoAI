@@ -10,18 +10,23 @@ class OnboardingPage extends StatefulWidget {
   State<OnboardingPage> createState() => _OnboardingPageState();
 }
 
-class _OnboardingPageState extends State<OnboardingPage> {
+class _OnboardingPageState extends State<OnboardingPage>
+    with TickerProviderStateMixin {
   final PageController _pageController = PageController();
   int _currentPage = 0;
-  
-  // User selections
   String? _selectedGoal;
   String? _selectedDailyGoal;
 
-  // Colors matching the app theme
-  static const Color primaryBlue = Color(0xFF1A2151);
-  static const Color darkBlue = Color(0xFF141938);
-  static const Color accentYellow = Color(0xFFFFD93D);
+  late final AnimationController _fadeController;
+  late final Animation<double> _fadeAnim;
+
+  // Design tokens
+  static const _bg       = Color(0xFF0D0D12);
+  static const _card     = Color(0xFF14141C);
+  static const _border   = Color(0xFF252530);
+  static const _accent   = Color(0xFF6C63FF);
+  static const _textP    = Color(0xFFF0F0FF);
+  static const _textS    = Color(0xFF8888A8);
 
   final List<String> _goals = [
     'Communicate with family',
@@ -30,126 +35,135 @@ class _OnboardingPageState extends State<OnboardingPage> {
     'Just for fun',
   ];
 
-  final List<Map<String, String>> _dailyGoals = [
-    {'title': 'Casual', 'subtitle': '5 min/day'},
-    {'title': 'Regular', 'subtitle': '10 min/day'},
-    {'title': 'Serious', 'subtitle': '15 min/day'},
-    {'title': 'Intense', 'subtitle': '20 min/day'},
-  ];
-
   final List<IconData> _goalIcons = [
-    Icons.family_restroom,
-    Icons.work_outline,
-    Icons.volunteer_activism,
+    Icons.family_restroom_rounded,
+    Icons.work_outline_rounded,
+    Icons.volunteer_activism_rounded,
     Icons.emoji_emotions_outlined,
   ];
+
+  final List<Map<String, dynamic>> _dailyGoals = [
+    {'title': 'Casual',  'sub': '5 min/day',  'mins': 5},
+    {'title': 'Regular', 'sub': '10 min/day', 'mins': 10},
+    {'title': 'Serious', 'sub': '15 min/day', 'mins': 15},
+    {'title': 'Intense', 'sub': '20 min/day', 'mins': 20},
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    )..forward();
+    _fadeAnim = CurvedAnimation(parent: _fadeController, curve: Curves.easeOut);
+  }
 
   @override
   void dispose() {
     _pageController.dispose();
+    _fadeController.dispose();
     super.dispose();
   }
 
   Future<void> _completeOnboarding() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('onboarding_complete', true);
-    
-    // Save user preferences
-    if (_selectedGoal != null) {
-      await prefs.setString('user_goal', _selectedGoal!);
-    }
-    if (_selectedDailyGoal != null) {
-      await prefs.setString('daily_goal', _selectedDailyGoal!);
-    }
+    if (_selectedGoal != null) await prefs.setString('user_goal', _selectedGoal!);
+    if (_selectedDailyGoal != null) await prefs.setString('daily_goal', _selectedDailyGoal!);
   }
 
   void _nextPage() {
     if (_currentPage < 3) {
       _pageController.nextPage(
-        duration: const Duration(milliseconds: 150),
-        curve: Curves.easeOut,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOutCubic,
       );
     }
   }
 
-  void _navigateToSignUp() async {
+  void _goTo(String page) async {
     await _completeOnboarding();
-    if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) => const SignUpPage(),
-          transitionDuration: Duration.zero,
-          reverseTransitionDuration: Duration.zero,
-        ),
-      );
-    }
-  }
-
-  void _navigateToLogin() async {
-    await _completeOnboarding();
-    if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) => const LoginPage(),
-          transitionDuration: Duration.zero,
-          reverseTransitionDuration: Duration.zero,
-        ),
-      );
-    }
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) =>
+            page == 'signup' ? const SignUpPage() : const LoginPage(),
+        transitionsBuilder: (_, anim, __, child) =>
+            FadeTransition(opacity: anim, child: child),
+        transitionDuration: const Duration(milliseconds: 300),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [primaryBlue, darkBlue],
-          ),
-        ),
+      backgroundColor: _bg,
+      body: FadeTransition(
+        opacity: _fadeAnim,
         child: SafeArea(
           child: Column(
             children: [
-              // Progress indicator
+              // ── Top bar (skip + dots) ──────────────────────────
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
                 child: Row(
-                  children: List.generate(4, (index) {
-                    return Expanded(
-                      child: Container(
-                        height: 4,
-                        margin: const EdgeInsets.symmetric(horizontal: 2),
-                        decoration: BoxDecoration(
-                          color: index <= _currentPage
-                              ? accentYellow
-                              : Colors.white.withOpacity(0.3),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Page dots
+                    Row(
+                      children: List.generate(4, (i) {
+                        final active = i == _currentPage;
+                        return AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          margin: const EdgeInsets.only(right: 6),
+                          width: active ? 20 : 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: active ? _accent : _border,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        );
+                      }),
+                    ),
+                    // Skip
+                    if (_currentPage < 3)
+                      TextButton(
+                        onPressed: () => _goTo('login'),
+                        child: const Text('Skip',
+                          style: TextStyle(color: _textS, fontSize: 14, fontWeight: FontWeight.w500)),
                       ),
-                    );
-                  }),
+                  ],
                 ),
               ),
-              
-              // Page content
+
+              // ── Pages ─────────────────────────────────────────
               Expanded(
                 child: PageView(
                   controller: _pageController,
-                  onPageChanged: (index) {
-                    setState(() {
-                      _currentPage = index;
-                    });
-                  },
+                  onPageChanged: (i) => setState(() => _currentPage = i),
                   physics: const NeverScrollableScrollPhysics(),
                   children: [
-                    _buildWelcomePage(),
-                    _buildGoalPage(),
-                    _buildDailyGoalPage(),
-                    _buildReadyPage(),
+                    _WelcomePage(onNext: _nextPage),
+                    _GoalPage(
+                      goals: _goals,
+                      icons: _goalIcons,
+                      selected: _selectedGoal,
+                      onSelect: (g) => setState(() => _selectedGoal = g),
+                      onNext: _selectedGoal != null ? _nextPage : null,
+                    ),
+                    _DailyGoalPage(
+                      goals: _dailyGoals,
+                      selected: _selectedDailyGoal,
+                      onSelect: (g) => setState(() => _selectedDailyGoal = g),
+                      onNext: _selectedDailyGoal != null ? _nextPage : null,
+                    ),
+                    _ReadyPage(
+                      onSignUp: () => _goTo('signup'),
+                      onLogin:  () => _goTo('login'),
+                    ),
                   ],
                 ),
               ),
@@ -159,429 +173,422 @@ class _OnboardingPageState extends State<OnboardingPage> {
       ),
     );
   }
+}
 
-  Widget _buildWelcomePage() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Logo/Mascot area
-          Container(
-            width: 200,
-            height: 200,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [
-                  primaryBlue.withOpacity(0.8),
-                  darkBlue.withOpacity(0.4),
-                ],
-              ),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(100),
-              child: Image.asset(
-                'assets/logo/logo.jpeg',
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Icon(
-                    Icons.sign_language,
-                    size: 100,
-                    color: accentYellow,
-                  );
-                },
-              ),
-            ),
-          ),
-          
-          const SizedBox(height: 48),
-          
-          // Title
-          const Text(
-            'Learn to Sign!',
-            style: TextStyle(
-              fontSize: 36,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Subtitle
-          Text(
-            'Master sign language through fun,\ninteractive lessons with AI.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.white.withOpacity(0.8),
-              height: 1.5,
-            ),
-          ),
-          
-          const SizedBox(height: 60),
-          
-          // Continue button
-          _buildPrimaryButton('Continue', _nextPage),
-        ],
-      ),
-    );
-  }
+// ────────────────────────────────────────────────
+//  Shared button
+// ────────────────────────────────────────────────
+class _ContinueButton extends StatelessWidget {
+  final String label;
+  final VoidCallback? onPressed;
+  const _ContinueButton({required this.label, this.onPressed});
 
-  Widget _buildGoalPage() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Hand icon
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: accentYellow.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.waving_hand,
-              size: 60,
-              color: accentYellow,
-            ),
-          ),
-          
-          const SizedBox(height: 32),
-          
-          const Text(
-            'What brings you\nhere?',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          
-          const SizedBox(height: 32),
-          
-          // Goal options
-          ...List.generate(_goals.length, (index) {
-            final isSelected = _selectedGoal == _goals[index];
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _buildOptionCard(
-                icon: _goalIcons[index],
-                title: _goals[index],
-                isSelected: isSelected,
-                onTap: () {
-                  setState(() {
-                    _selectedGoal = _goals[index];
-                  });
-                },
-              ),
-            );
-          }),
-          
-          const SizedBox(height: 24),
-          
-          // Continue button
-          _buildPrimaryButton(
-            'Continue',
-            _selectedGoal != null ? _nextPage : null,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDailyGoalPage() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Progress icon
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              SizedBox(
-                width: 100,
-                height: 100,
-                child: CircularProgressIndicator(
-                  value: 0.7,
-                  strokeWidth: 8,
-                  backgroundColor: Colors.white.withOpacity(0.2),
-                  valueColor: const AlwaysStoppedAnimation<Color>(accentYellow),
-                ),
-              ),
-              const Icon(
-                Icons.timer_outlined,
-                size: 40,
-                color: accentYellow,
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 32),
-          
-          const Text(
-            'Set Your Daily Goal',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          
-          const SizedBox(height: 8),
-          
-          Text(
-            'We\'ll remind you to practice',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.white.withOpacity(0.7),
-            ),
-          ),
-          
-          const SizedBox(height: 32),
-          
-          // Daily goal options
-          ...List.generate(_dailyGoals.length, (index) {
-            final goal = _dailyGoals[index];
-            final isSelected = _selectedDailyGoal == goal['title'];
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _buildDailyGoalCard(
-                title: goal['title']!,
-                subtitle: goal['subtitle']!,
-                isSelected: isSelected,
-                onTap: () {
-                  setState(() {
-                    _selectedDailyGoal = goal['title'];
-                  });
-                },
-              ),
-            );
-          }),
-          
-          const SizedBox(height: 24),
-          
-          // Continue button
-          _buildPrimaryButton(
-            'Continue',
-            _selectedDailyGoal != null ? _nextPage : null,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildReadyPage() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Celebration icon
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: accentYellow.withOpacity(0.15),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.celebration,
-              size: 80,
-              color: accentYellow,
-            ),
-          ),
-          
-          const SizedBox(height: 40),
-          
-          const Text(
-            'Ready to start?',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 36,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          Text(
-            'Join our community of learners\nand start your sign language journey!',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.white.withOpacity(0.8),
-              height: 1.5,
-            ),
-          ),
-          
-          const SizedBox(height: 48),
-          
-          // Create Profile button
-          _buildPrimaryButton('Create Profile', _navigateToSignUp),
-          
-          const SizedBox(height: 20),
-          
-          // Already have account
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                'Already have an account? ',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.white.withOpacity(0.7),
-                ),
-              ),
-              GestureDetector(
-                onTap: _navigateToLogin,
-                child: const Text(
-                  'Log in',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: accentYellow,
-                    decoration: TextDecoration.underline,
-                    decorationColor: accentYellow,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPrimaryButton(String text, VoidCallback? onPressed) {
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onPressed != null;
     return SizedBox(
       width: double.infinity,
-      height: 56,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: onPressed != null ? accentYellow : accentYellow.withOpacity(0.5),
-          foregroundColor: darkBlue,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(28),
+      height: 52,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: enabled
+                ? [const Color(0xFF6C63FF), const Color(0xFF9B94FF)]
+                : [const Color(0xFF6C63FF).withOpacity(0.3), const Color(0xFF9B94FF).withOpacity(0.3)],
           ),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: enabled
+              ? [BoxShadow(color: const Color(0xFF6C63FF).withOpacity(0.4), blurRadius: 20, offset: const Offset(0, 6))]
+              : null,
         ),
-        child: Text(
-          text,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
+        child: ElevatedButton(
+          onPressed: onPressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            shadowColor: Colors.transparent,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           ),
+          child: Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
         ),
       ),
     );
   }
+}
 
-  Widget _buildOptionCard({
-    required IconData icon,
-    required String title,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
+// ────────────────────────────────────────────────
+//  Page 1 — Welcome
+// ────────────────────────────────────────────────
+class _WelcomePage extends StatelessWidget {
+  final VoidCallback onNext;
+  const _WelcomePage({required this.onNext});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(28, 32, 28, 32),
+      child: Column(
+        children: [
+          const Spacer(),
+          // Hero icon
+          Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF6C63FF), Color(0xFF9B94FF)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(36),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF6C63FF).withOpacity(0.4),
+                  blurRadius: 32,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: const Icon(Icons.sign_language_rounded, color: Colors.white, size: 56),
+          ),
+          const SizedBox(height: 40),
+          // Headline
+          RichText(
+            textAlign: TextAlign.center,
+            text: const TextSpan(
+              style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800, height: 1.2, letterSpacing: -0.5),
+              children: [
+                TextSpan(text: 'Learn ISL\n', style: TextStyle(color: Color(0xFFF0F0FF))),
+                TextSpan(text: 'Speak without\nwords', style: TextStyle(color: Color(0xFF6C63FF))),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'Master Indian Sign Language through AI-powered interactive lessons.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Color(0xFF8888A8), fontSize: 16, height: 1.6),
+          ),
+          const Spacer(),
+          // Feature pills
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            alignment: WrapAlignment.center,
+            children: const [
+              _FeaturePill(icon: Icons.auto_awesome_rounded, label: 'AI Recognition'),
+              _FeaturePill(icon: Icons.school_rounded, label: 'Structured Lessons'),
+              _FeaturePill(icon: Icons.local_fire_department_rounded, label: 'Daily Streaks'),
+            ],
+          ),
+          const SizedBox(height: 40),
+          _ContinueButton(label: 'Get Started', onPressed: onNext),
+        ],
+      ),
+    );
+  }
+}
+
+class _FeaturePill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _FeaturePill({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF14141C),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFF252530), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: const Color(0xFF6C63FF)),
+          const SizedBox(width: 6),
+          Text(label, style: const TextStyle(color: Color(0xFF8888A8), fontSize: 13, fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
+  }
+}
+
+// ────────────────────────────────────────────────
+//  Page 2 — Goal Selection
+// ────────────────────────────────────────────────
+class _GoalPage extends StatelessWidget {
+  final List<String> goals;
+  final List<IconData> icons;
+  final String? selected;
+  final ValueChanged<String> onSelect;
+  final VoidCallback? onNext;
+
+  const _GoalPage({
+    required this.goals,
+    required this.icons,
+    required this.selected,
+    required this.onSelect,
+    required this.onNext,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(28, 32, 28, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('What brings\nyou here?',
+            style: TextStyle(color: Color(0xFFF0F0FF), fontSize: 30, fontWeight: FontWeight.w800, height: 1.2, letterSpacing: -0.5)),
+          const SizedBox(height: 8),
+          const Text('This helps us personalise your experience.',
+            style: TextStyle(color: Color(0xFF8888A8), fontSize: 15, height: 1.5)),
+          const SizedBox(height: 32),
+          Expanded(
+            child: ListView.separated(
+              itemCount: goals.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, i) {
+                final isSelected = selected == goals[i];
+                return _OptionTile(
+                  icon: icons[i],
+                  label: goals[i],
+                  isSelected: isSelected,
+                  onTap: () => onSelect(goals[i]),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 24),
+          _ContinueButton(label: 'Continue', onPressed: onNext),
+        ],
+      ),
+    );
+  }
+}
+
+// ────────────────────────────────────────────────
+//  Page 3 — Daily Goal
+// ────────────────────────────────────────────────
+class _DailyGoalPage extends StatelessWidget {
+  final List<Map<String, dynamic>> goals;
+  final String? selected;
+  final ValueChanged<String> onSelect;
+  final VoidCallback? onNext;
+
+  const _DailyGoalPage({
+    required this.goals,
+    required this.selected,
+    required this.onSelect,
+    required this.onNext,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(28, 32, 28, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Set your\ndaily goal',
+            style: TextStyle(color: Color(0xFFF0F0FF), fontSize: 30, fontWeight: FontWeight.w800, height: 1.2, letterSpacing: -0.5)),
+          const SizedBox(height: 8),
+          const Text("We'll gently remind you to keep the streak alive.",
+            style: TextStyle(color: Color(0xFF8888A8), fontSize: 15, height: 1.5)),
+          const SizedBox(height: 32),
+          Expanded(
+            child: ListView.separated(
+              itemCount: goals.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, i) {
+                final g = goals[i];
+                final isSelected = selected == g['title'];
+                return _DailyGoalTile(
+                  title: g['title'] as String,
+                  sub: g['sub'] as String,
+                  isSelected: isSelected,
+                  onTap: () => onSelect(g['title'] as String),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 24),
+          _ContinueButton(label: 'Continue', onPressed: onNext),
+        ],
+      ),
+    );
+  }
+}
+
+class _DailyGoalTile extends StatelessWidget {
+  final String title;
+  final String sub;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _DailyGoalTile({
+    required this.title,
+    required this.sub,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.white : Colors.white.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(16),
+          color: isSelected ? const Color(0xFF6C63FF).withOpacity(0.12) : const Color(0xFF14141C),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isSelected ? accentYellow : Colors.transparent,
-            width: 2,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: isSelected ? accentYellow.withOpacity(0.2) : Colors.white.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                icon,
-                color: isSelected ? accentYellow : Colors.white,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Text(
-                title,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: isSelected ? darkBlue : Colors.white,
-                ),
-              ),
-            ),
-            if (isSelected)
-              const Icon(
-                Icons.check_circle,
-                color: accentYellow,
-                size: 24,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDailyGoalCard({
-    required String title,
-    required String subtitle,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.white : Colors.white.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected ? accentYellow : Colors.transparent,
-            width: 2,
+            color: isSelected ? const Color(0xFF6C63FF) : const Color(0xFF252530),
+            width: isSelected ? 1.5 : 1,
           ),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              title,
+            Text(title,
               style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: isSelected ? darkBlue : Colors.white,
-              ),
-            ),
+                color: isSelected ? const Color(0xFFF0F0FF) : const Color(0xFF8888A8),
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              )),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
               decoration: BoxDecoration(
-                color: isSelected ? accentYellow : accentYellow.withOpacity(0.3),
+                color: isSelected ? const Color(0xFF6C63FF) : const Color(0xFF252530),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: Text(
-                subtitle,
+              child: Text(sub,
                 style: TextStyle(
-                  fontSize: 14,
+                  color: isSelected ? Colors.white : const Color(0xFF8888A8),
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: isSelected ? darkBlue : Colors.white,
-                ),
+                )),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ────────────────────────────────────────────────
+//  Page 4 — Ready
+// ────────────────────────────────────────────────
+class _ReadyPage extends StatelessWidget {
+  final VoidCallback onSignUp;
+  final VoidCallback onLogin;
+
+  const _ReadyPage({required this.onSignUp, required this.onLogin});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(28, 32, 28, 32),
+      child: Column(
+        children: [
+          const Spacer(),
+          // Celebration
+          Container(
+            width: 112,
+            height: 112,
+            decoration: BoxDecoration(
+              color: const Color(0xFF4ADE80).withOpacity(0.12),
+              borderRadius: BorderRadius.circular(36),
+              border: Border.all(color: const Color(0xFF4ADE80).withOpacity(0.3)),
+            ),
+            child: const Icon(Icons.celebration_rounded, color: Color(0xFF4ADE80), size: 52),
+          ),
+          const SizedBox(height: 36),
+          const Text("You're all set!", textAlign: TextAlign.center,
+            style: TextStyle(color: Color(0xFFF0F0FF), fontSize: 32, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
+          const SizedBox(height: 16),
+          const Text('Create your profile to start learning ISL with AI.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Color(0xFF8888A8), fontSize: 16, height: 1.6)),
+          const Spacer(),
+          _ContinueButton(label: 'Create Profile', onPressed: onSignUp),
+          const SizedBox(height: 14),
+          GestureDetector(
+            onTap: onLogin,
+            child: RichText(
+              text: const TextSpan(
+                style: TextStyle(fontSize: 14),
+                children: [
+                  TextSpan(text: 'Already have an account? ', style: TextStyle(color: Color(0xFF8888A8))),
+                  TextSpan(text: 'Sign in', style: TextStyle(color: Color(0xFF6C63FF), fontWeight: FontWeight.w600)),
+                ],
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ────────────────────────────────────────────────
+//  Reusable option tile
+// ────────────────────────────────────────────────
+class _OptionTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _OptionTile({
+    required this.icon,
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF6C63FF).withOpacity(0.12) : const Color(0xFF14141C),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF6C63FF) : const Color(0xFF252530),
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: isSelected ? const Color(0xFF6C63FF).withOpacity(0.2) : const Color(0xFF252530),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon,
+                size: 20,
+                color: isSelected ? const Color(0xFF6C63FF) : const Color(0xFF8888A8)),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(label,
+                style: TextStyle(
+                  color: isSelected ? const Color(0xFFF0F0FF) : const Color(0xFF8888A8),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                )),
+            ),
+            if (isSelected)
+              const Icon(Icons.check_circle_rounded, color: Color(0xFF6C63FF), size: 20),
           ],
         ),
       ),

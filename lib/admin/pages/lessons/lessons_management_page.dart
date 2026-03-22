@@ -374,7 +374,7 @@ class _LessonsManagementPageState extends State<LessonsManagementPage> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: difficulty,
+                      initialValue: difficulty,
                       decoration: const InputDecoration(labelText: 'Difficulty', border: OutlineInputBorder()),
                       items: ['Beginner', 'Intermediate', 'Advanced']
                           .map((d) => DropdownMenuItem(value: d, child: Text(d)))
@@ -383,7 +383,7 @@ class _LessonsManagementPageState extends State<LessonsManagementPage> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: type,
+                      initialValue: type,
                       decoration: const InputDecoration(labelText: 'Type', border: OutlineInputBorder()),
                       items: ['alphabet', 'number', 'word', 'sentence']
                           .map((t) => DropdownMenuItem(value: t, child: Text(t)))
@@ -642,14 +642,14 @@ class _LessonsManagementPageState extends State<LessonsManagementPage> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: difficulty,
+                      initialValue: difficulty,
                       decoration: const InputDecoration(labelText: 'Difficulty', border: OutlineInputBorder()),
                       items: ['Beginner', 'Intermediate', 'Advanced'].map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
                       onChanged: (v) => setDialogState(() => difficulty = v ?? difficulty),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: type,
+                      initialValue: type,
                       decoration: const InputDecoration(labelText: 'Type', border: OutlineInputBorder()),
                       items: ['alphabet', 'number', 'word', 'sentence'].map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
                       onChanged: (v) => setDialogState(() => type = v ?? type),

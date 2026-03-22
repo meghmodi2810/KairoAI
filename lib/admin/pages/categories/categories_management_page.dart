@@ -314,7 +314,7 @@ class _CategoriesManagementPageState extends State<CategoriesManagementPage> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: selectedEmoji,
+                  initialValue: selectedEmoji,
                   dropdownColor: AdminTheme.cardBg,
                   decoration: const InputDecoration(labelText: 'Icon Emoji'),
                   items: [
@@ -345,7 +345,7 @@ class _CategoriesManagementPageState extends State<CategoriesManagementPage> {
                       style: TextStyle(
                           color: AdminTheme.textSecondary, fontSize: 11)),
                   value: isLocked,
-                  activeColor: AdminTheme.accentYellow,
+                  activeThumbColor: AdminTheme.accentYellow,
                   onChanged: (v) => setDialogState(() => isLocked = v),
                   contentPadding: EdgeInsets.zero,
                 ),
@@ -589,7 +589,7 @@ class _CategoriesManagementPageState extends State<CategoriesManagementPage> {
                       style: TextStyle(
                           color: AdminTheme.textPrimary, fontSize: 14)),
                   value: isLocked,
-                  activeColor: AdminTheme.accentYellow,
+                  activeThumbColor: AdminTheme.accentYellow,
                   onChanged: (v) => setDialogState(() => isLocked = v),
                   contentPadding: EdgeInsets.zero,
                 ),
