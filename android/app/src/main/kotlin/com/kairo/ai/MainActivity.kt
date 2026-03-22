@@ -79,13 +79,11 @@ class MainActivity : FlutterActivity() {
     private var tfliteInterpreter: Interpreter? = null
     private var isTfliteReady = false
     
-    // Sign language labels (35 classes to match ISL model output)
-    // MUST MATCH the LABELS in landmark_model.py: A-Z (26) + 1-9 (9) = 35
+    // Model labels (must perfectly match Python LabelEncoder alphabetical sort)
     private val signLabels = listOf(
-        "A", "B", "C", "D", "E", "F", "G", "H", "I", "J",
-        "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T",
-        "U", "V", "W", "X", "Y", "Z", "1", "2", "3", "4",
-        "5", "6", "7", "8", "9"
+        "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", 
+        "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z",
+        "1", "2", "3", "4", "5", "6", "7", "8", "9"
     )
     
     // Handler for UI thread operations
@@ -239,14 +237,7 @@ class MainActivity : FlutterActivity() {
             val modelBuffer = loadModelFile("isl_model_advanced.tflite")
             val options = Interpreter.Options().apply {
                 setNumThreads(4)
-                setUseXNNPACK(true)   // Fast CPU SIMD
-                // Try NNAPI (NPU/DSP) — falls back to CPU silently
-                try {
-                    addDelegate(org.tensorflow.lite.nnapi.NnApiDelegate())
-                    Log.d(TAG, "   ✅ NNAPI delegate added (NPU/DSP acceleration)")
-                } catch (e: Throwable) {
-                    Log.d(TAG, "   ℹ️ NNAPI not available, using CPU XNNPACK")
-                }
+                // Use default CPU delegate (XNNPACK is usually enabled by default in newer TFLite versions)
             }
             tfliteInterpreter = Interpreter(modelBuffer, options)
             isTfliteReady = true
@@ -577,12 +568,19 @@ class MainActivity : FlutterActivity() {
         //   126 = 2 hands × 21 landmarks × 3 coords (normalized)
         //   4 = 2 hands × (is_palm_facing + is_left)
         val landmarkArray = FloatArray(126) { 0f }
-        val orientationArray = FloatArray(4) { 0f }  // [palm1, left1, palm2, left2]
+        // Initialize orientation array with -1f for missing hands
+        // Python Model training script pads empty hand orientation with -1.0
+        val orientationArray = FloatArray(4) { -1f }  // [palm1, left1, palm2, left2]
         
         // Fill NORMALIZED landmarks for each detected hand
-        result.landmarks().forEachIndexed { handIndex, handLandmarks ->
-            if (handIndex < 2) {  // Max 2 hands
-                val handOffset = handIndex * 63  // Each hand = 21 landmarks × 3 coords
+        // We also want to sort hands by X coordinate (left to right) like Python does
+        val sortedHands = result.landmarks()
+            .mapIndexed { i, hand -> Pair(i, hand) }
+            .sortedBy { it.second[0].x() }
+            
+        sortedHands.forEachIndexed { sortedIndex, (originalIndex, handLandmarks) ->
+            if (sortedIndex < 2) {  // Max 2 hands
+                val handOffset = sortedIndex * 63  // Each hand = 21 landmarks × 3 coords
                 
                 // Get wrist position as reference point
                 val wrist = handLandmarks[0]
@@ -612,42 +610,35 @@ class MainActivity : FlutterActivity() {
                 }
                 
                 // ── Compute orientation features ──
-                // Palm normal via cross product of (wrist→indexMCP) × (wrist→pinkyMCP)
+                // Use orientation_v2 logic (thumb tip vs palm center) to match Python training
+                val thumbTip = handLandmarks.getOrNull(4)
                 val indexMcp = handLandmarks.getOrNull(5)
+                // middleMcp is already defined above
+                val ringMcp = handLandmarks.getOrNull(13)
                 val pinkyMcp = handLandmarks.getOrNull(17)
                 
                 var isPalmFacing = 0f
-                if (indexMcp != null && pinkyMcp != null) {
-                    val v1x = indexMcp.x() - wristX
-                    val v1y = indexMcp.y() - wristY
-                    val v1z = indexMcp.z() - wristZ
-                    val v2x = pinkyMcp.x() - wristX
-                    val v2y = pinkyMcp.y() - wristY
-                    val v2z = pinkyMcp.z() - wristZ
-                    
-                    // Cross product z-component
-                    val normalZ = v1x * v2y - v1y * v2x
+                if (thumbTip != null && indexMcp != null && middleMcp != null && ringMcp != null && pinkyMcp != null) {
+                    val palmCenterX = (indexMcp.x() + middleMcp.x() + ringMcp.x() + pinkyMcp.x()) / 4f
+                    val thumbIsLeftOfCenter = thumbTip.x() < palmCenterX
                     
                     // Determine handedness from MediaPipe result
-                    val handedness = result.handednesses().getOrNull(handIndex)
+                    val handedness = result.handednesses().getOrNull(originalIndex)
                     val handLabel = handedness?.getOrNull(0)?.categoryName() ?: "Right"
                     
                     // Determine if left hand (is_left feature)
                     val isLeft = if (handLabel == "Left") 1f else 0f
                     
-                    // Python training script logic:
-                    // Right hand: positive normalZ = palm facing camera
-                    // Left hand: negative normalZ = palm facing camera
                     isPalmFacing = if (handLabel == "Right") {
-                        if (normalZ > 0) 1f else 0f
+                        if (thumbIsLeftOfCenter) 1f else 0f
                     } else {
-                        if (normalZ < 0) 1f else 0f
+                        if (!thumbIsLeftOfCenter) 1f else 0f
                     }
                     
-                    orientationArray[handIndex * 2] = isPalmFacing
-                    orientationArray[handIndex * 2 + 1] = isLeft
+                    orientationArray[sortedIndex * 2] = isPalmFacing
+                    orientationArray[sortedIndex * 2 + 1] = isLeft
                     
-                    Log.d(TAG, "🖐️ Hand $handIndex: label=$handLabel, palmFacing=$isPalmFacing, isLeft=$isLeft, normalZ=${String.format("%.4f", normalZ)}")
+                    Log.d(TAG, "🖐️ Hand $sortedIndex: label=$handLabel, palmFacing=$isPalmFacing, isLeft=$isLeft, thumbTipX=${String.format("%.4f", thumbTip.x())}, palmCenterX=${String.format("%.4f", palmCenterX)}")
                 }
             }
         }
