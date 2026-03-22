@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/app_models.dart';
 import '../services/database_service.dart';
@@ -79,7 +80,7 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
                   gradient: LinearGradient(
                     colors: [
                       _categoryColor,
-                      _categoryColor.withOpacity(0.6),
+                      _categoryColor.withValues(alpha: 0.6),
                     ],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -109,7 +110,7 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
                         Text(
                           widget.category.description,
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.85),
+                            color: Colors.white.withValues(alpha: 0.85),
                             fontSize: 14,
                           ),
                         ),
@@ -175,7 +176,7 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
               child: LinearProgressIndicator(
                 value: pct,
                 minHeight: 8,
-                backgroundColor: cs.onSurface.withOpacity(0.08),
+                backgroundColor: cs.onSurface.withValues(alpha: 0.08),
                 valueColor: AlwaysStoppedAnimation<Color>(_categoryColor),
               ),
             ),
@@ -190,12 +191,12 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.school_outlined, color: cs.onSurface.withOpacity(0.35), size: 56),
+          Icon(Icons.school_outlined, color: cs.onSurface.withValues(alpha: 0.35), size: 56),
           const SizedBox(height: 16),
-          Text('No lessons yet', style: TextStyle(color: cs.onSurface.withOpacity(0.6), fontSize: 18)),
+          Text('No lessons yet', style: TextStyle(color: cs.onSurface.withValues(alpha: 0.6), fontSize: 18)),
           const SizedBox(height: 8),
           Text('Lessons will appear here once the admin adds them.',
-              style: TextStyle(color: cs.onSurface.withOpacity(0.4), fontSize: 14)),
+              style: TextStyle(color: cs.onSurface.withValues(alpha: 0.4), fontSize: 14)),
         ],
       ),
     );
@@ -214,7 +215,7 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
       isLocked = req?.status != 'completed';
     }
 
-    Color statusColor = cs.onSurface.withOpacity(0.35);
+    Color statusColor = cs.onSurface.withValues(alpha: 0.35);
     IconData statusIcon = Icons.circle_outlined;
     if (isCompleted) {
       statusColor = AppTheme.accentGreen;
@@ -245,7 +246,7 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
         difficultyLabel = 'Advanced';
         break;
       default:
-        difficultyColor = cs.onSurface.withOpacity(0.35);
+        difficultyColor = cs.onSurface.withValues(alpha: 0.35);
     }
 
     return Padding(
@@ -267,14 +268,14 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: isLocked ? cs.surface.withOpacity(0.5) : cs.surface,
+            color: isLocked ? cs.surface.withValues(alpha: 0.5) : cs.surface,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isCompleted
-                  ? AppTheme.accentGreen.withOpacity(0.4)
+                  ? AppTheme.accentGreen.withValues(alpha: 0.4)
                   : isInProgress
-                      ? AppTheme.accentAmber.withOpacity(0.3)
-                      : cs.onSurface.withOpacity(0.08),
+                      ? AppTheme.accentAmber.withValues(alpha: 0.3)
+                      : cs.onSurface.withValues(alpha: 0.08),
             ),
           ),
           child: Row(
@@ -284,7 +285,7 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.15),
+                  color: statusColor.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
                 child: Center(
@@ -308,7 +309,7 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
                     Text(
                       lesson.title,
                       style: TextStyle(
-                        color: isLocked ? cs.onSurface.withOpacity(0.35) : cs.onSurface,
+                        color: isLocked ? cs.onSurface.withValues(alpha: 0.35) : cs.onSurface,
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                       ),
@@ -324,7 +325,7 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: difficultyColor.withOpacity(0.15),
+                            color: difficultyColor.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
@@ -335,11 +336,11 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.timer_outlined, color: cs.onSurface.withOpacity(0.35), size: 14),
+                            Icon(Icons.timer_outlined, color: cs.onSurface.withValues(alpha: 0.35), size: 14),
                             const SizedBox(width: 3),
                             Text(
                               '${lesson.estimatedMinutes} min',
-                              style: TextStyle(color: cs.onSurface.withOpacity(0.35), fontSize: 12),
+                              style: TextStyle(color: cs.onSurface.withValues(alpha: 0.35), fontSize: 12),
                             ),
                           ],
                         ),

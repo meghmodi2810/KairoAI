@@ -45,9 +45,9 @@ class WordsPage extends StatelessWidget {
                               return Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.purple.withOpacity(0.12),
+                                  color: AppTheme.purple.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: AppTheme.purple.withOpacity(0.3)),
+                                  border: Border.all(color: AppTheme.purple.withValues(alpha: 0.3)),
                                 ),
                                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                                   const Icon(Icons.diamond_rounded, color: AppTheme.purple, size: 15),
@@ -203,7 +203,7 @@ class _WordGroupCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: isLocked
                         ? context.border
-                        : AppTheme.accent.withOpacity(0.12),
+                        : AppTheme.accent.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Center(
@@ -216,9 +216,9 @@ class _WordGroupCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: AppTheme.purple.withOpacity(0.12),
+                      color: AppTheme.purple.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppTheme.purple.withOpacity(0.25)),
+                      border: Border.all(color: AppTheme.purple.withValues(alpha: 0.25)),
                     ),
                     child: Row(mainAxisSize: MainAxisSize.min, children: [
                       const Icon(Icons.diamond_rounded, color: AppTheme.purple, size: 12),
@@ -239,7 +239,7 @@ class _WordGroupCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                 decoration: BoxDecoration(
-                  color: diffColor.withOpacity(0.1), borderRadius: BorderRadius.circular(5)),
+                  color: diffColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(5)),
                 child: Text(difficulty, style: TextStyle(
                   color: diffColor, fontSize: 10, fontWeight: FontWeight.w700)),
               ),

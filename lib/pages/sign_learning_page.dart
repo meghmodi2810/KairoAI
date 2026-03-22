@@ -315,7 +315,7 @@ class _SignCard extends StatelessWidget {
                     child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                       Text(sign.word.toUpperCase(),
                         style: TextStyle(
-                          color: AppTheme.accent.withOpacity(0.4),
+                          color: AppTheme.accent.withValues(alpha: 0.4),
                           fontSize: 96, fontWeight: FontWeight.w900)),
                       Text('No image available',
                         style: TextStyle(color: context.textMuted, fontSize: 12)),
@@ -400,7 +400,7 @@ class _CompletionSheet extends StatelessWidget {
         Container(
           width: 72, height: 72,
           decoration: BoxDecoration(
-            color: AppTheme.success.withOpacity(0.15),
+            color: AppTheme.success.withValues(alpha: 0.15),
             shape: BoxShape.circle),
           child: const Icon(Icons.check_circle_rounded, color: AppTheme.success, size: 40)),
         const SizedBox(height: 16),
@@ -482,7 +482,7 @@ class _NavButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: enabled ? context.card : context.card.withOpacity(0.4),
+          color: enabled ? context.card : context.card.withValues(alpha: 0.4),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: context.border)),
         child: Icon(icon,
@@ -507,7 +507,7 @@ class _GradientButton extends StatelessWidget {
             colors: [AppTheme.accent, AppTheme.accentDark]),
           borderRadius: BorderRadius.circular(14),
           boxShadow: [BoxShadow(
-            color: AppTheme.accent.withOpacity(0.3),
+            color: AppTheme.accent.withValues(alpha: 0.3),
             blurRadius: 12, offset: const Offset(0, 4))],
         ),
         child: Center(
@@ -526,9 +526,9 @@ class _SmallChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.25))),
+        border: Border.all(color: color.withValues(alpha: 0.25))),
       child: Text(label, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600)));
   }
 }

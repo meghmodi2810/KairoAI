@@ -233,7 +233,7 @@ class _LessonPracticePageState extends State<LessonPracticePage>
                       child: Container(
                         width: 36, height: 36,
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.4),
+                          color: Colors.black.withValues(alpha: 0.4),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
@@ -246,7 +246,7 @@ class _LessonPracticePageState extends State<LessonPracticePage>
                         child: LinearProgressIndicator(
                           value: progress,
                           minHeight: 6,
-                          backgroundColor: Colors.white.withOpacity(0.15),
+                          backgroundColor: Colors.white.withValues(alpha: 0.15),
                           valueColor: AlwaysStoppedAnimation<Color>(
                             _matched ? AppTheme.success : AppTheme.accent),
                         ),
@@ -277,9 +277,9 @@ class _LessonPracticePageState extends State<LessonPracticePage>
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.12),
+                    color: Colors.white.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white.withOpacity(0.2)),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
                   ),
                   child: const Row(mainAxisSize: MainAxisSize.min, children: [
                     Text('Skip', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
@@ -317,9 +317,9 @@ class _ReferencePanel extends StatelessWidget {
           begin: Alignment.topCenter, end: Alignment.bottomCenter,
           colors: [
             matched
-                ? AppTheme.success.withOpacity(0.4)
-                : const Color(0xFF0D0D12).withOpacity(0.95),
-            Colors.black.withOpacity(0.7),
+                ? AppTheme.success.withValues(alpha: 0.4)
+                : const Color(0xFF0D0D12).withValues(alpha: 0.95),
+            Colors.black.withValues(alpha: 0.7),
           ],
         ),
       ),
@@ -340,11 +340,11 @@ class _ReferencePanel extends StatelessWidget {
                       return Image.memory(snap.data!, fit: BoxFit.contain);
                     }
                     return Container(
-                      color: Colors.white.withOpacity(0.05),
+                      color: Colors.white.withValues(alpha: 0.05),
                       child: Center(
                         child: Text(sign.word.toUpperCase()[0],
                           style: TextStyle(
-                            color: AppTheme.accent.withOpacity(0.6),
+                            color: AppTheme.accent.withValues(alpha: 0.6),
                             fontSize: 72, fontWeight: FontWeight.w900)),
                       ),
                     );
@@ -361,14 +361,14 @@ class _ReferencePanel extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Sign this:', style: TextStyle(
-                    color: Colors.white.withOpacity(0.6), fontSize: 12, fontWeight: FontWeight.w500)),
+                    color: Colors.white.withValues(alpha: 0.6), fontSize: 12, fontWeight: FontWeight.w500)),
                   const SizedBox(height: 4),
                   Text(sign.word, style: const TextStyle(
                     color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
                   if (sign.word.length == 1 && sign.description.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Text(sign.description, style: TextStyle(
-                      color: Colors.white.withOpacity(0.5), fontSize: 11), maxLines: 3),
+                      color: Colors.white.withValues(alpha: 0.5), fontSize: 11), maxLines: 3),
                   ],
                   const SizedBox(height: 12),
                   // Match indicator dots
@@ -378,9 +378,9 @@ class _ReferencePanel extends StatelessWidget {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: AppTheme.success.withOpacity(0.2),
+                          color: AppTheme.success.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppTheme.success.withOpacity(0.5)),
+                          border: Border.all(color: AppTheme.success.withValues(alpha: 0.5)),
                         ),
                         child: Row(mainAxisSize: MainAxisSize.min, children: const [
                           Icon(Icons.check_circle_rounded, color: AppTheme.success, size: 16),
@@ -431,15 +431,15 @@ class _DetectionPanel extends StatelessWidget {
     return Container(
       padding: EdgeInsets.fromLTRB(20, 20, 20, bottom + 20),
       decoration: BoxDecoration(
-        color: const Color(0xFF0D0D12).withOpacity(0.9),
+        color: const Color(0xFF0D0D12).withValues(alpha: 0.9),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        border: Border(top: BorderSide(color: Colors.white.withOpacity(0.08))),
+        border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.08))),
       ),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         // Drag handle
         Container(width: 36, height: 4,
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.15),
+            color: Colors.white.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(2))),
         const SizedBox(height: 16),
 
@@ -535,7 +535,7 @@ class _LiveResult extends StatelessWidget {
           child: LinearProgressIndicator(
             value: confidence,
             minHeight: 6,
-            backgroundColor: Colors.white.withOpacity(0.08),
+            backgroundColor: Colors.white.withValues(alpha: 0.08),
             valueColor: AlwaysStoppedAnimation<Color>(confColor(confidence)),
           ),
         ),
@@ -560,7 +560,7 @@ class _LiveResult extends StatelessWidget {
                     ? (matched ? AppTheme.success : AppTheme.accent)
                     : Colors.white12,
                 boxShadow: i < matchCount
-                    ? [BoxShadow(color: AppTheme.accent.withOpacity(0.4), blurRadius: 6)]
+                    ? [BoxShadow(color: AppTheme.accent.withValues(alpha: 0.4), blurRadius: 6)]
                     : null,
               ),
             ),

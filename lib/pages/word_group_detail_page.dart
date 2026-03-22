@@ -42,7 +42,7 @@ class WordGroupDetailPage extends StatelessWidget {
             leading: Container(
               margin: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.25),
+                color: Colors.black.withValues(alpha: 0.25),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: IconButton(
@@ -55,7 +55,7 @@ class WordGroupDetailPage extends StatelessWidget {
               background: Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [AppTheme.accent.withOpacity(0.8), AppTheme.accentDark.withOpacity(0.6)],
+                    colors: [AppTheme.accent.withValues(alpha: 0.8), AppTheme.accentDark.withValues(alpha: 0.6)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -71,7 +71,7 @@ class WordGroupDetailPage extends StatelessWidget {
                           Container(
                             width: 52, height: 52,
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
+                              color: Colors.white.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(14),
                             ),
                             child: Center(child: Text(iconEmoji,
@@ -86,7 +86,7 @@ class WordGroupDetailPage extends StatelessWidget {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.15),
+                                  color: Colors.white.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(difficulty, style: const TextStyle(
@@ -94,7 +94,7 @@ class WordGroupDetailPage extends StatelessWidget {
                               ),
                               const SizedBox(width: 8),
                               Text('$totalWords words', style: TextStyle(
-                                color: Colors.white.withOpacity(0.75), fontSize: 13)),
+                                color: Colors.white.withValues(alpha: 0.75), fontSize: 13)),
                             ]),
                           ])),
                         ]),
@@ -153,7 +153,7 @@ class WordGroupDetailPage extends StatelessWidget {
                             Container(
                               width: 36, height: 36,
                               decoration: BoxDecoration(
-                                color: AppTheme.accent.withOpacity(0.1),
+                                color: AppTheme.accent.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Center(

@@ -91,9 +91,10 @@ class _SignUpPageState extends State<SignUpPage> {
       await _auth.signInWithCredential(cred);
       if (mounted) _navToMain();
     } on FirebaseAuthException catch (e) {
-      _showError(e.message ?? 'Google sign-up failed.');
-    } catch (_) {
-      _showError('Google sign-up failed. Please try again.');
+      _showError(e.message ?? 'Firebase: ${e.code}');
+    } catch (e) {
+      _showError('Signup Error: ${e.toString()}');
+      debugPrint('GOOGLE SIGN UP ERROR: $e');
     } finally {
       if (mounted) setState(() => _googleLoading = false);
     }
@@ -365,10 +366,10 @@ class _PrimaryBtn extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: LinearGradient(colors: onPressed != null
               ? [_accent, const Color(0xFF9B94FF)]
-              : [_accent.withOpacity(0.4), const Color(0xFF9B94FF).withOpacity(0.4)]),
+              : [_accent.withValues(alpha: 0.4), const Color(0xFF9B94FF).withValues(alpha: 0.4)]),
           borderRadius: BorderRadius.circular(13),
           boxShadow: onPressed != null
-              ? [BoxShadow(color: _accent.withOpacity(0.35), blurRadius: 20, offset: const Offset(0, 6))] : null,
+              ? [BoxShadow(color: _accent.withValues(alpha: 0.35), blurRadius: 20, offset: const Offset(0, 6))] : null,
         ),
         child: ElevatedButton(
           onPressed: onPressed,

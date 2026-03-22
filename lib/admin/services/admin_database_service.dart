@@ -1,9 +1,9 @@
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:math';
-import '../models/admin_models.dart';
-import '../../models/app_models.dart';
+import 'package:kairo_ai/admin/models/admin_models.dart';
+import 'package:kairo_ai/models/app_models.dart';
 
 class AdminDatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -60,7 +60,7 @@ class AdminDatabaseService {
       );
       return docRef.id;
     } catch (e) {
-      print('Error creating lesson: $e');
+      debugPrint('Error creating lesson: $e');
       return null;
     }
   }
@@ -99,7 +99,7 @@ class AdminDatabaseService {
       );
       return true;
     } catch (e) {
-      print('Error updating lesson: $e');
+      debugPrint('Error updating lesson: $e');
       return false;
     }
   }
@@ -134,7 +134,7 @@ class AdminDatabaseService {
       );
       return true;
     } catch (e) {
-      print('Error deleting lesson: $e');
+      debugPrint('Error deleting lesson: $e');
       return false;
     }
   }
@@ -194,7 +194,7 @@ class AdminDatabaseService {
         });
       }
     } catch (e) {
-      print('Error syncing signs to subcollection: $e');
+      debugPrint('Error syncing signs to subcollection: $e');
     }
   }
 
@@ -230,7 +230,7 @@ class AdminDatabaseService {
       );
       return docRef.id;
     } catch (e) {
-      print('Error creating word group: $e');
+      debugPrint('Error creating word group: $e');
       return null;
     }
   }
@@ -248,7 +248,7 @@ class AdminDatabaseService {
       );
       return true;
     } catch (e) {
-      print('Error updating word group: $e');
+      debugPrint('Error updating word group: $e');
       return false;
     }
   }
@@ -275,7 +275,7 @@ class AdminDatabaseService {
       );
       return true;
     } catch (e) {
-      print('Error deleting word group: $e');
+      debugPrint('Error deleting word group: $e');
       return false;
     }
   }
@@ -309,7 +309,7 @@ class AdminDatabaseService {
       );
       return docRef.id;
     } catch (e) {
-      print('Error adding word: $e');
+      debugPrint('Error adding word: $e');
       return null;
     }
   }
@@ -331,7 +331,7 @@ class AdminDatabaseService {
       );
       return true;
     } catch (e) {
-      print('Error updating word: $e');
+      debugPrint('Error updating word: $e');
       return false;
     }
   }
@@ -352,48 +352,14 @@ class AdminDatabaseService {
       );
       return true;
     } catch (e) {
-      print('Error deleting word: $e');
+      debugPrint('Error deleting word: $e');
       return false;
     }
   }
 
   // ==================== LEARNER OPERATIONS ====================
 
-  /// Get all learners with pagination
-  Future<LearnerQueryResult> getLearners({
-    int limit = 25,
-    DocumentSnapshot? lastDoc,
-    String? searchQuery,
-    bool? isActive,
-    String? orderBy = 'createdAt',
-    bool descending = true,
-  }) async {
-    try {
-      Query query = _db.collection('users');
-      
-      // Apply ordering
-      query = query.orderBy(orderBy ?? 'createdAt', descending: descending);
-      
-      // Apply pagination
-      if (lastDoc != null) {
-        query = query.startAfterDocument(lastDoc);
-      }
-      
-      query = query.limit(limit);
-      
-      final snapshot = await query.get();
-      final learners = snapshot.docs.map((doc) => UserModel.fromFirestore(doc)).toList();
-      
-      return LearnerQueryResult(
-        learners: learners,
-        lastDocument: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
-        hasMore: snapshot.docs.length == limit,
-      );
-    } catch (e) {
-      print('Error getting learners: $e');
-      return LearnerQueryResult(learners: [], hasMore: false);
-    }
-  }
+
 
   /// Get learner by ID
   Future<UserModel?> getLearner(String learnerId) async {
@@ -404,7 +370,7 @@ class AdminDatabaseService {
       }
       return null;
     } catch (e) {
-      print('Error getting learner: $e');
+      debugPrint('Error getting learner: $e');
       return null;
     }
   }
@@ -421,7 +387,7 @@ class AdminDatabaseService {
       );
       return true;
     } catch (e) {
-      print('Error updating learner: $e');
+      debugPrint('Error updating learner: $e');
       return false;
     }
   }
@@ -455,7 +421,7 @@ class AdminDatabaseService {
       );
       return true;
     } catch (e) {
-      print('Error resetting learner progress: $e');
+      debugPrint('Error resetting learner progress: $e');
       return false;
     }
   }
@@ -484,32 +450,44 @@ class AdminDatabaseService {
       );
       return true;
     } catch (e) {
-      print('Error deleting learner: $e');
+      debugPrint('Error deleting learner: $e');
       return false;
     }
   }
 
-  /// Get learners with simple pagination
-  Future<List<UserModel>> getLearnersPaginated({
+  /// Get learners with pagination
+  Future<LearnerQueryResult> getLearners({
     int limit = 25,
-    String? startAfterDocId,
+    DocumentSnapshot? startAfter,
+    String? searchQuery,
   }) async {
     try {
       Query query = _db.collection('users').orderBy('createdAt', descending: true);
-      
-      if (startAfterDocId != null) {
-        final startDoc = await _db.collection('users').doc(startAfterDocId).get();
-        if (startDoc.exists) {
-          query = query.startAfterDocument(startDoc);
-        }
+
+      if (searchQuery != null && searchQuery.isNotEmpty) {
+        // Simple prefix search
+        query = _db
+            .collection('users')
+            .where('displayName', isGreaterThanOrEqualTo: searchQuery)
+            .where('displayName', isLessThanOrEqualTo: '$searchQuery\uf8ff')
+            .orderBy('displayName');
       }
-      
-      query = query.limit(limit);
-      final snapshot = await query.get();
-      return snapshot.docs.map((doc) => UserModel.fromFirestore(doc)).toList();
+
+      if (startAfter != null) {
+        query = query.startAfterDocument(startAfter);
+      }
+
+      final snapshot = await query.limit(limit).get();
+      final learners = snapshot.docs.map((doc) => UserModel.fromFirestore(doc)).toList();
+
+      return LearnerQueryResult(
+        learners: learners,
+        lastDocument: snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
+        hasMore: snapshot.docs.length == limit,
+      );
     } catch (e) {
-      print('Error getting learners paginated: $e');
-      return [];
+      debugPrint('Error getting learners: $e');
+      return LearnerQueryResult(learners: [], hasMore: false);
     }
   }
 
@@ -527,7 +505,7 @@ class AdminDatabaseService {
       );
       return true;
     } catch (e) {
-      print('Error setting learner status: $e');
+      debugPrint('Error setting learner status: $e');
       return false;
     }
   }
@@ -542,7 +520,7 @@ class AdminDatabaseService {
           .get();
       return snapshot.docs.map((doc) => LessonProgress.fromFirestore(doc)).toList();
     } catch (e) {
-      print('Error getting learner progress: $e');
+      debugPrint('Error getting learner progress: $e');
       return [];
     }
   }
@@ -576,7 +554,7 @@ class AdminDatabaseService {
       }
       return null;
     } catch (e) {
-      print('Error getting issue: $e');
+      debugPrint('Error getting issue: $e');
       return null;
     }
   }
@@ -601,7 +579,7 @@ class AdminDatabaseService {
       );
       return true;
     } catch (e) {
-      print('Error updating issue status: $e');
+      debugPrint('Error updating issue status: $e');
       return false;
     }
   }
@@ -618,7 +596,7 @@ class AdminDatabaseService {
       );
       return true;
     } catch (e) {
-      print('Error updating issue priority: $e');
+      debugPrint('Error updating issue priority: $e');
       return false;
     }
   }
@@ -631,7 +609,7 @@ class AdminDatabaseService {
       });
       return true;
     } catch (e) {
-      print('Error adding issue note: $e');
+      debugPrint('Error adding issue note: $e');
       return false;
     }
   }
@@ -653,7 +631,7 @@ class AdminDatabaseService {
       );
       return true;
     } catch (e) {
-      print('Error updating issue: $e');
+      debugPrint('Error updating issue: $e');
       return false;
     }
   }
@@ -669,7 +647,7 @@ class AdminDatabaseService {
       );
       return true;
     } catch (e) {
-      print('Error deleting issue: $e');
+      debugPrint('Error deleting issue: $e');
       return false;
     }
   }
@@ -698,7 +676,7 @@ class AdminDatabaseService {
       );
       return true;
     } catch (e) {
-      print('Error updating maintenance mode: $e');
+      debugPrint('Error updating maintenance mode: $e');
       return false;
     }
   }
@@ -717,7 +695,7 @@ class AdminDatabaseService {
       }
       return MaintenanceModeModel();
     } catch (e) {
-      print('Error getting maintenance mode: $e');
+      debugPrint('Error getting maintenance mode: $e');
       return null;
     }
   }
@@ -730,7 +708,7 @@ class AdminDatabaseService {
       final snapshot = await _db.collection('users').count().get();
       return snapshot.count ?? 0;
     } catch (e) {
-      print('Error getting learner count: $e');
+      debugPrint('Error getting learner count: $e');
       return 0;
     }
   }
@@ -746,7 +724,7 @@ class AdminDatabaseService {
           .get();
       return snapshot.count ?? 0;
     } catch (e) {
-      print('Error getting active learner count: $e');
+      debugPrint('Error getting active learner count: $e');
       return 0;
     }
   }
@@ -767,7 +745,7 @@ class AdminDatabaseService {
       }
       return total;
     } catch (e) {
-      print('Error getting total lessons completed: $e');
+      debugPrint('Error getting total lessons completed: $e');
       return 0;
     }
   }
@@ -800,7 +778,7 @@ class AdminDatabaseService {
         'openIssues': openIssuesSnapshot.count ?? 0,
       };
     } catch (e) {
-      print('Error getting analytics summary: $e');
+      debugPrint('Error getting analytics summary: $e');
       return {
         'totalLearners': 0,
         'activeLearners': 0,
@@ -810,7 +788,39 @@ class AdminDatabaseService {
     }
   }
 
-  /// Get sign practice analytics
+  /// Get daily lesson completions for the last 7 days
+  Future<List<double>> getDailyLessonCompletions() async {
+    try {
+      final now = DateTime.now();
+      final List<double> dailyCounts = [0, 0, 0, 0, 0, 0, 0];
+      
+      // We look at all users' progress
+      final usersSnapshot = await _db.collection('users').get();
+      
+      for (final userDoc in usersSnapshot.docs) {
+        final weekAgo = now.subtract(const Duration(days: 7));
+        final completedSnapshot = await userDoc.reference
+            .collection('progress')
+            .where('status', isEqualTo: 'completed')
+            .where('updatedAt', isGreaterThan: Timestamp.fromDate(weekAgo))
+            .get();
+        
+        for (final progressDoc in completedSnapshot.docs) {
+          final updatedAt = (progressDoc.data()['updatedAt'] as Timestamp?)?.toDate();
+          if (updatedAt != null) {
+            final dayIndex = 6 - now.difference(updatedAt).inDays;
+            if (dayIndex >= 0 && dayIndex < 7) {
+              dailyCounts[dayIndex]++;
+            }
+          }
+        }
+      }
+      return dailyCounts;
+    } catch (e) {
+      debugPrint('Error getting daily completions: $e');
+      return [0, 0, 0, 0, 0, 0, 0];
+    }
+  }
   Future<List<SignPracticeLogModel>> getSignPracticeLogs({
     String? learnerId,
     String? lessonId,
@@ -839,7 +849,7 @@ class AdminDatabaseService {
       final snapshot = await query.get();
       return snapshot.docs.map((doc) => SignPracticeLogModel.fromFirestore(doc)).toList();
     } catch (e) {
-      print('Error getting sign practice logs: $e');
+      debugPrint('Error getting sign practice logs: $e');
       return [];
     }
   }
@@ -880,7 +890,7 @@ class AdminDatabaseService {
         'timestamp': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      print('Failed to log audit action: $e');
+      debugPrint('Failed to log audit action: $e');
     }
   }
 
@@ -904,7 +914,7 @@ class AdminDatabaseService {
         'timestamp': FieldValue.serverTimestamp(),
       });
     } catch (e) {
-      print('Failed to log audit action: $e');
+      debugPrint('Failed to log audit action: $e');
     }
   }
 
@@ -932,7 +942,7 @@ class AdminDatabaseService {
       );
       return category.id;
     } catch (e) {
-      print('Error creating category: $e');
+      debugPrint('Error creating category: $e');
       return null;
     }
   }
@@ -949,7 +959,7 @@ class AdminDatabaseService {
       );
       return true;
     } catch (e) {
-      print('Error updating category: $e');
+      debugPrint('Error updating category: $e');
       return false;
     }
   }
@@ -981,7 +991,7 @@ class AdminDatabaseService {
       );
       return true;
     } catch (e) {
-      print('Error deleting category: $e');
+      debugPrint('Error deleting category: $e');
       return false;
     }
   }
@@ -1022,7 +1032,7 @@ class AdminDatabaseService {
           .map((doc) => AdminSignModel.fromFirestore(doc))
           .toList();
     } catch (e) {
-      print('Error getting all signs: $e');
+      debugPrint('Error getting all signs: $e');
       return [];
     }
   }
@@ -1039,7 +1049,7 @@ class AdminDatabaseService {
       );
       return docRef.id;
     } catch (e) {
-      print('Error creating sign: $e');
+      debugPrint('Error creating sign: $e');
       return null;
     }
   }
@@ -1057,7 +1067,7 @@ class AdminDatabaseService {
       );
       return true;
     } catch (e) {
-      print('Error updating sign: $e');
+      debugPrint('Error updating sign: $e');
       return false;
     }
   }
@@ -1073,7 +1083,7 @@ class AdminDatabaseService {
       );
       return true;
     } catch (e) {
-      print('Error deleting sign: $e');
+      debugPrint('Error deleting sign: $e');
       return false;
     }
   }
@@ -1112,7 +1122,7 @@ class AdminDatabaseService {
       await ref.putData(Uint8List.fromList(fileBytes), metadata);
       return await ref.getDownloadURL();
     } catch (e) {
-      print('Error uploading sign media: $e');
+      debugPrint('Error uploading sign media: $e');
       return null;
     }
   }
@@ -1129,7 +1139,7 @@ class AdminDatabaseService {
       await task;
       return await ref.getDownloadURL();
     } catch (e) {
-      print('Error uploading sign file: $e');
+      debugPrint('Error uploading sign file: $e');
       return null;
     }
   }
@@ -1168,7 +1178,7 @@ class AdminDatabaseService {
           .toList();
 
       if (candidates.length < 3) {
-        print('Not enough signs to generate MCQ (need at least 3 distractors)');
+        debugPrint('Not enough signs to generate MCQ (need at least 3 distractors)');
         return null;
       }
 
@@ -1187,7 +1197,7 @@ class AdminDatabaseService {
             'Which sign represents "${correctSign.word}"?',
       );
     } catch (e) {
-      print('Error generating MCQ: $e');
+      debugPrint('Error generating MCQ: $e');
       return null;
     }
   }
@@ -1267,7 +1277,7 @@ class AdminDatabaseService {
         'totalSigns': totalSigns,
       });
     } catch (e) {
-      print('Error recalculating category totals: $e');
+      debugPrint('Error recalculating category totals: $e');
     }
   }
 
@@ -1279,7 +1289,7 @@ class AdminDatabaseService {
         await recalculateCategoryTotals(catDoc.id);
       }
     } catch (e) {
-      print('Error recalculating all category totals: $e');
+      debugPrint('Error recalculating all category totals: $e');
     }
   }
 

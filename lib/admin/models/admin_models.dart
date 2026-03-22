@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:kairo_ai/models/app_models.dart';
 
 /// Admin user model matching Firebase structure
 class AdminModel {
@@ -695,4 +696,17 @@ class SignPracticeLogModel {
       'attemptNumber': attemptNumber,
     };
   }
+}
+
+/// Result of a paginated learner query
+class LearnerQueryResult {
+  final List<UserModel> learners;
+  final DocumentSnapshot? lastDocument;
+  final bool hasMore;
+
+  LearnerQueryResult({
+    required this.learners,
+    this.lastDocument,
+    required this.hasMore,
+  });
 }

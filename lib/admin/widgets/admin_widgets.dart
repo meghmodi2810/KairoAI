@@ -83,7 +83,7 @@ class AdminCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: color ?? cs.surface,
         borderRadius: BorderRadius.circular(AdminTheme.borderRadiusMedium),
-        border: Border.all(color: cs.onSurface.withOpacity(0.06)),
+        border: Border.all(color: cs.onSurface.withValues(alpha: 0.06)),
       ),
       child: Material(
         color: Colors.transparent,
@@ -131,7 +131,7 @@ class StatCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
+              color: color.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(AdminTheme.borderRadiusSmall),
             ),
             child: Icon(icon, color: color, size: 22),
@@ -139,10 +139,10 @@ class StatCard extends StatelessWidget {
           const SizedBox(height: AdminTheme.spacingMd),
           Text(value, style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: cs.onSurface)),
           const SizedBox(height: AdminTheme.spacingXs),
-          Text(title, style: TextStyle(fontSize: 14, color: cs.onSurface.withOpacity(0.55))),
+          Text(title, style: TextStyle(fontSize: 14, color: cs.onSurface.withValues(alpha: 0.55))),
           if (subtitle != null) ...[
             const SizedBox(height: AdminTheme.spacingXs),
-            Text(subtitle!, style: TextStyle(fontSize: 12, color: cs.onSurface.withOpacity(0.4))),
+            Text(subtitle!, style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.4))),
           ],
         ],
       ),
@@ -200,9 +200,9 @@ class StatusBadge extends StatelessWidget {
         vertical: small ? 4 : 6,
       ),
       decoration: BoxDecoration(
-        color: statusColor.withOpacity(0.15),
+        color: statusColor.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(AdminTheme.borderRadiusSmall),
-        border: Border.all(color: statusColor.withOpacity(0.3)),
+        border: Border.all(color: statusColor.withValues(alpha: 0.3)),
       ),
       child: Text(
         status.replaceAll('_', ' ').toUpperCase(),
@@ -280,12 +280,12 @@ class EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 56, color: cs.onSurface.withOpacity(0.25)),
+            Icon(icon, size: 56, color: cs.onSurface.withValues(alpha: 0.25)),
             const SizedBox(height: AdminTheme.spacingMd),
             Text(title, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: cs.onSurface), textAlign: TextAlign.center),
             if (subtitle != null) ...[
               const SizedBox(height: AdminTheme.spacingSm),
-              Text(subtitle!, style: TextStyle(fontSize: 14, color: cs.onSurface.withOpacity(0.5)), textAlign: TextAlign.center),
+              Text(subtitle!, style: TextStyle(fontSize: 14, color: cs.onSurface.withValues(alpha: 0.5)), textAlign: TextAlign.center),
             ],
             if (action != null) ...[
               const SizedBox(height: AdminTheme.spacingLg),
@@ -323,7 +323,7 @@ class AdminConfirmDialog extends StatelessWidget {
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: cs.onSurface)),
-      content: Text(message, style: TextStyle(color: cs.onSurface.withOpacity(0.6))),
+      content: Text(message, style: TextStyle(color: cs.onSurface.withValues(alpha: 0.6))),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context, false), child: Text(cancelText)),
         FilledButton(
@@ -384,10 +384,10 @@ class AdminSearchBar extends StatelessWidget {
       onChanged: onChanged,
       decoration: InputDecoration(
         hintText: hintText,
-        prefixIcon: Icon(Icons.search, color: cs.onSurface.withOpacity(0.35)),
+        prefixIcon: Icon(Icons.search, color: cs.onSurface.withValues(alpha: 0.35)),
         suffixIcon: controller.text.isNotEmpty
             ? IconButton(
-                icon: Icon(Icons.clear, color: cs.onSurface.withOpacity(0.35)),
+                icon: Icon(Icons.clear, color: cs.onSurface.withValues(alpha: 0.35)),
                 onPressed: () {
                   controller.clear();
                   onClear?.call();

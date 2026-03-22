@@ -51,6 +51,14 @@ dependencies:
   permission_handler: ^11.3.1
   shared_preferences: ^2.5.4
 
+  # Admin UI dependencies
+  google_fonts: ^6.2.1
+  lucide_icons: ^0.257.0
+  cached_network_image: ^3.3.1
+  flutter_animate: ^4.5.0
+  share_plus: ^7.2.1
+  connectivity_plus: ^5.0.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

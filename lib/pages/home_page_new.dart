@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/app_models.dart';
@@ -119,7 +120,7 @@ class _HomePageState extends State<HomePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('$greeting 👋', style: TextStyle(color: cs.onSurface.withOpacity(0.5), fontSize: 14)),
+              Text('$greeting 👋', style: TextStyle(color: cs.onSurface.withValues(alpha: 0.5), fontSize: 14)),
               const SizedBox(height: 4),
               Text(name, style: TextStyle(color: cs.onSurface, fontSize: 24, fontWeight: FontWeight.bold)),
             ],
@@ -127,7 +128,7 @@ class _HomePageState extends State<HomePage> {
         ),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(color: cs.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+          decoration: BoxDecoration(color: cs.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
           child: Row(
             children: [
               const Icon(Icons.bolt, color: AppTheme.accentAmber, size: 18),
@@ -159,7 +160,7 @@ class _HomePageState extends State<HomePage> {
         decoration: BoxDecoration(
           color: cs.surface,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: cs.onSurface.withOpacity(0.06)),
+          border: Border.all(color: cs.onSurface.withValues(alpha: 0.06)),
         ),
         child: Column(
           children: [
@@ -167,7 +168,7 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 8),
             Text(value, style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 2),
-            Text(label, style: TextStyle(color: cs.onSurface.withOpacity(0.4), fontSize: 11)),
+            Text(label, style: TextStyle(color: cs.onSurface.withValues(alpha: 0.4), fontSize: 11)),
           ],
         ),
       ),
@@ -192,14 +193,14 @@ class _HomePageState extends State<HomePage> {
           child: Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              gradient: LinearGradient(colors: [cs.primary, cs.primary.withOpacity(0.7)]),
+              gradient: LinearGradient(colors: [cs.primary, cs.primary.withValues(alpha: 0.7)]),
               borderRadius: BorderRadius.circular(18),
             ),
             child: Row(
               children: [
                 Container(
                   width: 52, height: 52,
-                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(14)),
+                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(14)),
                   child: const Icon(Icons.sign_language, color: Colors.white, size: 26),
                 ),
                 const SizedBox(width: 16),
@@ -209,13 +210,13 @@ class _HomePageState extends State<HomePage> {
                     children: [
                       Text(lesson.title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 4),
-                      Text('Unit ${lesson.unitNumber} • ${lesson.estimatedMinutes} min', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13)),
+                      Text('Unit ${lesson.unitNumber} • ${lesson.estimatedMinutes} min', style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 13)),
                     ],
                   ),
                 ),
                 Container(
                   padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), shape: BoxShape.circle),
+                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), shape: BoxShape.circle),
                   child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 22),
                 ),
               ],
@@ -237,7 +238,7 @@ class _HomePageState extends State<HomePage> {
       decoration: BoxDecoration(
         color: cs.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: cs.onSurface.withOpacity(0.06)),
+        border: Border.all(color: cs.onSurface.withValues(alpha: 0.06)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -255,20 +256,20 @@ class _HomePageState extends State<HomePage> {
             child: LinearProgressIndicator(
               value: progress,
               minHeight: 7,
-              backgroundColor: cs.onSurface.withOpacity(0.08),
+              backgroundColor: cs.onSurface.withValues(alpha: 0.08),
               valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.accentGreen),
             ),
           ),
           const SizedBox(height: 14),
           Row(
             children: [
-              Icon(Icons.school, color: cs.onSurface.withOpacity(0.35), size: 16),
+              Icon(Icons.school, color: cs.onSurface.withValues(alpha: 0.35), size: 16),
               const SizedBox(width: 6),
-              Text('$completed lessons', style: TextStyle(color: cs.onSurface.withOpacity(0.55), fontSize: 13)),
+              Text('$completed lessons', style: TextStyle(color: cs.onSurface.withValues(alpha: 0.55), fontSize: 13)),
               const SizedBox(width: 20),
-              Icon(Icons.front_hand, color: cs.onSurface.withOpacity(0.35), size: 16),
+              Icon(Icons.front_hand, color: cs.onSurface.withValues(alpha: 0.35), size: 16),
               const SizedBox(width: 6),
-              Text('${_user?.totalSignsLearned ?? 0} signs', style: TextStyle(color: cs.onSurface.withOpacity(0.55), fontSize: 13)),
+              Text('${_user?.totalSignsLearned ?? 0} signs', style: TextStyle(color: cs.onSurface.withValues(alpha: 0.55), fontSize: 13)),
             ],
           ),
         ],
@@ -284,11 +285,11 @@ class _HomePageState extends State<HomePage> {
         child: Center(
           child: Column(
             children: [
-              Icon(Icons.category_outlined, color: cs.onSurface.withOpacity(0.25), size: 48),
+              Icon(Icons.category_outlined, color: cs.onSurface.withValues(alpha: 0.25), size: 48),
               const SizedBox(height: 12),
-              Text('No categories yet', style: TextStyle(color: cs.onSurface.withOpacity(0.6), fontSize: 16)),
+              Text('No categories yet', style: TextStyle(color: cs.onSurface.withValues(alpha: 0.6), fontSize: 16)),
               const SizedBox(height: 4),
-              Text('Ask your admin to add learning categories', style: TextStyle(color: cs.onSurface.withOpacity(0.35), fontSize: 13)),
+              Text('Ask your admin to add learning categories', style: TextStyle(color: cs.onSurface.withValues(alpha: 0.35), fontSize: 13)),
             ],
           ),
         ),
@@ -314,19 +315,19 @@ class _HomePageState extends State<HomePage> {
             decoration: BoxDecoration(
               color: cs.surface,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: cat.isLocked ? cs.onSurface.withOpacity(0.06) : color.withOpacity(0.2)),
+              border: Border.all(color: cat.isLocked ? cs.onSurface.withValues(alpha: 0.06) : color.withValues(alpha: 0.2)),
             ),
             child: Row(
               children: [
                 Container(
                   width: 48, height: 48,
                   decoration: BoxDecoration(
-                    color: cat.isLocked ? cs.onSurface.withOpacity(0.06) : color.withOpacity(0.12),
+                    color: cat.isLocked ? cs.onSurface.withValues(alpha: 0.06) : color.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Center(
                     child: cat.isLocked
-                        ? Icon(Icons.lock, color: cs.onSurface.withOpacity(0.3), size: 20)
+                        ? Icon(Icons.lock, color: cs.onSurface.withValues(alpha: 0.3), size: 20)
                         : Text(cat.iconEmoji, style: const TextStyle(fontSize: 24)),
                   ),
                 ),
@@ -335,21 +336,21 @@ class _HomePageState extends State<HomePage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(cat.name, style: TextStyle(color: cat.isLocked ? cs.onSurface.withOpacity(0.35) : cs.onSurface, fontSize: 15, fontWeight: FontWeight.w600)),
+                      Text(cat.name, style: TextStyle(color: cat.isLocked ? cs.onSurface.withValues(alpha: 0.35) : cs.onSurface, fontSize: 15, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 3),
-                      Text(cat.description, style: TextStyle(color: cs.onSurface.withOpacity(0.45), fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Text(cat.description, style: TextStyle(color: cs.onSurface.withValues(alpha: 0.45), fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
                     ],
                   ),
                 ),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text('${cat.totalLessons}', style: TextStyle(color: cat.isLocked ? cs.onSurface.withOpacity(0.3) : color, fontSize: 17, fontWeight: FontWeight.bold)),
-                    Text('lessons', style: TextStyle(color: cs.onSurface.withOpacity(0.35), fontSize: 11)),
+                    Text('${cat.totalLessons}', style: TextStyle(color: cat.isLocked ? cs.onSurface.withValues(alpha: 0.3) : color, fontSize: 17, fontWeight: FontWeight.bold)),
+                    Text('lessons', style: TextStyle(color: cs.onSurface.withValues(alpha: 0.35), fontSize: 11)),
                   ],
                 ),
                 const SizedBox(width: 4),
-                Icon(Icons.chevron_right_rounded, color: cs.onSurface.withOpacity(0.3), size: 20),
+                Icon(Icons.chevron_right_rounded, color: cs.onSurface.withValues(alpha: 0.3), size: 20),
               ],
             ),
           ),
