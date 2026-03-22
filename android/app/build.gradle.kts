@@ -56,6 +56,7 @@ dependencies {
     // TensorFlow Lite for Sign Classification
     implementation("org.tensorflow:tensorflow-lite:2.14.0")
     implementation("org.tensorflow:tensorflow-lite-support:0.4.4")
+    implementation("org.tensorflow:tensorflow-lite-select-tf-ops:2.14.0") // Flex ops for complex layers
     implementation("org.tensorflow:tensorflow-lite-api:2.14.0")      // NNAPI delegate API
     implementation("org.tensorflow:tensorflow-lite-gpu:2.14.0")       // GPU delegate (optional)
     
