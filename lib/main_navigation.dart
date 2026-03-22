@@ -26,7 +26,7 @@ class _MainNavigationState extends State<MainNavigation>
 
   // Use IndexedStack so pages stay alive between tab switches
   final List<Widget> _pages = const [
-    HomePageNew(),
+    HomePage(),
     LearnPage(),
     WordsPage(),
     ProfilePage(),

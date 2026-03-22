@@ -178,8 +178,19 @@ class _LessonPracticePageState extends State<LessonPracticePage>
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // ── CAMERA FILLS SCREEN (native renders underneath) ──
-          const SizedBox.expand(child: ColoredBox(color: Colors.black)),
+          // ── CAMERA FILLS SCREEN ──
+          SizedBox.expand(
+            child: _isCameraOn && _detection.textureId != null
+                ? FittedBox(
+                    fit: BoxFit.cover,
+                    child: SizedBox(
+                      width: 480,
+                      height: 640,
+                      child: Texture(textureId: _detection.textureId!),
+                    ),
+                  )
+                : const ColoredBox(color: Colors.black),
+          ),
 
           // ── TOP: Reference image + sign info ─────────────────
           Positioned(

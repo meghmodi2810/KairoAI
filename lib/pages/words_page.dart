@@ -20,7 +20,7 @@ class WordsPage extends StatelessWidget {
             backgroundColor: context.surface,
             pinned: false, floating: true,
             automaticallyImplyLeading: false,
-            expandedHeight: 100,
+            expandedHeight: 130,
             flexibleSpace: FlexibleSpaceBar(
               background: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 52, 20, 12),

@@ -54,29 +54,77 @@ class LearnPage extends StatelessWidget {
                       style: TextStyle(color: context.textSecondary))));
                 }
 
-                final docs = snap.data!.docs;
+                  final docs = snap.data!.docs;
                 return SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, i) {
                       final doc  = docs[i];
-                      final data = doc.data() as Map<String, dynamic>;
                       final cat  = CategoryModel.fromFirestore(doc);
                       final color = AppTheme.categoryColors[i % AppTheme.categoryColors.length];
                       final isLast = i == docs.length - 1;
 
-                      return Column(children: [
-                        _CategoryNode(
-                          index: i,
-                          category: cat,
-                          color: color,
-                          uid: uid,
-                          onTap: cat.isLocked
-                              ? null
-                              : () => Navigator.push(context, MaterialPageRoute(
-                                  builder: (_) => CategoryLessonsPage(category: cat))),
+                      return IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // ── Timeline Column ──
+                            SizedBox(
+                              width: 48,
+                              child: Column(
+                                children: [
+                                  // Circle Dot
+                                  Container(
+                                    width: 24,
+                                    height: 24,
+                                    decoration: BoxDecoration(
+                                      color: cat.isLocked ? context.card : color,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: cat.isLocked ? context.border : Colors.white,
+                                        width: 3,
+                                      ),
+                                      boxShadow: cat.isLocked ? null : [
+                                        BoxShadow(color: color.withOpacity(0.4), blurRadius: 8, offset: const Offset(0, 4))
+                                      ],
+                                    ),
+                                    child: cat.isLocked
+                                      ? Center(child: Icon(Icons.lock_rounded, size: 12, color: context.textMuted))
+                                      : const Center(child: Icon(Icons.check_rounded, size: 14, color: Colors.white)),
+                                  ),
+                                  // Line
+                                  if (!isLast)
+                                    Expanded(
+                                      child: Container(
+                                        width: 3,
+                                        margin: const EdgeInsets.symmetric(vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: context.border,
+                                          borderRadius: BorderRadius.circular(1.5),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            
+                            // ── Card ──
+                            Expanded(
+                              child: Padding(
+                                padding: EdgeInsets.only(bottom: isLast ? 0 : 24),
+                                child: _CategoryNode(
+                                  category: cat,
+                                  color: color,
+                                  uid: uid,
+                                  onTap: cat.isLocked
+                                      ? null
+                                      : () => Navigator.push(context, MaterialPageRoute(
+                                          builder: (_) => CategoryLessonsPage(category: cat))),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        if (!isLast) _PathConnector(color: color),
-                      ]);
+                      );
                     },
                     childCount: docs.length,
                   ),
@@ -92,14 +140,12 @@ class LearnPage extends StatelessWidget {
 
 // ── Learning path node ────────────────────────────────────────
 class _CategoryNode extends StatelessWidget {
-  final int index;
   final CategoryModel category;
   final Color color;
   final String uid;
   final VoidCallback? onTap;
 
   const _CategoryNode({
-    required this.index,
     required this.category,
     required this.color,
     required this.uid,
@@ -108,16 +154,9 @@ class _CategoryNode extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isEven = index.isEven;
-
     return GestureDetector(
       onTap: onTap,
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: isEven ? 0 : 48,
-          right: isEven ? 48 : 0,
-        ),
-        child: Container(
+      child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: category.isLocked ? context.card.withOpacity(0.5) : context.card,
@@ -195,32 +234,6 @@ class _CategoryNode extends StatelessWidget {
                   color: color.withOpacity(0.6), size: 14)),
           ]),
         ),
-      ),
-    );
-  }
-}
-
-// ── Path connector between nodes ──────────────────────────────
-class _PathConnector extends StatelessWidget {
-  final Color color;
-  const _PathConnector({required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 28,
-      child: Center(
-        child: Container(
-          width: 2,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [color.withOpacity(0.5), color.withOpacity(0.15)],
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

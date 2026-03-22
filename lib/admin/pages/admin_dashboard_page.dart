@@ -10,6 +10,7 @@ import 'signs/signs_management_page.dart';
 import 'word_groups/word_groups_management_page.dart';
 import 'learners/learners_management_page.dart';
 import 'analytics/analytics_page.dart';
+import 'issues/issues_management_page.dart';
 import 'settings/settings_page.dart';
 
 class AdminDashboardPage extends StatefulWidget {

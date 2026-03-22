@@ -9,6 +9,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.EventChannel
+import io.flutter.view.TextureRegistry
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.ImageFormat
@@ -62,6 +63,10 @@ class MainActivity : FlutterActivity() {
     private var imageAnalysis: ImageAnalysis? = null
     private var preview: Preview? = null
     private lateinit var cameraExecutor: ExecutorService
+    
+    // Flutter texture for zero-copy camera preview
+    private var textureRegistry: TextureRegistry? = null
+    private var surfaceEntry: TextureRegistry.SurfaceTextureEntry? = null
     private var isDetectionActive = false
     private var useFrontCamera = true
     private var camera: Camera? = null
@@ -108,6 +113,9 @@ class MainActivity : FlutterActivity() {
         Log.d(TAG, "🚀 KairoAI MainActivity initializing...")
         Log.d(TAG, "========================================")
         
+        // Grab flutter texture registry
+        textureRegistry = flutterEngine.renderer
+        
         // Initialize camera executor with more capacity
         cameraExecutor = Executors.newFixedThreadPool(2)
         Log.d(TAG, "📷 Camera executor created with 2 threads")
@@ -124,11 +132,15 @@ class MainActivity : FlutterActivity() {
             Log.d(TAG, "📱 Method called: ${call.method}")
             when (call.method) {
                 "startDetection" -> {
+                    if (surfaceEntry == null) {
+                        surfaceEntry = textureRegistry?.createSurfaceTexture()
+                    }
                     startDetection()
                     result.success(mapOf(
                         "success" to true,
                         "handLandmarkerReady" to isHandLandmarkerReady,
-                        "tfliteReady" to isTfliteReady
+                        "tfliteReady" to isTfliteReady,
+                        "textureId" to (surfaceEntry?.id() ?: -1L)
                     ))
                 }
                 "stopDetection" -> {
@@ -355,7 +367,7 @@ class MainActivity : FlutterActivity() {
         imageAnalysis = ImageAnalysis.Builder()
             .setTargetResolution(android.util.Size(640, 480))  // Standard VGA for better detection
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-            .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
+            .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
             .build()
             .also { analysis ->
                 Log.d(TAG, "📷 Setting analyzer on cameraExecutor...")
@@ -374,11 +386,30 @@ class MainActivity : FlutterActivity() {
                 }
                 Log.d(TAG, "✅ Analyzer set successfully")
             }
+            
+        // Setup Native Camera Preview attached to Flutter SurfaceTexture
+        preview = Preview.Builder()
+            .setTargetResolution(android.util.Size(640, 480))
+            .build()
+            
+        surfaceEntry?.surfaceTexture()?.let { surfaceTexture ->
+            surfaceTexture.setDefaultBufferSize(640, 480)
+            
+            val surfaceProvider = Preview.SurfaceProvider { request ->
+                val surface = Surface(surfaceTexture)
+                request.provideSurface(surface, ContextCompat.getMainExecutor(this@MainActivity)) {
+                    surface.release()
+                }
+            }
+            preview?.setSurfaceProvider(surfaceProvider)
+            Log.d(TAG, "✅ Native camera preview surface bound to Flutter texture")
+        }
         
         try {
             camera = provider.bindToLifecycle(
                 this,
                 cameraSelector,
+                preview,
                 imageAnalysis
             )
             
@@ -468,73 +499,8 @@ class MainActivity : FlutterActivity() {
     
     private fun convertToBitmap(imageProxy: ImageProxy): Bitmap? {
         return try {
-            val width = imageProxy.width
-            val height = imageProxy.height
-            
-            val planes = imageProxy.planes
-            
-            // Get plane buffers and properties
-            val yPlane = planes[0]
-            val uPlane = planes[1]
-            val vPlane = planes[2]
-            
-            val yBuffer = yPlane.buffer
-            val uBuffer = uPlane.buffer
-            val vBuffer = vPlane.buffer
-            
-            val yRowStride = yPlane.rowStride
-            val uvRowStride = uPlane.rowStride
-            val uvPixelStride = uPlane.pixelStride
-            
-            // Create NV21 byte array (Y + interleaved VU)
-            val nv21Size = width * height + width * height / 2
-            val nv21 = ByteArray(nv21Size)
-            
-            // Copy Y plane
-            var destPos = 0
-            if (yRowStride == width) {
-                // Fast path - no row padding
-                yBuffer.position(0)
-                yBuffer.get(nv21, 0, width * height)
-                destPos = width * height
-            } else {
-                // Handle row stride padding
-                for (row in 0 until height) {
-                    yBuffer.position(row * yRowStride)
-                    yBuffer.get(nv21, destPos, width)
-                    destPos += width
-                }
-            }
-            
-            // Copy UV planes interleaved as VU (NV21 format)
-            val uvHeight = height / 2
-            val uvWidth = width / 2
-            
-            for (row in 0 until uvHeight) {
-                for (col in 0 until uvWidth) {
-                    val uvOffset = row * uvRowStride + col * uvPixelStride
-                    
-                    // NV21 format: V first, then U
-                    nv21[destPos++] = vBuffer.get(uvOffset)
-                    nv21[destPos++] = uBuffer.get(uvOffset)
-                }
-            }
-            
-            // Convert NV21 to JPEG then to Bitmap — 80% quality is sufficient and ~30% faster
-            val yuvImage = YuvImage(nv21, ImageFormat.NV21, width, height, null)
-            val out = ByteArrayOutputStream()
-            yuvImage.compressToJpeg(Rect(0, 0, width, height), 80, out)
-            
-            val options = BitmapFactory.Options().apply {
-                inPreferredConfig = Bitmap.Config.ARGB_8888
-            }
-            var bitmap = BitmapFactory.decodeByteArray(out.toByteArray(), 0, out.size(), options)
-            out.close()
-            
-            if (bitmap == null) {
-                Log.e(TAG, "❌ Failed to decode bitmap from JPEG")
-                return null
-            }
+            // CameraX 1.3.1 built-in conversion (handles all strides perfectly)
+            var bitmap = imageProxy.toBitmap()
             
             // Apply rotation to make image upright for MediaPipe
             val rotation = imageProxy.imageInfo.rotationDegrees
@@ -669,13 +635,13 @@ class MainActivity : FlutterActivity() {
                     // Determine if left hand (is_left feature)
                     val isLeft = if (handLabel == "Left") 1f else 0f
                     
-                    // Palm facing depends on handedness:
-                    // Right hand: negative normalZ = palm facing camera
-                    // Left hand: positive normalZ = palm facing camera
+                    // Python training script logic:
+                    // Right hand: positive normalZ = palm facing camera
+                    // Left hand: negative normalZ = palm facing camera
                     isPalmFacing = if (handLabel == "Right") {
-                        if (normalZ < 0) 1f else 0f
-                    } else {
                         if (normalZ > 0) 1f else 0f
+                    } else {
+                        if (normalZ < 0) 1f else 0f
                     }
                     
                     orientationArray[handIndex * 2] = isPalmFacing
@@ -866,8 +832,8 @@ class MainActivity : FlutterActivity() {
                 rawOutputs[i] = outputBuffer.float
             }
             
-            // Apply softmax to get proper probabilities
-            val probabilities = softmax(rawOutputs)
+            // The TFLite model already outputs proper softmax probabilities
+            val probabilities = rawOutputs
             
             // Create indexed list and sort by probability
             val indexedProbs = probabilities.mapIndexed { idx, prob -> Pair(idx, prob) }
