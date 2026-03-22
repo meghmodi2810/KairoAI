@@ -13,13 +13,25 @@ class SignDetectionService {
   Stream<DetectionResult>? _detectionStream;
   StreamSubscription? _subscription;
   
+  int? _textureId;
+  /// The ID of the native SurfaceTexture to render the camera preview
+  int? get textureId => _textureId;
+  
   /// Start hand sign detection
   Future<void> startDetection() async {
     try {
       // Reset prediction state before starting
       await resetPrediction();
-      await _methodChannel.invokeMethod('startDetection');
-      print('✅ Detection started');
+      final dynamic result = await _methodChannel.invokeMethod('startDetection');
+      if (result is Map) {
+        final tid = result['textureId'];
+        if (tid != null && tid is int) {
+           _textureId = tid;
+        } else if (tid is num) {
+           _textureId = tid.toInt(); // Handle JS/Num casting 
+        }
+      }
+      print('✅ Detection started (textureId : $_textureId)');
     } on PlatformException catch (e) {
       print('❌ Error starting detection: ${e.message}');
       rethrow;
@@ -32,6 +44,7 @@ class SignDetectionService {
       _subscription?.cancel();
       _subscription = null;
       _detectionStream = null;
+      _textureId = null;
       await _methodChannel.invokeMethod('stopDetection');
       print('✅ Detection stopped');
     } on PlatformException catch (e) {

@@ -148,7 +148,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     Switch(
                       value: _maintenanceMode?.isEnabled ?? false,
                       onChanged: (value) => _toggleMaintenanceMode(value),
-                      activeColor: AdminTheme.warning,
+                      activeThumbColor: AdminTheme.warning,
                     ),
                   ],
                 ),

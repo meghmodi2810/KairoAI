@@ -15,6 +15,19 @@ class AppTheme {
   static const Color errorRed = Color(0xFFEF4444);
   static const Color successGreen = Color(0xFF22C55E);
 
+  // ── Re-added Tokens (Used in Redesigned Screens) ──
+  static const Color accent = Color(0xFF6C63FF);
+  static const Color accentDark = Color(0xFF4B44CC);
+  static const Color danger = errorRed;
+  static const Color success = successGreen;
+  static const Color warning = accentAmber;
+  static const Color purple = gemPurple;
+
+  static const List<Color> categoryColors = [
+    Color(0xFF6C63FF), Color(0xFF10B981), Color(0xFFF59E0B), Color(0xFFEF4444),
+    Color(0xFF3B82F6), Color(0xFFA78BFA), Color(0xFF14B8A6), Color(0xFFF97316),
+  ];
+
   // ── Semantic getters (dark defaults, used by old code) ──
   static const Color surface = Color(0xFF0F172A);
   static const Color surfaceLight = Color(0xFF1E293B);
@@ -182,4 +195,5 @@ extension AppColors on BuildContext {
   Color get textSecondary => isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569);
   Color get textMuted => isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8);
   Color get divider => isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+  Color get border => divider;
 }

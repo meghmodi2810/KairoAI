@@ -9,6 +9,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.EventChannel
+import io.flutter.view.TextureRegistry
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.ImageFormat
@@ -62,6 +63,10 @@ class MainActivity : FlutterActivity() {
     private var imageAnalysis: ImageAnalysis? = null
     private var preview: Preview? = null
     private lateinit var cameraExecutor: ExecutorService
+    
+    // Flutter texture for zero-copy camera preview
+    private var textureRegistry: TextureRegistry? = null
+    private var surfaceEntry: TextureRegistry.SurfaceTextureEntry? = null
     private var isDetectionActive = false
     private var useFrontCamera = true
     private var camera: Camera? = null
@@ -88,9 +93,9 @@ class MainActivity : FlutterActivity() {
     
     // Frame processing control
     private var frameCounter = 0
-    private val PROCESS_EVERY_N_FRAMES = 2  // Process more frames for responsiveness
+    private val PROCESS_EVERY_N_FRAMES = 1  // Process every frame
     private var lastProcessTime = 0L
-    private val MIN_PROCESS_INTERVAL_MS = 66L  // ~15 FPS for detection
+    private val MIN_PROCESS_INTERVAL_MS = 33L  // ~30 FPS for detection
     
     // Prediction stabilization
     private var lastPredictions = mutableListOf<String>()
@@ -108,6 +113,9 @@ class MainActivity : FlutterActivity() {
         Log.d(TAG, "🚀 KairoAI MainActivity initializing...")
         Log.d(TAG, "========================================")
         
+        // Grab flutter texture registry
+        textureRegistry = flutterEngine.renderer
+        
         // Initialize camera executor with more capacity
         cameraExecutor = Executors.newFixedThreadPool(2)
         Log.d(TAG, "📷 Camera executor created with 2 threads")
@@ -124,11 +132,15 @@ class MainActivity : FlutterActivity() {
             Log.d(TAG, "📱 Method called: ${call.method}")
             when (call.method) {
                 "startDetection" -> {
+                    if (surfaceEntry == null) {
+                        surfaceEntry = textureRegistry?.createSurfaceTexture()
+                    }
                     startDetection()
                     result.success(mapOf(
                         "success" to true,
                         "handLandmarkerReady" to isHandLandmarkerReady,
-                        "tfliteReady" to isTfliteReady
+                        "tfliteReady" to isTfliteReady,
+                        "textureId" to (surfaceEntry?.id() ?: -1L)
                     ))
                 }
                 "stopDetection" -> {
@@ -222,11 +234,19 @@ class MainActivity : FlutterActivity() {
     
     private fun initializeTFLite() {
         try {
-            Log.d(TAG, "🔄 Initializing TFLite model...")
+            Log.d(TAG, "🔄 Initializing TFLite model (advanced)...")
             
-            val modelBuffer = loadModelFile("isl_model.tflite")
+            val modelBuffer = loadModelFile("isl_model_advanced.tflite")
             val options = Interpreter.Options().apply {
                 setNumThreads(4)
+                setUseXNNPACK(true)   // Fast CPU SIMD
+                // Try NNAPI (NPU/DSP) — falls back to CPU silently
+                try {
+                    addDelegate(org.tensorflow.lite.nnapi.NnApiDelegate())
+                    Log.d(TAG, "   ✅ NNAPI delegate added (NPU/DSP acceleration)")
+                } catch (e: Throwable) {
+                    Log.d(TAG, "   ℹ️ NNAPI not available, using CPU XNNPACK")
+                }
             }
             tfliteInterpreter = Interpreter(modelBuffer, options)
             isTfliteReady = true
@@ -234,7 +254,7 @@ class MainActivity : FlutterActivity() {
             // Log model info
             val inputTensor = tfliteInterpreter?.getInputTensor(0)
             val outputTensor = tfliteInterpreter?.getOutputTensor(0)
-            Log.d(TAG, "✅ TFLite model loaded!")
+            Log.d(TAG, "✅ TFLite ADVANCED model loaded!")
             Log.d(TAG, "   Input shape: ${inputTensor?.shape()?.contentToString()}")
             Log.d(TAG, "   Output shape: ${outputTensor?.shape()?.contentToString()}")
             Log.d(TAG, "   Number of labels defined: ${signLabels.size}")
@@ -242,7 +262,7 @@ class MainActivity : FlutterActivity() {
             
         } catch (e: Exception) {
             Log.e(TAG, "❌ Error loading TFLite model: ${e.message}")
-            Log.e(TAG, "   Ensure 'isl_model.tflite' exists in android/app/src/main/assets/")
+            Log.e(TAG, "   Ensure 'isl_model_advanced.tflite' exists in android/app/src/main/assets/")
             e.printStackTrace()
             isTfliteReady = false
         }
@@ -347,7 +367,7 @@ class MainActivity : FlutterActivity() {
         imageAnalysis = ImageAnalysis.Builder()
             .setTargetResolution(android.util.Size(640, 480))  // Standard VGA for better detection
             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-            .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
+            .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
             .build()
             .also { analysis ->
                 Log.d(TAG, "📷 Setting analyzer on cameraExecutor...")
@@ -366,11 +386,30 @@ class MainActivity : FlutterActivity() {
                 }
                 Log.d(TAG, "✅ Analyzer set successfully")
             }
+            
+        // Setup Native Camera Preview attached to Flutter SurfaceTexture
+        preview = Preview.Builder()
+            .setTargetResolution(android.util.Size(640, 480))
+            .build()
+            
+        surfaceEntry?.surfaceTexture()?.let { surfaceTexture ->
+            surfaceTexture.setDefaultBufferSize(640, 480)
+            
+            val surfaceProvider = Preview.SurfaceProvider { request ->
+                val surface = Surface(surfaceTexture)
+                request.provideSurface(surface, ContextCompat.getMainExecutor(this@MainActivity)) {
+                    surface.release()
+                }
+            }
+            preview?.setSurfaceProvider(surfaceProvider)
+            Log.d(TAG, "✅ Native camera preview surface bound to Flutter texture")
+        }
         
         try {
             camera = provider.bindToLifecycle(
                 this,
                 cameraSelector,
+                preview,
                 imageAnalysis
             )
             
@@ -460,73 +499,8 @@ class MainActivity : FlutterActivity() {
     
     private fun convertToBitmap(imageProxy: ImageProxy): Bitmap? {
         return try {
-            val width = imageProxy.width
-            val height = imageProxy.height
-            
-            val planes = imageProxy.planes
-            
-            // Get plane buffers and properties
-            val yPlane = planes[0]
-            val uPlane = planes[1]
-            val vPlane = planes[2]
-            
-            val yBuffer = yPlane.buffer
-            val uBuffer = uPlane.buffer
-            val vBuffer = vPlane.buffer
-            
-            val yRowStride = yPlane.rowStride
-            val uvRowStride = uPlane.rowStride
-            val uvPixelStride = uPlane.pixelStride
-            
-            // Create NV21 byte array (Y + interleaved VU)
-            val nv21Size = width * height + width * height / 2
-            val nv21 = ByteArray(nv21Size)
-            
-            // Copy Y plane
-            var destPos = 0
-            if (yRowStride == width) {
-                // Fast path - no row padding
-                yBuffer.position(0)
-                yBuffer.get(nv21, 0, width * height)
-                destPos = width * height
-            } else {
-                // Handle row stride padding
-                for (row in 0 until height) {
-                    yBuffer.position(row * yRowStride)
-                    yBuffer.get(nv21, destPos, width)
-                    destPos += width
-                }
-            }
-            
-            // Copy UV planes interleaved as VU (NV21 format)
-            val uvHeight = height / 2
-            val uvWidth = width / 2
-            
-            for (row in 0 until uvHeight) {
-                for (col in 0 until uvWidth) {
-                    val uvOffset = row * uvRowStride + col * uvPixelStride
-                    
-                    // NV21 format: V first, then U
-                    nv21[destPos++] = vBuffer.get(uvOffset)
-                    nv21[destPos++] = uBuffer.get(uvOffset)
-                }
-            }
-            
-            // Convert NV21 to JPEG then to Bitmap
-            val yuvImage = YuvImage(nv21, ImageFormat.NV21, width, height, null)
-            val out = ByteArrayOutputStream()
-            yuvImage.compressToJpeg(Rect(0, 0, width, height), 100, out)
-            
-            val options = BitmapFactory.Options().apply {
-                inPreferredConfig = Bitmap.Config.ARGB_8888
-            }
-            var bitmap = BitmapFactory.decodeByteArray(out.toByteArray(), 0, out.size(), options)
-            out.close()
-            
-            if (bitmap == null) {
-                Log.e(TAG, "❌ Failed to decode bitmap from JPEG")
-                return null
-            }
+            // CameraX 1.3.1 built-in conversion (handles all strides perfectly)
+            var bitmap = imageProxy.toBitmap()
             
             // Apply rotation to make image upright for MediaPipe
             val rotation = imageProxy.imageInfo.rotationDegrees
@@ -599,9 +573,11 @@ class MainActivity : FlutterActivity() {
         val numHands = result.landmarks().size
         Log.d(TAG, "🖐️ Processing $numHands hand(s)")
         
-        // Model expects 126 floats = 2 hands × 21 landmarks × 3 coords
-        // If only 1 hand detected, pad the second hand with zeros
+        // Advanced model expects 130 floats:
+        //   126 = 2 hands × 21 landmarks × 3 coords (normalized)
+        //   4 = 2 hands × (is_palm_facing + is_left)
         val landmarkArray = FloatArray(126) { 0f }
+        val orientationArray = FloatArray(4) { 0f }  // [palm1, left1, palm2, left2]
         
         // Fill NORMALIZED landmarks for each detected hand
         result.landmarks().forEachIndexed { handIndex, handLandmarks ->
@@ -629,25 +605,63 @@ class MainActivity : FlutterActivity() {
                 handLandmarks.forEachIndexed { lmIndex, landmark ->
                     if (lmIndex < 21) {
                         val base = handOffset + lmIndex * 3
-                        // Normalize: subtract wrist position and divide by hand size
                         landmarkArray[base] = (landmark.x() - wristX) / handSize
                         landmarkArray[base + 1] = (landmark.y() - wristY) / handSize
                         landmarkArray[base + 2] = (landmark.z() - wristZ) / handSize
                     }
                 }
+                
+                // ── Compute orientation features ──
+                // Palm normal via cross product of (wrist→indexMCP) × (wrist→pinkyMCP)
+                val indexMcp = handLandmarks.getOrNull(5)
+                val pinkyMcp = handLandmarks.getOrNull(17)
+                
+                var isPalmFacing = 0f
+                if (indexMcp != null && pinkyMcp != null) {
+                    val v1x = indexMcp.x() - wristX
+                    val v1y = indexMcp.y() - wristY
+                    val v1z = indexMcp.z() - wristZ
+                    val v2x = pinkyMcp.x() - wristX
+                    val v2y = pinkyMcp.y() - wristY
+                    val v2z = pinkyMcp.z() - wristZ
+                    
+                    // Cross product z-component
+                    val normalZ = v1x * v2y - v1y * v2x
+                    
+                    // Determine handedness from MediaPipe result
+                    val handedness = result.handednesses().getOrNull(handIndex)
+                    val handLabel = handedness?.getOrNull(0)?.categoryName() ?: "Right"
+                    
+                    // Determine if left hand (is_left feature)
+                    val isLeft = if (handLabel == "Left") 1f else 0f
+                    
+                    // Python training script logic:
+                    // Right hand: positive normalZ = palm facing camera
+                    // Left hand: negative normalZ = palm facing camera
+                    isPalmFacing = if (handLabel == "Right") {
+                        if (normalZ > 0) 1f else 0f
+                    } else {
+                        if (normalZ < 0) 1f else 0f
+                    }
+                    
+                    orientationArray[handIndex * 2] = isPalmFacing
+                    orientationArray[handIndex * 2 + 1] = isLeft
+                    
+                    Log.d(TAG, "🖐️ Hand $handIndex: label=$handLabel, palmFacing=$isPalmFacing, isLeft=$isLeft, normalZ=${String.format("%.4f", normalZ)}")
+                }
             }
         }
         
-        // Log normalized landmark info (wrist should be at 0,0,0 after normalization)
-        Log.d(TAG, "📐 Created NORMALIZED 126-float input for $numHands hand(s)")
-        Log.d(TAG, "📍 Hand 1 wrist (normalized): x=${String.format("%.3f", landmarkArray[0])}, y=${String.format("%.3f", landmarkArray[1])}, z=${String.format("%.3f", landmarkArray[2])}")
-        Log.d(TAG, "📍 Hand 1 index tip (normalized): x=${String.format("%.3f", landmarkArray[24])}, y=${String.format("%.3f", landmarkArray[25])}, z=${String.format("%.3f", landmarkArray[26])}")
-        if (numHands > 1) {
-            Log.d(TAG, "📍 Hand 2 wrist (normalized): x=${String.format("%.3f", landmarkArray[63])}, y=${String.format("%.3f", landmarkArray[64])}, z=${String.format("%.3f", landmarkArray[65])}")
-        }
+        // Combine into 130-float feature vector
+        val fullFeatures = FloatArray(130)
+        System.arraycopy(landmarkArray, 0, fullFeatures, 0, 126)
+        System.arraycopy(orientationArray, 0, fullFeatures, 126, 4)
         
-        // Classify the sign
-        val (rawSign, rawConfidence) = classifySign(landmarkArray)
+        Log.d(TAG, "📐 Created 130-float input for $numHands hand(s) [126 landmarks + 4 orientation]")
+        Log.d(TAG, "📍 Orientation: palm1=${orientationArray[0]}, left1=${orientationArray[1]}, palm2=${orientationArray[2]}, left2=${orientationArray[3]}")
+        
+        // Classify the sign using full 130-feature vector
+        val (rawSign, rawConfidence) = classifySign(fullFeatures)
         
         // Apply confidence threshold and stabilization
         val (detectedSign, confidence) = stabilizePrediction(rawSign, rawConfidence)
@@ -818,8 +832,8 @@ class MainActivity : FlutterActivity() {
                 rawOutputs[i] = outputBuffer.float
             }
             
-            // Apply softmax to get proper probabilities
-            val probabilities = softmax(rawOutputs)
+            // The TFLite model already outputs proper softmax probabilities
+            val probabilities = rawOutputs
             
             // Create indexed list and sort by probability
             val indexedProbs = probabilities.mapIndexed { idx, prob -> Pair(idx, prob) }

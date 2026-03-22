@@ -59,15 +59,16 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: AppTheme.surface,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
         slivers: [
           // Header
           SliverAppBar(
-            expandedHeight: 180,
+            expandedHeight: 240,
             pinned: true,
-            backgroundColor: AppTheme.surface,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
             leading: IconButton(
               icon: const Icon(Icons.arrow_back_ios_rounded, color: Colors.white),
               onPressed: () => Navigator.pop(context),
@@ -129,12 +130,12 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
                   child: Center(child: CircularProgressIndicator(color: AppTheme.primaryIndigo)),
                 )
               : _lessons.isEmpty
-                  ? SliverFillRemaining(child: _buildEmpty())
+                  ? SliverFillRemaining(child: _buildEmpty(cs))
                   : SliverPadding(
                       padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
                       sliver: SliverList(
                         delegate: SliverChildBuilderDelegate(
-                          (context, index) => _buildLessonCard(index),
+                          (context, index) => _buildLessonCard(index, cs),
                           childCount: _lessons.length,
                         ),
                       ),
@@ -145,6 +146,7 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
   }
 
   Widget _buildProgress() {
+    final cs = Theme.of(context).colorScheme;
     int completed = _progressMap.values.where((p) => p.status == 'completed').length;
     double pct = _lessons.isEmpty ? 0 : completed / _lessons.length;
     return Padding(
@@ -152,7 +154,7 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppTheme.cardDark,
+          color: cs.surface,
           borderRadius: BorderRadius.circular(14),
         ),
         child: Column(
@@ -160,7 +162,7 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Progress', style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w600)),
+                Text('Progress', style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w600)),
                 Text(
                   '$completed / ${_lessons.length} completed',
                   style: const TextStyle(color: AppTheme.accentGreen, fontSize: 13, fontWeight: FontWeight.bold),
@@ -173,7 +175,7 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
               child: LinearProgressIndicator(
                 value: pct,
                 minHeight: 8,
-                backgroundColor: AppTheme.cardLight,
+                backgroundColor: cs.onSurface.withOpacity(0.08),
                 valueColor: AlwaysStoppedAnimation<Color>(_categoryColor),
               ),
             ),
@@ -183,23 +185,23 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
     );
   }
 
-  Widget _buildEmpty() {
-    return const Center(
+  Widget _buildEmpty(ColorScheme cs) {
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.school_outlined, color: AppTheme.textMuted, size: 56),
-          SizedBox(height: 16),
-          Text('No lessons yet', style: TextStyle(color: AppTheme.textSecondary, fontSize: 18)),
-          SizedBox(height: 8),
+          Icon(Icons.school_outlined, color: cs.onSurface.withOpacity(0.35), size: 56),
+          const SizedBox(height: 16),
+          Text('No lessons yet', style: TextStyle(color: cs.onSurface.withOpacity(0.6), fontSize: 18)),
+          const SizedBox(height: 8),
           Text('Lessons will appear here once the admin adds them.',
-              style: TextStyle(color: AppTheme.textMuted, fontSize: 14)),
+              style: TextStyle(color: cs.onSurface.withOpacity(0.4), fontSize: 14)),
         ],
       ),
     );
   }
 
-  Widget _buildLessonCard(int index) {
+  Widget _buildLessonCard(int index, ColorScheme cs) {
     final lesson = _lessons[index];
     final progress = _progressMap[lesson.id];
     final isCompleted = progress?.status == 'completed';
@@ -212,7 +214,7 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
       isLocked = req?.status != 'completed';
     }
 
-    Color statusColor = AppTheme.textMuted;
+    Color statusColor = cs.onSurface.withOpacity(0.35);
     IconData statusIcon = Icons.circle_outlined;
     if (isCompleted) {
       statusColor = AppTheme.accentGreen;
@@ -243,7 +245,7 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
         difficultyLabel = 'Advanced';
         break;
       default:
-        difficultyColor = AppTheme.textMuted;
+        difficultyColor = cs.onSurface.withOpacity(0.35);
     }
 
     return Padding(
@@ -265,14 +267,14 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: isLocked ? AppTheme.cardDark.withOpacity(0.5) : AppTheme.cardDark,
+            color: isLocked ? cs.surface.withOpacity(0.5) : cs.surface,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isCompleted
                   ? AppTheme.accentGreen.withOpacity(0.4)
                   : isInProgress
                       ? AppTheme.accentAmber.withOpacity(0.3)
-                      : AppTheme.dividerColor,
+                      : cs.onSurface.withOpacity(0.08),
             ),
           ),
           child: Row(
@@ -306,13 +308,18 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
                     Text(
                       lesson.title,
                       style: TextStyle(
-                        color: isLocked ? AppTheme.textMuted : AppTheme.textPrimary,
+                        color: isLocked ? cs.onSurface.withOpacity(0.35) : cs.onSurface,
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 6),
-                    Row(
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -325,18 +332,23 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
                             style: TextStyle(color: difficultyColor, fontSize: 11, fontWeight: FontWeight.w600),
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        Icon(Icons.timer_outlined, color: AppTheme.textMuted, size: 14),
-                        const SizedBox(width: 3),
-                        Text(
-                          '${lesson.estimatedMinutes} min',
-                          style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.timer_outlined, color: cs.onSurface.withOpacity(0.35), size: 14),
+                            const SizedBox(width: 3),
+                            Text(
+                              '${lesson.estimatedMinutes} min',
+                              style: TextStyle(color: cs.onSurface.withOpacity(0.35), fontSize: 12),
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
               // Rewards
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,

@@ -124,7 +124,7 @@ def load_dataset():
     return X, y, df
 
 def load_model():
-    """Load the trained model (supports both Keras and TFLite formats)."""
+    """Load the trained model."""
     print("\n" + "="*60)
     print("LOADING MODEL")
     print("="*60)
@@ -134,75 +134,16 @@ def load_model():
         print("  Please update CONFIG['model_path'] with correct path")
         return None
     
-    model_path = CONFIG["model_path"]
+    model = keras.models.load_model(CONFIG["model_path"])
+    print(f"✓ Model loaded from: {CONFIG['model_path']}")
     
-    # Check if it's a TFLite model
-    if model_path.endswith('.tflite'):
-        print(f"✓ Loading TFLite model from: {model_path}")
-        interpreter = tf.lite.Interpreter(model_path=model_path)
-        interpreter.allocate_tensors()
-        
-        # Get model info
-        input_details = interpreter.get_input_details()
-        output_details = interpreter.get_output_details()
-        
-        # Get model file size
-        model_size = os.path.getsize(model_path) / 1024  # KB
-        
-        print(f"\n  TFLite Model Summary:")
-        print(f"    Input shape: {input_details[0]['shape']}")
-        print(f"    Input dtype: {input_details[0]['dtype']}")
-        print(f"    Output shape: {output_details[0]['shape']}")
-        print(f"    Model size: {model_size:.1f} KB")
-        
-        # Return interpreter wrapped in a dict for identification
-        return {"type": "tflite", "interpreter": interpreter, 
-                "input_details": input_details, "output_details": output_details}
-    else:
-        # Load Keras model
-        model = keras.models.load_model(model_path)
-        print(f"✓ Keras model loaded from: {model_path}")
-        
-        print(f"\n  Model Summary:")
-        total_params = model.count_params()
-        print(f"    Total parameters: {total_params:,}")
-        print(f"    Model size: ~{total_params * 4 / 1024:.1f} KB (float32)")
-        
-        return {"type": "keras", "model": model}
-
-
-def predict_with_model(model_dict, X):
-    """Make predictions using either Keras or TFLite model."""
-    if model_dict["type"] == "tflite":
-        interpreter = model_dict["interpreter"]
-        input_details = model_dict["input_details"]
-        output_details = model_dict["output_details"]
-        
-        predictions = []
-        total = len(X)
-        print_interval = max(1, total // 10)  # Print progress every 10%
-        
-        for i in range(total):
-            # Prepare input
-            input_data = X[i:i+1].astype(np.float32)
-            interpreter.set_tensor(input_details[0]['index'], input_data)
-            
-            # Run inference
-            interpreter.invoke()
-            
-            # Get output
-            output = interpreter.get_tensor(output_details[0]['index'])
-            predictions.append(output[0])
-            
-            # Progress indicator
-            if (i + 1) % print_interval == 0 or i == total - 1:
-                print(f"    Progress: {i+1}/{total} ({(i+1)/total*100:.0f}%)", end='\r')
-        
-        print()  # New line after progress
-        return np.array(predictions)
-    else:
-        # Keras model
-        return model_dict["model"].predict(X, verbose=0)
+    # Model summary
+    print(f"\n  Model Summary:")
+    total_params = model.count_params()
+    print(f"    Total parameters: {total_params:,}")
+    print(f"    Model size: ~{total_params * 4 / 1024:.1f} KB (float32)")
+    
+    return model
 
 def split_data(X, y):
     """Split data into train, validation, and test sets."""
@@ -237,7 +178,7 @@ def split_data(X, y):
 # EVALUATION FUNCTIONS
 # ============================================================================
 
-def evaluate_model(model_dict, X_train, X_val, X_test, y_train, y_val, y_test):
+def evaluate_model(model, X_train, X_val, X_test, y_train, y_val, y_test):
     """Evaluate model on all datasets and compute metrics."""
     print("\n" + "="*60)
     print("EVALUATING MODEL")
@@ -252,10 +193,10 @@ def evaluate_model(model_dict, X_train, X_val, X_test, y_train, y_val, y_test):
     ]
     
     for name, X, y in datasets:
-        print(f"\n  Evaluating on {name} set ({len(X)} samples)...")
+        print(f"\n  Evaluating on {name} set...")
         
-        # Get predictions using the appropriate method
-        y_pred_proba = predict_with_model(model_dict, X)
+        # Get predictions
+        y_pred_proba = model.predict(X, verbose=0)
         y_pred = np.argmax(y_pred_proba, axis=1)
         
         # Calculate metrics
