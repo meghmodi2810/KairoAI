@@ -4,8 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'signup_page.dart';
 import '../main_navigation.dart';
-import '../admin/pages/admin_dashboard_page.dart';
-import '../admin/models/admin_models.dart';
+import 'package:kairo_ai/admin/screens/admin_shell.dart';
+import 'package:kairo_ai/admin/models/admin_models.dart';
 import '../theme/app_theme.dart';
 
 class LoginPage extends StatefulWidget {
@@ -91,9 +91,10 @@ class _LoginPageState extends State<LoginPage> {
         await _navigateAfterLogin(cred.user!.uid);
       }
     } on FirebaseAuthException catch (e) {
-      _showError(e.message ?? 'Google sign-in failed.');
-    } catch (_) {
-      _showError('Google sign-in failed. Please try again.');
+      _showError(e.message ?? 'Firebase: ${e.code}');
+    } catch (e) {
+      _showError('Login Error: ${e.toString()}');
+      debugPrint('GOOGLE SIGN IN ERROR: $e');
     } finally {
       if (mounted) setState(() => _googleLoading = false);
     }
@@ -105,7 +106,7 @@ class _LoginPageState extends State<LoginPage> {
       final adminDoc = await FirebaseFirestore.instance.collection('admins').doc(uid).get();
       if (adminDoc.exists) {
         final admin = AdminModel.fromFirestore(adminDoc);
-        if (admin.isActive) dest = AdminDashboardPage(admin: admin);
+        if (admin.isActive) dest = AdminShell(admin: admin);
       }
     } catch (_) {}
     if (!mounted) return;
@@ -174,7 +175,7 @@ class _LoginPageState extends State<LoginPage> {
                           borderRadius: BorderRadius.circular(22),
                           boxShadow: [
                             BoxShadow(
-                              color: _accent.withOpacity(0.4),
+                              color: _accent.withValues(alpha: 0.4),
                               blurRadius: 24,
                               offset: const Offset(0, 8),
                             ),
@@ -408,11 +409,11 @@ class _PrimaryBtn extends StatelessWidget {
           gradient: LinearGradient(
             colors: onPressed != null
                 ? [_accent, const Color(0xFF9B94FF)]
-                : [_accent.withOpacity(0.4), const Color(0xFF9B94FF).withOpacity(0.4)],
+                : [_accent.withValues(alpha: 0.4), const Color(0xFF9B94FF).withValues(alpha: 0.4)],
           ),
           borderRadius: BorderRadius.circular(13),
           boxShadow: onPressed != null
-              ? [BoxShadow(color: _accent.withOpacity(0.35), blurRadius: 20, offset: const Offset(0, 6))]
+              ? [BoxShadow(color: _accent.withValues(alpha: 0.35), blurRadius: 20, offset: const Offset(0, 6))]
               : null,
         ),
         child: ElevatedButton(

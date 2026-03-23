@@ -81,7 +81,7 @@ class _FloatingNavBar extends StatelessWidget {
         border: Border.all(color: context.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.25),
+            color: Colors.black.withValues(alpha: 0.25),
             blurRadius: 24,
             offset: const Offset(0, 8),
           ),
@@ -107,12 +107,12 @@ class _FloatingNavBar extends StatelessWidget {
                       height: selected ? 44 : 36,
                       decoration: BoxDecoration(
                         color: selected
-                            ? AppTheme.accent.withOpacity(0.16)
+                            ? AppTheme.accent.withValues(alpha: 0.16)
                             : Colors.transparent,
                         borderRadius: BorderRadius.circular(14),
                         boxShadow: selected
                             ? [BoxShadow(
-                                color: AppTheme.accent.withOpacity(0.3),
+                                color: AppTheme.accent.withValues(alpha: 0.3),
                                 blurRadius: 12,
                                 spreadRadius: 1,
                               )]

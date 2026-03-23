@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/sign_detection_service.dart';
@@ -422,7 +423,7 @@ class _SignPracticePageState extends State<SignPracticePage>
       child: Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.95),
+          color: Colors.white.withValues(alpha: 0.95),
           borderRadius: BorderRadius.circular(32),
           border: Border.all(
             color: result.confidence > 0.7
@@ -570,9 +571,9 @@ class _SignPracticePageState extends State<SignPracticePage>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: color.withOpacity(0.4), width: 2),
+        border: Border.all(color: color.withValues(alpha: 0.4), width: 2),
       ),
       child: Text(
         text,

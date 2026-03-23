@@ -194,11 +194,11 @@ class _ContinueButton extends StatelessWidget {
           gradient: LinearGradient(
             colors: enabled
                 ? [const Color(0xFF6C63FF), const Color(0xFF9B94FF)]
-                : [const Color(0xFF6C63FF).withOpacity(0.3), const Color(0xFF9B94FF).withOpacity(0.3)],
+                : [const Color(0xFF6C63FF).withValues(alpha: 0.3), const Color(0xFF9B94FF).withValues(alpha: 0.3)],
           ),
           borderRadius: BorderRadius.circular(14),
           boxShadow: enabled
-              ? [BoxShadow(color: const Color(0xFF6C63FF).withOpacity(0.4), blurRadius: 20, offset: const Offset(0, 6))]
+              ? [BoxShadow(color: const Color(0xFF6C63FF).withValues(alpha: 0.4), blurRadius: 20, offset: const Offset(0, 6))]
               : null,
         ),
         child: ElevatedButton(
@@ -243,7 +243,7 @@ class _WelcomePage extends StatelessWidget {
               borderRadius: BorderRadius.circular(36),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF6C63FF).withOpacity(0.4),
+                  color: const Color(0xFF6C63FF).withValues(alpha: 0.4),
                   blurRadius: 32,
                   offset: const Offset(0, 8),
                 ),
@@ -443,7 +443,7 @@ class _DailyGoalTile extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF6C63FF).withOpacity(0.12) : const Color(0xFF14141C),
+          color: isSelected ? const Color(0xFF6C63FF).withValues(alpha: 0.12) : const Color(0xFF14141C),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: isSelected ? const Color(0xFF6C63FF) : const Color(0xFF252530),
@@ -500,9 +500,9 @@ class _ReadyPage extends StatelessWidget {
             width: 112,
             height: 112,
             decoration: BoxDecoration(
-              color: const Color(0xFF4ADE80).withOpacity(0.12),
+              color: const Color(0xFF4ADE80).withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(36),
-              border: Border.all(color: const Color(0xFF4ADE80).withOpacity(0.3)),
+              border: Border.all(color: const Color(0xFF4ADE80).withValues(alpha: 0.3)),
             ),
             child: const Icon(Icons.celebration_rounded, color: Color(0xFF4ADE80), size: 52),
           ),
@@ -558,7 +558,7 @@ class _OptionTile extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF6C63FF).withOpacity(0.12) : const Color(0xFF14141C),
+          color: isSelected ? const Color(0xFF6C63FF).withValues(alpha: 0.12) : const Color(0xFF14141C),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: isSelected ? const Color(0xFF6C63FF) : const Color(0xFF252530),
@@ -571,7 +571,7 @@ class _OptionTile extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: isSelected ? const Color(0xFF6C63FF).withOpacity(0.2) : const Color(0xFF252530),
+                color: isSelected ? const Color(0xFF6C63FF).withValues(alpha: 0.2) : const Color(0xFF252530),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(icon,

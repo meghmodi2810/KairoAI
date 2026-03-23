@@ -1,6 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../models/admin_models.dart';
+import 'package:kairo_ai/admin/models/admin_models.dart';
 
 class AdminAuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -188,7 +189,7 @@ class AdminAuthService {
       });
     } catch (e) {
       // Silent fail - don't break the main operation
-      print('Failed to log audit action: $e');
+      debugPrint('Failed to log audit action: $e');
     }
   }
 

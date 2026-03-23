@@ -102,9 +102,9 @@ class ProfilePage extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       decoration: BoxDecoration(
-                        color: AppTheme.danger.withOpacity(0.08),
+                        color: AppTheme.danger.withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppTheme.danger.withOpacity(0.25)),
+                        border: Border.all(color: AppTheme.danger.withValues(alpha: 0.25)),
                       ),
                       child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                         Icon(Icons.logout_rounded, color: AppTheme.danger, size: 18),
@@ -143,7 +143,7 @@ class _HeroHeader extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(24, MediaQuery.of(context).padding.top + 24, 24, 28),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppTheme.accent.withOpacity(0.7), AppTheme.accentDark.withOpacity(0.9)],
+          colors: [AppTheme.accent.withValues(alpha: 0.7), AppTheme.accentDark.withValues(alpha: 0.9)],
           begin: Alignment.topLeft, end: Alignment.bottomRight),
       ),
       child: Column(children: [
@@ -152,8 +152,8 @@ class _HeroHeader extends StatelessWidget {
           width: 80, height: 80,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.white.withOpacity(0.2),
-            border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
+            color: Colors.white.withValues(alpha: 0.2),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 2),
           ),
           child: Center(child: Text(initials.isEmpty ? '?' : initials,
             style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800))),
@@ -162,15 +162,15 @@ class _HeroHeader extends StatelessWidget {
         Text(name, style: const TextStyle(
           color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
         const SizedBox(height: 2),
-        Text(email, style: TextStyle(color: Colors.white.withOpacity(0.65), fontSize: 13)),
+        Text(email, style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 13)),
         const SizedBox(height: 12),
         // Level pill
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.15),
+            color: Colors.white.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withOpacity(0.25))),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.25))),
           child: Text('Level $level ISL Learner', style: const TextStyle(
             color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
         ),
@@ -236,7 +236,7 @@ class _SettingsGroup extends StatelessWidget {
               leading: Container(
                 width: 36, height: 36,
                 decoration: BoxDecoration(
-                  color: AppTheme.accent.withOpacity(0.1),
+                  color: AppTheme.accent.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10)),
                 child: Icon(item.icon, color: AppTheme.accent, size: 18)),
               title: Text(item.label, style: TextStyle(

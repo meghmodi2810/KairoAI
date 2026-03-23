@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 
@@ -31,9 +32,9 @@ class SignDetectionService {
            _textureId = tid.toInt(); // Handle JS/Num casting 
         }
       }
-      print('✅ Detection started (textureId : $_textureId)');
+      debugPrint('✅ Detection started (textureId : $_textureId)');
     } on PlatformException catch (e) {
-      print('❌ Error starting detection: ${e.message}');
+      debugPrint('❌ Error starting detection: ${e.message}');
       rethrow;
     }
   }
@@ -46,9 +47,9 @@ class SignDetectionService {
       _detectionStream = null;
       _textureId = null;
       await _methodChannel.invokeMethod('stopDetection');
-      print('✅ Detection stopped');
+      debugPrint('✅ Detection stopped');
     } on PlatformException catch (e) {
-      print('❌ Error stopping detection: ${e.message}');
+      debugPrint('❌ Error stopping detection: ${e.message}');
       rethrow;
     }
   }
@@ -59,10 +60,10 @@ class SignDetectionService {
       // Reset predictions when switching camera
       await resetPrediction();
       final bool isFrontCamera = await _methodChannel.invokeMethod('switchCamera');
-      print('📷 Switched to ${isFrontCamera ? "front" : "back"} camera');
+      debugPrint('📷 Switched to ${isFrontCamera ? "front" : "back"} camera');
       return isFrontCamera;
     } on PlatformException catch (e) {
-      print('❌ Error switching camera: ${e.message}');
+      debugPrint('❌ Error switching camera: ${e.message}');
       rethrow;
     }
   }
@@ -71,9 +72,9 @@ class SignDetectionService {
   Future<void> resetPrediction() async {
     try {
       await _methodChannel.invokeMethod('resetPrediction');
-      print('🔄 Prediction state reset');
+      debugPrint('🔄 Prediction state reset');
     } on PlatformException catch (e) {
-      print('❌ Error resetting prediction: ${e.message}');
+      debugPrint('❌ Error resetting prediction: ${e.message}');
       // Non-critical error, don't rethrow
     }
   }
@@ -84,7 +85,7 @@ class SignDetectionService {
       final bool isFront = await _methodChannel.invokeMethod('isFrontCamera');
       return isFront;
     } on PlatformException catch (e) {
-      print('❌ Error checking camera: ${e.message}');
+      debugPrint('❌ Error checking camera: ${e.message}');
       return true; // Default to front
     }
   }
@@ -95,12 +96,12 @@ class SignDetectionService {
     _detectionStream = _eventChannel
         .receiveBroadcastStream()
         .map((event) {
-          print('📥 Received event from native: $event');
+          debugPrint('📥 Received event from native: $event');
           final data = Map<String, dynamic>.from(event);
           return DetectionResult.fromMap(data);
         })
         .handleError((error) {
-          print('❌ Stream error: $error');
+          debugPrint('❌ Stream error: $error');
         });
     
     return _detectionStream!;
@@ -113,7 +114,7 @@ class SignDetectionService {
           await _methodChannel.invokeMethod('checkCameraPermission');
       return hasPermission;
     } on PlatformException catch (e) {
-      print('❌ Error checking permission: ${e.message}');
+      debugPrint('❌ Error checking permission: ${e.message}');
       return false;
     }
   }
@@ -126,7 +127,7 @@ class SignDetectionService {
       await Future.delayed(const Duration(milliseconds: 500));
       return await checkCameraPermission();
     } on PlatformException catch (e) {
-      print('❌ Error requesting permission: ${e.message}');
+      debugPrint('❌ Error requesting permission: ${e.message}');
       return false;
     }
   }

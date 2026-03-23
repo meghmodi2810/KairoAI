@@ -84,7 +84,7 @@ class LearnPage extends StatelessWidget {
                                         width: 3,
                                       ),
                                       boxShadow: cat.isLocked ? null : [
-                                        BoxShadow(color: color.withOpacity(0.4), blurRadius: 8, offset: const Offset(0, 4))
+                                        BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 4))
                                       ],
                                     ),
                                     child: cat.isLocked
@@ -159,10 +159,10 @@ class _CategoryNode extends StatelessWidget {
       child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: category.isLocked ? context.card.withOpacity(0.5) : context.card,
+            color: category.isLocked ? context.card.withValues(alpha: 0.5) : context.card,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: category.isLocked ? context.border : color.withOpacity(0.4),
+              color: category.isLocked ? context.border : color.withValues(alpha: 0.4),
               width: category.isLocked ? 1 : 1.5,
             ),
           ),
@@ -173,7 +173,7 @@ class _CategoryNode extends StatelessWidget {
               decoration: BoxDecoration(
                 color: category.isLocked
                     ? context.border
-                    : color.withOpacity(0.15),
+                    : color.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(15),
               ),
               child: Center(
@@ -231,7 +231,7 @@ class _CategoryNode extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(left: 8),
                 child: Icon(Icons.arrow_forward_ios_rounded,
-                  color: color.withOpacity(0.6), size: 14)),
+                  color: color.withValues(alpha: 0.6), size: 14)),
           ]),
         ),
     );
