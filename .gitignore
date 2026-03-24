@@ -50,5 +50,6 @@ app.*.map.json
 
 # Adding config files into gitignore
 firebase.json
+upload_to_firebase.py
 firestore.rules
 **/google-services.json
