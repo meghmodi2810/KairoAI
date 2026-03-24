@@ -1,429 +1,256 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../theme/app_theme.dart';
 import '../models/app_models.dart';
-import '../services/database_service.dart';
 import 'login_page.dart';
-import 'home_page.dart';
 
-class ProfilePage extends StatefulWidget {
+class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
 
   @override
-  State<ProfilePage> createState() => _ProfilePageState();
-}
-
-class _ProfilePageState extends State<ProfilePage> {
-  final DatabaseService _databaseService = DatabaseService();
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  UserModel? _user;
-  bool _isLoading = true;
-  bool _hasError = false;
-  String _errorMessage = '';
-  StreamSubscription<UserModel?>? _userSubscription;
-
-  // Theme colors
-  static const Color darkBlue = Color(0xFF141938);
-  static const Color accentYellow = Color(0xFFFFD93D);
-  static const Color cardBg = Color(0xFF252A5E);
-
-  @override
-  void initState() {
-    super.initState();
-    _initializeUser();
-  }
-
-  @override
-  void dispose() {
-    _userSubscription?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _initializeUser() async {
-    try {
-      // Ensure user document exists first
-      final currentUser = _auth.currentUser;
-      if (currentUser != null) {
-        await _databaseService.createUserDocument(currentUser);
-      }
-      
-      // Subscribe to user stream for real-time updates
-      _userSubscription = _databaseService.userStream().listen(
-        (user) {
-          if (mounted) {
-            setState(() {
-              _user = user;
-              _isLoading = false;
-              _hasError = false;
-            });
-          }
-        },
-        onError: (error) {
-          if (mounted) {
-            setState(() {
-              _isLoading = false;
-              _hasError = true;
-              _errorMessage = 'Failed to load profile data';
-            });
-          }
-        },
-      );
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _hasError = true;
-          _errorMessage = 'Failed to initialize profile: ${e.toString()}';
-        });
-      }
-    }
-  }
-
-  Future<void> _refreshUser() async {
-    setState(() {
-      _isLoading = true;
-      _hasError = false;
-    });
-    await _initializeUser();
-  }
-
-  Future<void> _signOut() async {
-    await _auth.signOut();
-    if (mounted) {
-      Navigator.of(context).pushAndRemoveUntil(
-        PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) => const LoginPage(),
-          transitionDuration: Duration.zero,
-          reverseTransitionDuration: Duration.zero,
-        ),
-        (route) => false,
-      );
-    }
-  }
-
-  void _seedData() async {
-    setState(() => _isLoading = true);
-    try {
-      // Use forceReseedData to replace old data with comprehensive new lessons
-      await _databaseService.forceReseedData();
-      await _refreshUser();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Lesson data refreshed successfully!'),
-            backgroundColor: Color(0xFF27AE60),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _hasError = true;
-          _errorMessage = 'Failed to seed data: ${e.toString()}';
-        });
-      }
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final uid  = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final user = FirebaseAuth.instance.currentUser;
+
     return Scaffold(
-      backgroundColor: darkBlue,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text(
-          'Profile',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-        automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: _refreshUser,
-          ),
-        ],
-      ),
-      body: _buildBody(),
-    );
-  }
+      backgroundColor: context.surface,
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
+        builder: (context, snap) {
+          final ud     = snap.data?.data() as Map<String, dynamic>?;
+          final name   = (ud?['displayName'] ?? user?.displayName ?? 'Learner') as String;
+          final email  = user?.email ?? '';
+          final streak = (ud?['streakDays'] ?? 0) as int;
+          final gems   = (ud?['gems']       ?? 0) as int;
+          final xp     = (ud?['xp']         ?? 0) as int;
+          final level  = (ud?['level']       ?? 1) as int;
+          final completedLessons = ((ud?['completedLessonIds']) as List?)?.length ?? 0;
 
-  Widget _buildBody() {
-    if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: accentYellow),
-      );
-    }
+          return CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              // ── HERO HEADER ──────────────────────────────────────
+              SliverToBoxAdapter(
+                child: _HeroHeader(name: name, email: email, level: level),
+              ),
 
-    if (_hasError) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.error_outline,
-                color: Colors.redAccent,
-                size: 60,
+              // ── 2×2 STATS GRID ──────────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                  child: Column(children: [
+                    Row(children: [
+                      Expanded(child: _StatCard(label: 'Day Streak', value: '$streak', emoji: '🔥',
+                        color: const Color(0xFFFF6B35))),
+                      const SizedBox(width: 10),
+                      Expanded(child: _StatCard(label: 'Total XP', value: '$xp', emoji: '⚡',
+                        color: AppTheme.warning)),
+                    ]),
+                    const SizedBox(height: 10),
+                    Row(children: [
+                      Expanded(child: _StatCard(label: 'Gems', value: '$gems', emoji: '💎',
+                        color: AppTheme.purple)),
+                      const SizedBox(width: 10),
+                      Expanded(child: _StatCard(label: 'Lessons', value: '$completedLessons', emoji: '📚',
+                        color: AppTheme.accent)),
+                    ]),
+                  ]),
+                ),
               ),
-              const SizedBox(height: 16),
-              Text(
-                _errorMessage,
-                style: const TextStyle(color: Colors.white70),
-                textAlign: TextAlign.center,
+
+              // ── SETTINGS ─────────────────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 28, 20, 0),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Settings', style: TextStyle(
+                      color: context.textMuted, fontSize: 11,
+                      fontWeight: FontWeight.w700, letterSpacing: 0.8)),
+                    const SizedBox(height: 8),
+                    _SettingsGroup(items: [
+                      _SettingsItemData(icon: Icons.person_rounded,      label: 'Account',        sub: email),
+                      _SettingsItemData(icon: Icons.notifications_rounded, label: 'Notifications',   sub: 'Manage alerts'),
+                      _SettingsItemData(icon: Icons.language_rounded,     label: 'Language',       sub: 'English'),
+                    ]),
+                    const SizedBox(height: 16),
+                    Text('Support', style: TextStyle(
+                      color: context.textMuted, fontSize: 11,
+                      fontWeight: FontWeight.w700, letterSpacing: 0.8)),
+                    const SizedBox(height: 8),
+                    _SettingsGroup(items: [
+                      _SettingsItemData(icon: Icons.help_outline_rounded, label: 'Help & FAQ',     sub: 'Get support'),
+                      _SettingsItemData(icon: Icons.info_outline_rounded, label: 'About KairoAI', sub: 'Version 1.0'),
+                    ]),
+                  ]),
+                ),
               ),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: _refreshUser,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: accentYellow,
-                  foregroundColor: darkBlue,
+
+              // ── SIGN OUT ─────────────────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 100),
+                  child: GestureDetector(
+                    onTap: () async {
+                      await FirebaseAuth.instance.signOut();
+                      if (context.mounted) {
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(builder: (_) => const LoginPage()),
+                          (_) => false);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      decoration: BoxDecoration(
+                        color: AppTheme.danger.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppTheme.danger.withValues(alpha: 0.25)),
+                      ),
+                      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        Icon(Icons.logout_rounded, color: AppTheme.danger, size: 18),
+                        const SizedBox(width: 8),
+                        Text('Sign Out', style: TextStyle(
+                          color: AppTheme.danger, fontSize: 15, fontWeight: FontWeight.w700)),
+                      ]),
+                    ),
+                  ),
                 ),
               ),
             ],
-          ),
-        ),
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: _refreshUser,
-      color: accentYellow,
-      backgroundColor: cardBg,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            // Profile Avatar
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                color: cardBg,
-                shape: BoxShape.circle,
-                border: Border.all(color: accentYellow, width: 3),
-              ),
-              child: _auth.currentUser?.photoURL != null
-                  ? ClipOval(
-                      child: Image.network(
-                        _auth.currentUser!.photoURL!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Icon(
-                          Icons.person,
-                          color: Colors.white60,
-                          size: 50,
-                        ),
-                      ),
-                    )
-                  : const Icon(Icons.person, color: Colors.white60, size: 50),
-            ),
-            const SizedBox(height: 16),
-            
-            // User Name
-            Text(
-              _user?.displayName ?? _auth.currentUser?.displayName ?? 'Learner',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              _user?.email ?? _auth.currentUser?.email ?? '',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.6),
-                fontSize: 14,
-              ),
-            ),
-            const SizedBox(height: 24),
-            
-            // Stats Row - Connected to real Firebase data
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildStatCard('💎', '${_user?.gems ?? 0}', 'Gems'),
-                _buildStatCard('🪙', '${_user?.coins ?? 0}', 'Coins'),
-                _buildStatCard('🔥', '${_user?.streakDays ?? 0}', 'Streak'),
-              ],
-            ),
-            const SizedBox(height: 24),
-            
-            // Progress Stats
-            _buildProgressCard(),
-            const SizedBox(height: 16),
-            
-            // Menu Options
-            _buildMenuOption(
-              icon: Icons.sign_language,
-              title: 'Test ISL',
-              subtitle: 'Test Indian Sign Language detection',
-              onTap: () {
-                Navigator.push(
-                  context,
-                  PageRouteBuilder(
-                    pageBuilder: (context, animation, secondaryAnimation) => const HomePage(),
-                    transitionDuration: Duration.zero,
-                    reverseTransitionDuration: Duration.zero,
-                  ),
-                );
-              },
-            ),
-            _buildMenuOption(
-              icon: Icons.refresh,
-              title: 'Refresh Lesson Data',
-              subtitle: 'Reload all lessons & signs (tap if lessons won\'t start)',
-              onTap: _seedData,
-            ),
-            _buildMenuOption(
-              icon: Icons.help_outline,
-              title: 'Help & Support',
-              subtitle: 'Get help with the app',
-              onTap: () {},
-            ),
-            _buildMenuOption(
-              icon: Icons.info_outline,
-              title: 'About',
-              subtitle: 'Learn about KairoAI',
-              onTap: () {},
-            ),
-            const SizedBox(height: 16),
-            
-            // Sign Out Button
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: _signOut,
-                icon: const Icon(Icons.logout, color: Colors.redAccent),
-                label: const Text('Sign Out', style: TextStyle(color: Colors.redAccent)),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Colors.redAccent),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
+}
 
-  Widget _buildStatCard(String emoji, String value, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        children: [
-          Text(emoji, style: const TextStyle(fontSize: 24)),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+// ── Hero header ───────────────────────────────────────────────
+class _HeroHeader extends StatelessWidget {
+  final String name, email;
+  final int level;
+  const _HeroHeader({required this.name, required this.email, required this.level});
 
-  Widget _buildProgressCard() {
+  @override
+  Widget build(BuildContext context) {
+    final initials = name.trim().split(' ')
+        .where((w) => w.isNotEmpty)
+        .take(2)
+        .map((w) => w[0].toUpperCase())
+        .join();
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.fromLTRB(24, MediaQuery.of(context).padding.top + 24, 24, 28),
       decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          colors: [AppTheme.accent.withValues(alpha: 0.7), AppTheme.accentDark.withValues(alpha: 0.9)],
+          begin: Alignment.topLeft, end: Alignment.bottomRight),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Your Progress',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+      child: Column(children: [
+        // Avatar
+        Container(
+          width: 80, height: 80,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white.withValues(alpha: 0.2),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 2),
           ),
-          const SizedBox(height: 16),
-          _buildProgressRow('Lessons Completed', '${_user?.totalLessonsCompleted ?? 0}'),
-          _buildProgressRow('Signs Learned', '${_user?.totalSignsLearned ?? 0}'),
-          _buildProgressRow('Practice Time', '${_user?.totalPracticeMinutes ?? 0} min'),
-          _buildProgressRow('Current Level', '${_user?.currentLevel ?? 1}'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProgressRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
-              fontSize: 14,
-            ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              color: accentYellow,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMenuOption({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: ListTile(
-        leading: Icon(icon, color: accentYellow),
-        title: Text(title, style: const TextStyle(color: Colors.white)),
-        subtitle: Text(
-          subtitle,
-          style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+          child: Center(child: Text(initials.isEmpty ? '?' : initials,
+            style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800))),
         ),
-        trailing: Icon(Icons.chevron_right, color: Colors.white.withOpacity(0.5)),
-        onTap: onTap,
+        const SizedBox(height: 12),
+        Text(name, style: const TextStyle(
+          color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: -0.3)),
+        const SizedBox(height: 2),
+        Text(email, style: TextStyle(color: Colors.white.withValues(alpha: 0.65), fontSize: 13)),
+        const SizedBox(height: 12),
+        // Level pill
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.25))),
+          child: Text('Level $level ISL Learner', style: const TextStyle(
+            color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+        ),
+      ]),
+    );
+  }
+}
+
+// ── 2-col stat card ───────────────────────────────────────────
+class _StatCard extends StatelessWidget {
+  final String label, value, emoji;
+  final Color color;
+  const _StatCard({required this.label, required this.value, required this.emoji, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: context.card,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: context.border)),
+      child: Row(children: [
+        Text(emoji, style: const TextStyle(fontSize: 22)),
+        const SizedBox(width: 10),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(value, style: TextStyle(
+            color: color, fontSize: 22, fontWeight: FontWeight.w900,
+            letterSpacing: -0.5)),
+          Text(label, style: TextStyle(color: context.textMuted, fontSize: 11)),
+        ])),
+      ]),
+    );
+  }
+}
+
+// ── Settings group ────────────────────────────────────────────
+class _SettingsItemData {
+  final IconData icon;
+  final String label;
+  final String? sub;
+  const _SettingsItemData({required this.icon, required this.label, this.sub});
+}
+
+class _SettingsGroup extends StatelessWidget {
+  final List<_SettingsItemData> items;
+  const _SettingsGroup({required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: context.card,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: context.border)),
+      child: Column(
+        children: items.asMap().entries.map((e) {
+          final i    = e.key;
+          final item = e.value;
+          return Column(children: [
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+              leading: Container(
+                width: 36, height: 36,
+                decoration: BoxDecoration(
+                  color: AppTheme.accent.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10)),
+                child: Icon(item.icon, color: AppTheme.accent, size: 18)),
+              title: Text(item.label, style: TextStyle(
+                color: context.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+              subtitle: item.sub != null
+                  ? Text(item.sub!, style: TextStyle(color: context.textMuted, fontSize: 12))
+                  : null,
+              trailing: Icon(Icons.chevron_right_rounded, color: context.textMuted, size: 18),
+              dense: true,
+            ),
+            if (i < items.length - 1)
+              Divider(height: 0, color: context.border, indent: 68),
+          ]);
+        }).toList(),
       ),
     );
   }

@@ -24,6 +24,7 @@ class UserModel {
   final int totalPracticeMinutes;
   final int currentLevel;
   final int xp;
+  final bool isActive;
 
   UserModel({
     required this.uid,
@@ -43,6 +44,7 @@ class UserModel {
     this.totalPracticeMinutes = 0,
     this.currentLevel = 1,
     this.xp = 0,
+    this.isActive = true,
   });
 
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
@@ -65,6 +67,7 @@ class UserModel {
       totalPracticeMinutes: data['totalPracticeMinutes'] ?? 0,
       currentLevel: data['currentLevel'] ?? 1,
       xp: data['xp'] ?? 0,
+      isActive: data['isActive'] ?? true,
     );
   }
 
@@ -86,6 +89,7 @@ class UserModel {
       'totalPracticeMinutes': totalPracticeMinutes,
       'currentLevel': currentLevel,
       'xp': xp,
+      'isActive': isActive,
     };
   }
 
@@ -107,6 +111,7 @@ class UserModel {
     int? totalPracticeMinutes,
     int? currentLevel,
     int? xp,
+    bool? isActive,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -126,6 +131,7 @@ class UserModel {
       totalPracticeMinutes: totalPracticeMinutes ?? this.totalPracticeMinutes,
       currentLevel: currentLevel ?? this.currentLevel,
       xp: xp ?? this.xp,
+      isActive: isActive ?? this.isActive,
     );
   }
 }
