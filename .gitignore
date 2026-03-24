@@ -46,3 +46,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+
+# Adding config files into gitignore
+firebase.json
+firestore.rules
+**/google-services.json

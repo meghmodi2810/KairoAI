@@ -67,7 +67,7 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
         slivers: [
           // Header
           SliverAppBar(
-            expandedHeight: 180,
+            expandedHeight: 240,
             pinned: true,
             backgroundColor: Theme.of(context).scaffoldBackgroundColor,
             leading: IconButton(

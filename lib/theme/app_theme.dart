@@ -15,21 +15,17 @@ class AppTheme {
   static const Color errorRed = Color(0xFFEF4444);
   static const Color successGreen = Color(0xFF22C55E);
 
-  // ── Legacy/Backward Compatibility Colors ──
+  // ── Re-added Tokens (Used in Redesigned Screens) ──
+  static const Color accent = Color(0xFF6C63FF);
+  static const Color accentDark = Color(0xFF4B44CC);
   static const Color danger = errorRed;
   static const Color success = successGreen;
-  static const Color warning = coinGold;
-  static const Color accent = primaryIndigo;
-  static const Color accentDark = primaryDark;
+  static const Color warning = accentAmber;
   static const Color purple = gemPurple;
 
   static const List<Color> categoryColors = [
-    primaryIndigo,
-    accentPink,
-    accentGreen,
-    accentAmber,
-    accentBlue,
-    gemPurple,
+    Color(0xFF6C63FF), Color(0xFF10B981), Color(0xFFF59E0B), Color(0xFFEF4444),
+    Color(0xFF3B82F6), Color(0xFFA78BFA), Color(0xFF14B8A6), Color(0xFFF97316),
   ];
 
   // ── Semantic getters (dark defaults, used by old code) ──
