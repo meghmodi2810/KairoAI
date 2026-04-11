@@ -1,151 +1,328 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import '../main_navigation.dart';
+import '../theme/app_theme.dart';
+import '../theme/neo_brutal_widgets.dart';
+import 'signup_page.dart';
+import 'package:kairo_ai/admin/models/admin_models.dart';
+import 'package:kairo_ai/admin/screens/admin_shell.dart';
 
-class LoginPage extends StatelessWidget {
+class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
   @override
+  State<LoginPage> createState() => _LoginPageState();
+}
+
+class _LoginPageState extends State<LoginPage> {
+  final _formKey = GlobalKey<FormState>();
+  final _emailCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
+
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
+
+  bool _obscure = true;
+  bool _loading = false;
+  bool _googleLoading = false;
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _passCtrl.dispose();
+    super.dispose();
+  }
+
+  String? _validateEmail(String? value) {
+    if (value == null || value.trim().isEmpty) return 'Email is required';
+    final ok = RegExp(r'^[\w\-.]+@([\w\-]+\.)+[\w\-]{2,4}$').hasMatch(value.trim());
+    if (!ok) return 'Enter a valid email address';
+    return null;
+  }
+
+  String? _validatePassword(String? value) {
+    if (value == null || value.isEmpty) return 'Password is required';
+    if (value.length < 8) return 'Minimum 8 characters';
+    return null;
+  }
+
+  Future<void> _signIn() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _loading = true);
+    try {
+      final cred = await _auth.signInWithEmailAndPassword(
+        email: _emailCtrl.text.trim(),
+        password: _passCtrl.text.trim(),
+      );
+      if (cred.user == null || !mounted) return;
+      await _navigateAfterLogin(cred.user!.uid);
+    } on FirebaseAuthException catch (e) {
+      _showError(_authMessage(e.code));
+    } catch (_) {
+      _showError('Could not sign in. Please try again.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() => _googleLoading = true);
+    try {
+      await _googleSignIn.signOut();
+      final account = await _googleSignIn.signIn();
+      if (account == null) return;
+
+      final auth = await account.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: auth.accessToken,
+        idToken: auth.idToken,
+      );
+      final cred = await _auth.signInWithCredential(credential);
+      if (cred.user == null || !mounted) return;
+
+      await _navigateAfterLogin(cred.user!.uid);
+    } on FirebaseAuthException catch (e) {
+      _showError(e.message ?? _authMessage(e.code));
+    } catch (_) {
+      _showError('Google sign-in failed. Please retry.');
+    } finally {
+      if (mounted) setState(() => _googleLoading = false);
+    }
+  }
+
+  Future<void> _forgotPassword() async {
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty) {
+      _showError('Enter your email first to reset password.');
+      return;
+    }
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password reset mail sent.')),
+      );
+    } on FirebaseAuthException {
+      _showError('Could not send reset email. Check your email and retry.');
+    }
+  }
+
+  Future<void> _navigateAfterLogin(String uid) async {
+    Widget destination = const MainNavigation();
+    try {
+      final doc = await FirebaseFirestore.instance.collection('admins').doc(uid).get();
+      if (doc.exists) {
+        final admin = AdminModel.fromFirestore(doc);
+        if (admin.isActive) {
+          destination = AdminShell(admin: admin);
+        }
+      }
+    } catch (_) {}
+
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => destination,
+        transitionDuration: const Duration(milliseconds: 250),
+        transitionsBuilder: (_, animation, __, child) =>
+            FadeTransition(opacity: animation, child: child),
+      ),
+    );
+  }
+
+  String _authMessage(String code) {
+    switch (code) {
+      case 'user-not-found':
+        return 'No account found with this email.';
+      case 'wrong-password':
+      case 'invalid-credential':
+        return 'Incorrect email or password.';
+      case 'invalid-email':
+        return 'This email format looks incorrect.';
+      case 'user-disabled':
+        return 'This account is disabled.';
+      default:
+        return 'Login failed. Please try again.';
+    }
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppTheme.punchRed,
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final topSpace = MediaQuery.of(context).padding.top;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F1EB),
-      body: Center(
-        child: SingleChildScrollView(
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(28),
-            ),
-            child: Column(
-              children: [
-                // Top purple section
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 30),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFCBB6E9),
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(28),
-                    ),
-                  ),
+      backgroundColor: AppTheme.paperCream,
+      body: SafeArea(
+        child: Form(
+          key: _formKey,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(18, 12, 18, 20),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight - topSpace),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Image.asset(
-                        'assets/login_image.jpeg',
-                        height: 120,
+                      NeoPanel(
+                        color: AppTheme.signalYellow,
+                        radius: 18,
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 58,
+                              height: 58,
+                              decoration: BoxDecoration(
+                                color: AppTheme.electricBlue,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppTheme.inkBlack, width: 3),
+                              ),
+                              child: const Icon(Icons.smart_toy_rounded, color: AppTheme.inkBlack, size: 30),
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'HANDS READY?',
+                                    style: TextStyle(
+                                      color: AppTheme.inkBlack,
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    'Log in and continue your sign streak.',
+                                    style: TextStyle(
+                                      color: AppTheme.inkBlack,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Learn ISL',
-                        style: TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E2A38),
+                      const SizedBox(height: 18),
+                      NeoPanel(
+                        color: AppTheme.warmWhite,
+                        radius: 18,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'LOG IN',
+                              style: TextStyle(
+                                color: AppTheme.inkBlack,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 28,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Need camera access to practice signs with AI.',
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                            const SizedBox(height: 14),
+                            TextFormField(
+                              controller: _emailCtrl,
+                              validator: _validateEmail,
+                              keyboardType: TextInputType.emailAddress,
+                              decoration: const InputDecoration(
+                                labelText: 'Email',
+                                hintText: 'you@example.com',
+                                prefixIcon: Icon(Icons.email_outlined),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _passCtrl,
+                              obscureText: _obscure,
+                              validator: _validatePassword,
+                              decoration: InputDecoration(
+                                labelText: 'Password',
+                                hintText: '********',
+                                prefixIcon: const Icon(Icons.lock_outline),
+                                suffixIcon: IconButton(
+                                  onPressed: () => setState(() => _obscure = !_obscure),
+                                  icon: Icon(_obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                                ),
+                              ),
+                            ),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: _loading ? null : _forgotPassword,
+                                child: const Text('Forgot password?'),
+                              ),
+                            ),
+                            NeoPrimaryButton(
+                              label: 'Let\'s Sign In',
+                              onPressed: _loading ? null : _signIn,
+                              loading: _loading,
+                              icon: Icons.login_rounded,
+                            ),
+                            const SizedBox(height: 12),
+                            NeoSecondaryButton(
+                              label: _googleLoading ? 'Connecting to Google...' : 'Continue with Google',
+                              onPressed: _googleLoading ? null : _signInWithGoogle,
+                              icon: Icons.g_mobiledata,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Center(
+                        child: GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const SignUpPage()),
+                            );
+                          },
+                          child: const Text.rich(
+                            TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: 'New here? ',
+                                  style: TextStyle(
+                                    color: AppTheme.inkBlack,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: 'Create account',
+                                  style: TextStyle(
+                                    color: AppTheme.cobaltBlue,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
-
-                const SizedBox(height: 25),
-
-                const Text(
-                  'Sign in',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: TextField(
-                    decoration: InputDecoration(
-                      hintText: 'Email',
-                      filled: true,
-                      fillColor: Color(0xFFF5F5F5),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 15),
-
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: TextField(
-                    obscureText: true,
-                    decoration: InputDecoration(
-                      hintText: 'Password',
-                      filled: true,
-                      fillColor: Color(0xFFF5F5F5),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 8),
-
-                Padding(
-                  padding: const EdgeInsets.only(right: 24),
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      'Forgot password',
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: () {},
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Color(0xFF9C7DD6),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: const Text(
-                        'Sign in',
-                        style: TextStyle(fontSize: 18),
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 25),
-
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Text("Don’t have an account? "),
-                    Text(
-                      "Sign up",
-                      style: TextStyle(
-                        color: Color(0xFF9C7DD6),
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 25),
-              ],
-            ),
+              );
+            },
           ),
         ),
       ),
