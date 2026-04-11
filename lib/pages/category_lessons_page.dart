@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/app_models.dart';
 import '../services/database_service.dart';
@@ -184,7 +183,7 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
               child: Center(child: CircularProgressIndicator(color: AppTheme.cobaltBlue)),
             )
           else if (_lessons.isEmpty)
-            const SliverFillRemaining(
+            SliverFillRemaining(
               child: NeoEmptyState(
                 icon: Icons.school_outlined,
                 title: 'No Lessons Yet',

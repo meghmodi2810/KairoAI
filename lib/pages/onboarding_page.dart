@@ -16,6 +16,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   final PageController _controller = PageController();
 
   int _page = 0;
+  bool _animating = false;
   String? _selectedGoal;
   String? _selectedDailyGoal;
 
@@ -44,12 +45,25 @@ class _OnboardingPageState extends State<OnboardingPage> {
     }
   }
 
-  void _nextPage() {
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _nextPage() async {
+    if (_animating) return;
     if (_page >= 3) return;
-    _controller.nextPage(
-      duration: const Duration(milliseconds: 320),
+
+    setState(() => _animating = true);
+    await _controller.animateToPage(
+      _page + 1,
+      duration: const Duration(milliseconds: 380),
       curve: Curves.easeOutCubic,
     );
+
+    if (!mounted) return;
+    setState(() => _animating = false);
   }
 
   Future<void> _goToAuth({required bool signup}) async {
@@ -97,11 +111,20 @@ class _OnboardingPageState extends State<OnboardingPage> {
                     );
                   }),
                   const SizedBox(width: 10),
-                  if (_page < 3)
-                    TextButton(
-                      onPressed: () => _goToAuth(signup: false),
-                      child: const Text('Skip'),
+                  SizedBox(
+                    width: 64,
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 180),
+                      opacity: _page < 3 ? 1 : 0,
+                      child: IgnorePointer(
+                        ignoring: _page >= 3,
+                        child: TextButton(
+                          onPressed: () => _goToAuth(signup: false),
+                          child: const Text('Skip'),
+                        ),
+                      ),
                     ),
+                  ),
                 ],
               ),
             ),

@@ -36,7 +36,6 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
   final _coinsCtrl = TextEditingController();
 
   String _selectedCategoryId = '';
-  String _selectedCategoryName = '';
   String _type = 'alphabet'; // 'alphabet', 'numeric', 'both'
   bool _isActive = false;
   bool _isSaving = false;
@@ -109,11 +108,8 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
         
         if (_selectedCategoryId.isEmpty && _categories.isNotEmpty) {
           _selectedCategoryId = _categories.first.id;
-          _selectedCategoryName = _categories.first.name;
           _updateNextOrder(_selectedCategoryId);
         } else if (_selectedCategoryId.isNotEmpty) {
-          final found = _categories.where((cat) => cat.id == _selectedCategoryId).firstOrNull;
-          _selectedCategoryName = found?.name ?? '';
           if (!_isEdit) _updateNextOrder(_selectedCategoryId);
         }
       });
@@ -288,7 +284,6 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
                                 onTap: () {
                                   setState(() {
                                     _selectedCategoryId = cat.id;
-                                    _selectedCategoryName = cat.name;
                                     _updateNextOrder(cat.id);
                                   });
                                 },

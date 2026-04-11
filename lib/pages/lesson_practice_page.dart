@@ -34,6 +34,8 @@ class _LessonPracticePageState extends State<LessonPracticePage>
   bool _cameraOn = false;
   bool _loading = true;
   bool _hasPermission = false;
+  int _activePracticeSeconds = 0;
+  DateTime? _cameraSegmentStart;
 
   SignModel get _current => widget.signs[_index];
 
@@ -78,25 +80,38 @@ class _LessonPracticePageState extends State<LessonPracticePage>
     }
   }
 
-  Future<void> _startCamera() async {
+  Future<void> _startCamera({bool retryOnFail = true}) async {
     if (_cameraOn) return;
     setState(() => _loading = true);
 
     try {
       await _detection.startDetection();
       _sub = _detection.detectionStream.listen(_onDetection);
+      _cameraSegmentStart = DateTime.now();
       if (!mounted) return;
       setState(() {
         _cameraOn = true;
         _loading = false;
       });
     } catch (_) {
+      if (retryOnFail && _hasPermission) {
+        await Future.delayed(const Duration(milliseconds: 260));
+        if (!mounted) return;
+        await _startCamera(retryOnFail: false);
+        return;
+      }
       if (!mounted) return;
       setState(() => _loading = false);
     }
   }
 
   Future<void> _stopCamera() async {
+    if (_cameraSegmentStart != null) {
+      _activePracticeSeconds +=
+          DateTime.now().difference(_cameraSegmentStart!).inSeconds;
+      _cameraSegmentStart = null;
+    }
+
     await _sub?.cancel();
     _sub = null;
     try {
@@ -146,10 +161,17 @@ class _LessonPracticePageState extends State<LessonPracticePage>
     _detection.resetPrediction().catchError((_) {});
   }
 
-  void _finish() {
-    _stopCamera();
+  Future<void> _finish() async {
+    final elapsedSeconds = _elapsedPracticeSeconds().clamp(1, 7200);
+    await _stopCamera();
     if (!mounted) return;
-    Navigator.pop(context, true);
+    Navigator.pop(context, elapsedSeconds);
+  }
+
+  int _elapsedPracticeSeconds() {
+    if (_cameraSegmentStart == null) return _activePracticeSeconds;
+    return _activePracticeSeconds +
+        DateTime.now().difference(_cameraSegmentStart!).inSeconds;
   }
 
   Color _confidenceColor(double confidence) {

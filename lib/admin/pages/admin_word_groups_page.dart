@@ -63,7 +63,14 @@ class _AdminWordGroupsPageState extends State<AdminWordGroupsPage> {
           child: StreamBuilder<List<WordGroupModel>>(
             stream: _adminDbService.wordGroupsStream(),
             builder: (context, snapshot) {
-              final groups = snapshot.data ?? [];
+              final allGroups = snapshot.data ?? [];
+              final query = _searchQuery.trim().toLowerCase();
+              final groups = query.isEmpty
+                  ? allGroups
+                  : allGroups
+                      .where((g) => g.name.toLowerCase().contains(query))
+                      .toList();
+
               return ListView.builder(
                 padding: const EdgeInsets.all(16),
                 itemCount: groups.length,

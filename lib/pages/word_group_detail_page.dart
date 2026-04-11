@@ -140,7 +140,7 @@ class WordGroupDetailPage extends StatelessWidget {
                 }
 
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const SliverFillRemaining(
+                  return SliverFillRemaining(
                     child: NeoEmptyState(
                       icon: Icons.text_fields,
                       title: 'No Words Yet',

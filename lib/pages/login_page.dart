@@ -171,6 +171,7 @@ class _LoginPageState extends State<LoginPage> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               return SingleChildScrollView(
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.fromLTRB(18, 12, 18, 20),
                 child: ConstrainedBox(
                   constraints: BoxConstraints(minHeight: constraints.maxHeight - topSpace),
@@ -293,7 +294,12 @@ class _LoginPageState extends State<LoginPage> {
                           onTap: () {
                             Navigator.push(
                               context,
-                              MaterialPageRoute(builder: (_) => const SignUpPage()),
+                              PageRouteBuilder(
+                                pageBuilder: (_, __, ___) => const SignUpPage(),
+                                transitionDuration: const Duration(milliseconds: 240),
+                                transitionsBuilder: (_, animation, __, child) =>
+                                    FadeTransition(opacity: animation, child: child),
+                              ),
                             );
                           },
                           child: const Text.rich(

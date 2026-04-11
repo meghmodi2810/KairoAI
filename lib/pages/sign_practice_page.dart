@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../services/sign_detection_service.dart';
 import '../theme/app_theme.dart';
@@ -70,7 +69,7 @@ class _SignPracticePageState extends State<SignPracticePage>
     }
   }
 
-  Future<void> _startDetection() async {
+  Future<void> _startDetection({bool retryOnFail = true}) async {
     if (_detecting) return;
     try {
       setState(() => _loading = true);
@@ -114,6 +113,12 @@ class _SignPracticePageState extends State<SignPracticePage>
       });
     } catch (e) {
       debugPrint('Failed to start detection: $e');
+      if (retryOnFail && _hasPermission) {
+        await Future.delayed(const Duration(milliseconds: 260));
+        if (!mounted) return;
+        await _startDetection(retryOnFail: false);
+        return;
+      }
       if (!mounted) return;
       setState(() {
         _loading = false;

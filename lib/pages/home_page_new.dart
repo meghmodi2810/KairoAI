@@ -96,7 +96,7 @@ class _HomePageState extends State<HomePage> {
                         _continueCard(),
                       ],
                       const SizedBox(height: 18),
-                      _dailyGoalCard(),
+                      _dailyGoalSection(),
                       const SizedBox(height: 20),
                       const Text(
                         'FEATURED CATEGORIES',
@@ -309,10 +309,21 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _dailyGoalCard() {
-    final goal = _user?.dailyGoalMinutes ?? 10;
-    final practiceMinutes = _user?.totalPracticeMinutes ?? 0;
-    final progress = (practiceMinutes / goal).clamp(0.0, 1.0);
+  Widget _dailyGoalSection() {
+    return StreamBuilder<UserModel?>(
+      stream: _db.userStream(),
+      initialData: _user,
+      builder: (context, snapshot) {
+        return _dailyGoalCard(snapshot.data ?? _user);
+      },
+    );
+  }
+
+  Widget _dailyGoalCard(UserModel? user) {
+    final goal = user?.dailyGoalMinutes ?? 10;
+    final practiceMinutes = _todayLessonMinutes(user);
+    final progress = goal <= 0 ? 0.0 : (practiceMinutes / goal).clamp(0.0, 1.0);
+    final remaining = (goal - practiceMinutes).clamp(0, goal);
 
     return NeoPanel(
       color: AppTheme.softPeach,
@@ -341,18 +352,33 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
           const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 10,
-              backgroundColor: AppTheme.warmWhite,
-              valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.mintGreen),
+          TweenAnimationBuilder<double>(
+            tween: Tween<double>(end: progress),
+            duration: const Duration(milliseconds: 420),
+            curve: Curves.easeOutCubic,
+            builder: (context, value, _) => ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: value,
+                minHeight: 10,
+                backgroundColor: AppTheme.warmWhite,
+                valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.mintGreen),
+              ),
             ),
           ),
           const SizedBox(height: 10),
           Text(
-            '${_user?.totalLessonsCompleted ?? 0} lessons • ${_user?.totalSignsLearned ?? 0} signs',
+            remaining == 0
+                ? 'Goal complete. Great consistency today.'
+                : '$remaining min left in today\'s lesson goal.',
+            style: const TextStyle(
+              color: AppTheme.inkBlack,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${user?.totalLessonsCompleted ?? 0} lessons • ${user?.totalSignsLearned ?? 0} signs',
             style: const TextStyle(
               color: AppTheme.inkBlack,
               fontWeight: FontWeight.w700,
@@ -363,9 +389,20 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  int _todayLessonMinutes(UserModel? user) {
+    if (user == null || user.todayLessonPracticeDate == null) return 0;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final date = user.todayLessonPracticeDate!;
+    final tracked = DateTime(date.year, date.month, date.day);
+
+    if (tracked != today) return 0;
+    return user.todayLessonPracticeMinutes;
+  }
+
   Widget _categoriesList() {
     if (_categories.isEmpty) {
-      return const NeoEmptyState(
+      return NeoEmptyState(
         icon: Icons.category_outlined,
         title: 'No Categories Yet',
         subtitle: 'Ask your admin to publish learning packs.',

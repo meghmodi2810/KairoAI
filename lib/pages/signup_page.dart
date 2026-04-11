@@ -4,6 +4,8 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../main_navigation.dart';
 import '../theme/app_theme.dart';
 import '../theme/neo_brutal_widgets.dart';
+import 'login_page.dart';
+import 'set_account_password_page.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -83,8 +85,16 @@ class _SignUpPageState extends State<SignUpPage> {
         accessToken: auth.accessToken,
         idToken: auth.idToken,
       );
-      await _auth.signInWithCredential(cred);
+      final userCred = await _auth.signInWithCredential(cred);
+      final isNewUser = userCred.additionalUserInfo?.isNewUser ?? false;
       if (!mounted) return;
+      if (isNewUser) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const SetAccountPasswordPage()),
+        );
+        return;
+      }
       _goToMain();
     } on FirebaseAuthException catch (e) {
       _showError(e.message ?? _authMessage(e.code));
@@ -111,7 +121,24 @@ class _SignUpPageState extends State<SignUpPage> {
   void _goToMain() {
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => const MainNavigation()),
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => const MainNavigation(),
+        transitionDuration: const Duration(milliseconds: 240),
+        transitionsBuilder: (_, animation, __, child) =>
+            FadeTransition(opacity: animation, child: child),
+      ),
+    );
+  }
+
+  void _goToLogin() {
+    Navigator.pushReplacement(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => const LoginPage(),
+        transitionDuration: const Duration(milliseconds: 240),
+        transitionsBuilder: (_, animation, __, child) =>
+            FadeTransition(opacity: animation, child: child),
+      ),
     );
   }
 
@@ -124,166 +151,176 @@ class _SignUpPageState extends State<SignUpPage> {
 
   @override
   Widget build(BuildContext context) {
+    final topSpace = MediaQuery.of(context).padding.top;
+
     return Scaffold(
       backgroundColor: AppTheme.paperCream,
       body: SafeArea(
         child: Form(
           key: _formKey,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(18, 12, 18, 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: Container(
-                    width: 46,
-                    height: 46,
-                    decoration: BoxDecoration(
-                      color: AppTheme.warmWhite,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppTheme.inkBlack, width: 3),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: AppTheme.inkBlack,
-                          offset: Offset(3, 3),
-                          blurRadius: 0,
-                        ),
-                      ],
-                    ),
-                    child: const Icon(Icons.arrow_back_rounded, color: AppTheme.inkBlack),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                NeoPanel(
-                  color: AppTheme.mintGreen,
-                  child: Row(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: const EdgeInsets.fromLTRB(18, 12, 18, 20),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight - topSpace),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          color: AppTheme.signalYellow,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppTheme.inkBlack, width: 3),
-                        ),
-                        child: const Icon(Icons.waving_hand_rounded, color: AppTheme.inkBlack, size: 28),
-                      ),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'JOIN KAIROAI',
-                              style: TextStyle(
+                      GestureDetector(
+                        onTap: _goToLogin,
+                        child: Container(
+                          width: 46,
+                          height: 46,
+                          decoration: BoxDecoration(
+                            color: AppTheme.warmWhite,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppTheme.inkBlack, width: 3),
+                            boxShadow: const [
+                              BoxShadow(
                                 color: AppTheme.inkBlack,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 26,
+                                offset: Offset(3, 3),
+                                blurRadius: 0,
                               ),
+                            ],
+                          ),
+                          child: const Icon(Icons.arrow_back_rounded, color: AppTheme.inkBlack),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      NeoPanel(
+                        color: AppTheme.mintGreen,
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 56,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                color: AppTheme.signalYellow,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppTheme.inkBlack, width: 3),
+                              ),
+                              child: const Icon(Icons.waving_hand_rounded, color: AppTheme.inkBlack, size: 28),
                             ),
-                            Text(
-                              'Build your sign learning streak from day one.',
-                              style: TextStyle(
-                                color: AppTheme.inkBlack,
-                                fontWeight: FontWeight.w700,
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'JOIN KAIROAI',
+                                    style: TextStyle(
+                                      color: AppTheme.inkBlack,
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 26,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Build your sign learning streak from day one.',
+                                    style: TextStyle(
+                                      color: AppTheme.inkBlack,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                NeoPanel(
-                  color: AppTheme.warmWhite,
-                  child: Column(
-                    children: [
-                      TextFormField(
-                        controller: _emailCtrl,
-                        validator: _validateEmail,
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: const InputDecoration(
-                          labelText: 'Email',
-                          hintText: 'you@example.com',
-                          prefixIcon: Icon(Icons.email_outlined),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _passCtrl,
-                        validator: _validatePassword,
-                        obscureText: _hidePass,
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          hintText: '********',
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          suffixIcon: IconButton(
-                            onPressed: () => setState(() => _hidePass = !_hidePass),
-                            icon: Icon(_hidePass ? Icons.visibility_off_outlined : Icons.visibility_outlined),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _confirmCtrl,
-                        validator: _validateConfirm,
-                        obscureText: _hideConfirm,
-                        decoration: InputDecoration(
-                          labelText: 'Confirm Password',
-                          hintText: '********',
-                          prefixIcon: const Icon(Icons.lock_clock_outlined),
-                          suffixIcon: IconButton(
-                            onPressed: () => setState(() => _hideConfirm = !_hideConfirm),
-                            icon: Icon(_hideConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined),
-                          ),
+                      const SizedBox(height: 16),
+                      NeoPanel(
+                        color: AppTheme.warmWhite,
+                        child: Column(
+                          children: [
+                            TextFormField(
+                              controller: _emailCtrl,
+                              validator: _validateEmail,
+                              keyboardType: TextInputType.emailAddress,
+                              decoration: const InputDecoration(
+                                labelText: 'Email',
+                                hintText: 'you@example.com',
+                                prefixIcon: Icon(Icons.email_outlined),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _passCtrl,
+                              validator: _validatePassword,
+                              obscureText: _hidePass,
+                              decoration: InputDecoration(
+                                labelText: 'Password',
+                                hintText: '********',
+                                prefixIcon: const Icon(Icons.lock_outline),
+                                suffixIcon: IconButton(
+                                  onPressed: () => setState(() => _hidePass = !_hidePass),
+                                  icon: Icon(_hidePass ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _confirmCtrl,
+                              validator: _validateConfirm,
+                              obscureText: _hideConfirm,
+                              decoration: InputDecoration(
+                                labelText: 'Confirm Password',
+                                hintText: '********',
+                                prefixIcon: const Icon(Icons.lock_clock_outlined),
+                                suffixIcon: IconButton(
+                                  onPressed: () => setState(() => _hideConfirm = !_hideConfirm),
+                                  icon: Icon(_hideConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            NeoPrimaryButton(
+                              label: 'Create Account',
+                              loading: _loading,
+                              onPressed: _loading ? null : _createAccount,
+                              icon: Icons.person_add_alt_rounded,
+                            ),
+                            const SizedBox(height: 10),
+                            NeoSecondaryButton(
+                              label: _googleLoading ? 'Connecting to Google...' : 'Continue with Google',
+                              onPressed: _googleLoading ? null : _signupWithGoogle,
+                              icon: Icons.g_mobiledata,
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 14),
-                      NeoPrimaryButton(
-                        label: 'Create Account',
-                        loading: _loading,
-                        onPressed: _loading ? null : _createAccount,
-                        icon: Icons.person_add_alt_rounded,
-                      ),
-                      const SizedBox(height: 10),
-                      NeoSecondaryButton(
-                        label: _googleLoading ? 'Connecting to Google...' : 'Continue with Google',
-                        onPressed: _googleLoading ? null : _signupWithGoogle,
-                        icon: Icons.g_mobiledata,
+                      Center(
+                        child: GestureDetector(
+                          onTap: _goToLogin,
+                          child: const Text.rich(
+                            TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: 'Already signed up? ',
+                                  style: TextStyle(
+                                    color: AppTheme.inkBlack,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: 'Log in',
+                                  style: TextStyle(
+                                    color: AppTheme.cobaltBlue,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 14),
-                Center(
-                  child: GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: const Text.rich(
-                      TextSpan(
-                        children: [
-                          TextSpan(
-                            text: 'Already signed up? ',
-                            style: TextStyle(
-                              color: AppTheme.inkBlack,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          TextSpan(
-                            text: 'Log in',
-                            style: TextStyle(
-                              color: AppTheme.cobaltBlue,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              );
+            },
           ),
         ),
       ),

@@ -58,7 +58,7 @@ class LearnPage extends StatelessWidget {
                 }
 
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const SliverFillRemaining(
+                  return SliverFillRemaining(
                     child: NeoEmptyState(
                       icon: Icons.route,
                       title: 'No Learning Path Yet',

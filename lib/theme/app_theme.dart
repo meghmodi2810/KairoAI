@@ -15,6 +15,7 @@ class AppTheme {
   static const Color softPeach = Color(0xFFFFC8A2);
   static const Color warmWhite = Color(0xFFFFFCF7);
   static const Color charcoalNight = Color(0xFF171717);
+  static const Color gemPurple = Color(0xFFB599FF);
 
   // Status Colors (Semantic but Flat)
   static const Color success = mintGreen;
@@ -35,7 +36,6 @@ class AppTheme {
 
   static const Radius _radius12 = Radius.circular(12);
   static const Radius _radius16 = Radius.circular(16);
-  static const Radius _radius20 = Radius.circular(20);
 
   // Borders & Shadows
   static BorderSide neoBorderSide([double width = 3, Color? color]) => BorderSide(
@@ -216,17 +216,11 @@ class AppTheme {
           fontWeight: FontWeight.w800,
         ),
       ),
-      extensions: [
-        NeoShadows(isDark: isDark, hardShadow: hardShadow(color: borderColor)),
-      ],
-    );
-  }
-
       dividerTheme: DividerThemeData(
         color: isDark ? warmWhite.withValues(alpha: 0.35) : inkBlack.withValues(alpha: 0.25),
         thickness: 1.5,
       ),
-      chipTheme: base.chipTheme.copyWith(
+      chipTheme: ChipThemeData(
         side: BorderSide(color: isDark ? warmWhite : inkBlack, width: 2),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         labelStyle: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w700),
@@ -240,7 +234,7 @@ class AppTheme {
         ),
       ),
       extensions: [
-        NeoShadows(isDark: isDark, hardShadow: _hardShadow()),
+        NeoShadows(isDark: isDark, hardShadow: hardShadow(color: borderColor)),
       ],
     );
   }

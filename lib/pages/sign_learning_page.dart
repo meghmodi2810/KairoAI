@@ -53,7 +53,7 @@ class _SignLearningPageState extends State<SignLearningPage> {
     }
   }
 
-  Future<void> _completeLesson() async {
+  Future<void> _completeLesson(int timeSpentSeconds) async {
     if (_completed) return;
     _completed = true;
     try {
@@ -61,7 +61,7 @@ class _SignLearningPageState extends State<SignLearningPage> {
         lessonId: widget.lesson.id,
         categoryId: widget.categoryId,
         accuracy: 1.0,
-        timeSpentSeconds: _signs.length * 20,
+        timeSpentSeconds: timeSpentSeconds,
         gemsEarned: widget.lesson.gemsReward,
         coinsEarned: widget.lesson.coinsReward,
         xpEarned: widget.lesson.xpReward,
@@ -87,7 +87,7 @@ class _SignLearningPageState extends State<SignLearningPage> {
   }
 
   Future<void> _startPractice() async {
-    final result = await Navigator.push<bool>(
+    final result = await Navigator.push<int>(
       context,
       MaterialPageRoute(
         builder: (_) => LessonPracticePage(
@@ -97,8 +97,8 @@ class _SignLearningPageState extends State<SignLearningPage> {
       ),
     );
 
-    if (result == true && mounted) {
-      await _completeLesson();
+    if (result != null && result > 0 && mounted) {
+      await _completeLesson(result);
       _showCompletionDialog();
     }
   }
@@ -156,7 +156,7 @@ class _SignLearningPageState extends State<SignLearningPage> {
     }
 
     if (_signs.isEmpty) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: AppTheme.paperCream,
         body: NeoEmptyState(
           icon: Icons.sign_language_outlined,

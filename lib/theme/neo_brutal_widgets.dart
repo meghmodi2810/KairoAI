@@ -110,7 +110,7 @@ class NeoSectionTitle extends StatelessWidget {
               ],
             ),
           ),
-          if (trailing != null) trailing!,
+          ?trailing,
         ],
       ),
     );
@@ -171,6 +171,7 @@ class NeoButton extends StatefulWidget {
   final Color? textColor;
   final IconData? icon;
   final bool loading;
+  final EdgeInsetsGeometry padding;
 
   const NeoButton({
     super.key,
@@ -180,6 +181,7 @@ class NeoButton extends StatefulWidget {
     this.textColor,
     this.icon,
     this.loading = false,
+    this.padding = const EdgeInsets.symmetric(horizontal: 24),
   });
 
   @override
@@ -191,7 +193,6 @@ class _NeoButtonState extends State<NeoButton> {
 
   @override
   Widget build(BuildContext context) {
-    final double shadowOffset = _isPressed ? 0 : 6;
     final double translateOffset = _isPressed ? 6 : 0;
 
     return GestureDetector(
@@ -221,7 +222,7 @@ class _NeoButtonState extends State<NeoButton> {
         ),
         child: Container(
           height: 56,
-          padding: const EdgeInsets.symmetric(horizontal: 24),
+          padding: widget.padding,
           child: Center(
             child: widget.loading
                 ? const SizedBox(
@@ -316,6 +317,130 @@ class NeoTextField extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class NeoPrimaryButton extends StatelessWidget {
+  final String label;
+  final VoidCallback? onPressed;
+  final bool loading;
+  final IconData? icon;
+
+  const NeoPrimaryButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.loading = false,
+    this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return NeoButton(
+      label: label,
+      onPressed: onPressed,
+      loading: loading,
+      icon: icon,
+      color: AppTheme.cobaltBlue,
+      textColor: Colors.white,
+    );
+  }
+}
+
+class NeoSecondaryButton extends StatelessWidget {
+  final String label;
+  final VoidCallback? onPressed;
+  final bool loading;
+  final IconData? icon;
+
+  const NeoSecondaryButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.loading = false,
+    this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return NeoButton(
+      label: label,
+      onPressed: onPressed,
+      loading: loading,
+      icon: icon,
+      color: AppTheme.paperCream,
+      textColor: AppTheme.inkBlack,
+    );
+  }
+}
+
+class NeoEmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  const NeoEmptyState({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: NeoPanel(
+          color: AppTheme.warmWhite,
+          radius: 18,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: AppTheme.signalYellow,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppTheme.inkBlack, width: 3),
+                ),
+                child: Icon(icon, size: 34, color: AppTheme.inkBlack),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: AppTheme.inkBlack,
+                      fontWeight: FontWeight.w900,
+                    ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                subtitle,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppTheme.inkBlack.withValues(alpha: 0.75),
+                      fontWeight: FontWeight.w700,
+                    ),
+                textAlign: TextAlign.center,
+              ),
+              if (actionLabel != null && onAction != null) ...[
+                const SizedBox(height: 14),
+                NeoPrimaryButton(
+                  label: actionLabel!,
+                  onPressed: onAction,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
