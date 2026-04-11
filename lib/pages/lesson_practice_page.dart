@@ -6,12 +6,6 @@ import '../services/sign_detection_service.dart';
 import '../services/sign_image_service.dart';
 import '../theme/app_theme.dart';
 
-/// Full-screen per-lesson camera practice page.
-/// Shows each sign from the lesson one at a time:
-///   - Top half : reference sign image + sign name
-///   - Bottom half: live camera area + detection result overlay
-/// Advances automatically on 3 consistent correct detections,
-/// or manually via "Next →".
 class LessonPracticePage extends StatefulWidget {
   final LessonModel lesson;
   final List<SignModel> signs;
@@ -27,39 +21,26 @@ class LessonPracticePage extends StatefulWidget {
 }
 
 class _LessonPracticePageState extends State<LessonPracticePage>
-    with WidgetsBindingObserver, TickerProviderStateMixin {
-  final _detection = SignDetectionService();
-  final _imageService = SignImageService();
+    with WidgetsBindingObserver {
+  final SignDetectionService _detection = SignDetectionService();
+  final SignImageService _imageService = SignImageService();
 
   StreamSubscription<DetectionResult>? _sub;
-  DetectionResult? _lastResult;
+  DetectionResult? _result;
 
-  int _signIndex    = 0;
-  bool _isCameraOn  = false;
-  bool _isLoading   = true;
+  int _index = 0;
+  int _matchCount = 0;
+  bool _matched = false;
+  bool _cameraOn = false;
+  bool _loading = true;
   bool _hasPermission = false;
-  int  _matchCount  = 0;
-  bool _matched     = false;
-  Set<int> _completed = {};
 
-  // Animation controllers
-  late AnimationController _matchAnim;
-  late Animation<double>   _matchScale;
-
-  SignModel get _currentSign => widget.signs[_signIndex];
+  SignModel get _current => widget.signs[_index];
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-
-    _matchAnim = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 500),
-    );
-    _matchScale = Tween(begin: 0.8, end: 1.2).animate(
-      CurvedAnimation(parent: _matchAnim, curve: Curves.elasticOut));
-
     _initCamera();
   }
 
@@ -67,120 +48,129 @@ class _LessonPracticePageState extends State<LessonPracticePage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _stopCamera();
-    _matchAnim.dispose();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused)  _stopCamera();
-    if (state == AppLifecycleState.resumed && _hasPermission) _startCamera();
+    if (state == AppLifecycleState.paused) {
+      _stopCamera();
+    }
+    if (state == AppLifecycleState.resumed && _hasPermission) {
+      _startCamera();
+    }
   }
 
-  // ── Camera lifecycle ──────────────────────────────────────────
-
   Future<void> _initCamera() async {
-    bool ok = await _detection.checkCameraPermission();
-    if (!ok) ok = await _detection.requestCameraPermission();
+    bool granted = await _detection.checkCameraPermission();
+    if (!granted) {
+      granted = await _detection.requestCameraPermission();
+    }
+
     if (!mounted) return;
-    setState(() { _hasPermission = ok; _isLoading = false; });
-    if (ok) await _startCamera();
+    setState(() {
+      _hasPermission = granted;
+      _loading = false;
+    });
+
+    if (granted) {
+      await _startCamera();
+    }
   }
 
   Future<void> _startCamera() async {
-    if (_isCameraOn) return;
-    setState(() => _isLoading = true);
+    if (_cameraOn) return;
+    setState(() => _loading = true);
+
     try {
       await _detection.startDetection();
-      _sub = _detection.detectionStream.listen(_onDetection, onError: (_) {});
-      if (mounted) setState(() { _isCameraOn = true; _isLoading = false; });
+      _sub = _detection.detectionStream.listen(_onDetection);
+      if (!mounted) return;
+      setState(() {
+        _cameraOn = true;
+        _loading = false;
+      });
     } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
+      if (!mounted) return;
+      setState(() => _loading = false);
     }
   }
 
   Future<void> _stopCamera() async {
-    _sub?.cancel();
+    await _sub?.cancel();
     _sub = null;
-    try { await _detection.stopDetection(); } catch (_) {}
-    if (mounted) setState(() => _isCameraOn = false);
+    try {
+      await _detection.stopDetection();
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() => _cameraOn = false);
   }
 
-  // ── Detection logic ───────────────────────────────────────────
-
-  void _onDetection(DetectionResult r) {
+  void _onDetection(DetectionResult result) {
     if (!mounted || _matched) return;
-    setState(() => _lastResult = r);
 
-    final target = _currentSign.word.toUpperCase().trim();
-    final detected = r.detectedSign.toUpperCase().trim();
+    setState(() => _result = result);
 
-    if (r.handDetected && detected == target && r.confidence >= 0.65) {
+    final target = _current.word.toUpperCase().trim();
+    final detected = result.detectedSign.toUpperCase().trim();
+
+    if (result.handDetected && detected == target && result.confidence >= 0.65) {
       _matchCount++;
       if (_matchCount >= 3) {
         _confirmMatch();
       }
-    } else if (r.handDetected && detected != target) {
-      // Light penalty — decay match count
-      if (_matchCount > 0) _matchCount--;
+    } else if (result.handDetected && _matchCount > 0) {
+      _matchCount--;
     }
   }
 
   void _confirmMatch() {
     if (_matched) return;
     setState(() => _matched = true);
-    _completed.add(_signIndex);
     HapticFeedback.heavyImpact();
-    _matchAnim.forward(from: 0);
-    Future.delayed(const Duration(milliseconds: 1200), _nextSign);
+    Future.delayed(const Duration(milliseconds: 900), _nextSign);
   }
-
-  // ── Navigation ────────────────────────────────────────────────
 
   void _nextSign() {
-    if (_signIndex >= widget.signs.length - 1) {
-      _finishPractice();
+    if (_index >= widget.signs.length - 1) {
+      _finish();
       return;
     }
-    if (!mounted) return;
+
     setState(() {
-      _signIndex++;
+      _index++;
+      _result = null;
       _matchCount = 0;
-      _matched    = false;
-      _lastResult = null;
+      _matched = false;
     });
     _detection.resetPrediction().catchError((_) {});
-    _matchAnim.reset();
   }
 
-  void _finishPractice() {
-    if (!mounted) return;
+  void _finish() {
     _stopCamera();
-    Navigator.pop(context, true); // Return true = practice completed
+    if (!mounted) return;
+    Navigator.pop(context, true);
   }
 
-  // ── Confidence color ─────────────────────────────────────────
-
-  Color _confColor(double c) {
-    if (c >= 0.65) return AppTheme.success;
-    if (c >= 0.40) return AppTheme.warning;
-    return AppTheme.danger;
+  Color _confidenceColor(double confidence) {
+    if (confidence >= 0.65) return AppTheme.mintGreen;
+    if (confidence >= 0.4) return AppTheme.signalYellow;
+    return AppTheme.punchRed;
   }
 
   @override
   Widget build(BuildContext context) {
-    final sign = _currentSign;
-    final result = _lastResult;
-    final total  = widget.signs.length;
-    final progress = (_signIndex + (_matched ? 1 : 0)) / total;
+    final total = widget.signs.length;
+    final progress = (_index + (_matched ? 1 : 0)) / total;
+    final confidence = _result?.confidence ?? 0;
+    final confidenceColor = _confidenceColor(confidence);
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppTheme.charcoalNight,
       body: Stack(
         children: [
-          // ── CAMERA FILLS SCREEN ──
-          SizedBox.expand(
-            child: _isCameraOn && _detection.textureId != null
+          Positioned.fill(
+            child: _cameraOn && _detection.textureId != null
                 ? FittedBox(
                     fit: BoxFit.cover,
                     child: SizedBox(
@@ -191,405 +181,345 @@ class _LessonPracticePageState extends State<LessonPracticePage>
                   )
                 : const ColoredBox(color: Colors.black),
           ),
-
-          // ── TOP: Reference image + sign info ─────────────────
-          Positioned(
-            top: 0, left: 0, right: 0,
-            height: MediaQuery.of(context).size.height * 0.40,
-            child: _ReferencePanel(
-              sign: sign,
-              imageService: _imageService,
-              matched: _matched,
-              matchAnim: _matchScale,
-            ),
-          ),
-
-          // ── BOTTOM: Detection result card ─────────────────────
-          Positioned(
-            bottom: 0, left: 0, right: 0,
-            child: _DetectionPanel(
-              result: result,
-              target: sign.word,
-              matchCount: _matchCount,
-              matched: _matched,
-              isCameraOn: _isCameraOn,
-              isLoading: _isLoading,
-              hasPermission: _hasPermission,
-              confColor: _confColor,
-              onGrantPermission: _initCamera,
-            ),
-          ),
-
-          // ── Progress bar ──────────────────────────────────────
-          Positioned(
-            top: 0, left: 0, right: 0,
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                child: Column(children: [
-                  Row(children: [
-                    GestureDetector(
-                      onTap: () { _stopCamera(); Navigator.pop(context); },
-                      child: Container(
-                        width: 36, height: 36,
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.4),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          minHeight: 6,
-                          backgroundColor: Colors.white.withValues(alpha: 0.15),
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            _matched ? AppTheme.success : AppTheme.accent),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      '${_signIndex + 1}/$total',
-                      style: const TextStyle(
-                        color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
-                    ),
-                  ]),
-                ]),
-              ),
-            ),
-          ),
-
-          // ── "Next →" skip button ─────────────────────────────
-          if (!_matched)
-            Positioned(
-              bottom: MediaQuery.of(context).padding.bottom + 180,
-              right: 16,
-              child: GestureDetector(
-                onTap: () {
-                  setState(() { _matchCount = 0; _matched = false; });
-                  _nextSign();
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.65),
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.72),
+                    ],
+                    stops: const [0.0, 0.35, 1.0],
                   ),
-                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                    Text('Skip', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
-                    SizedBox(width: 4),
-                    Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 14),
-                  ]),
                 ),
               ),
             ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Reference panel (top half) ────────────────────────────────
-class _ReferencePanel extends StatelessWidget {
-  final SignModel sign;
-  final SignImageService imageService;
-  final bool matched;
-  final Animation<double> matchAnim;
-
-  const _ReferencePanel({
-    required this.sign,
-    required this.imageService,
-    required this.matched,
-    required this.matchAnim,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter, end: Alignment.bottomCenter,
-          colors: [
-            matched
-                ? AppTheme.success.withValues(alpha: 0.4)
-                : const Color(0xFF0D0D12).withValues(alpha: 0.95),
-            Colors.black.withValues(alpha: 0.7),
-          ],
-        ),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 52, 20, 12),
-          child: Row(children: [
-            // Reference image
-            Expanded(
-              flex: 5,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: FutureBuilder<dynamic>(
-                  future: imageService.getRandomImage(sign.word),
-                  builder: (ctx, snap) {
-                    if (snap.hasData && snap.data != null) {
-                      return Image.memory(snap.data!, fit: BoxFit.contain);
-                    }
-                    return Container(
-                      color: Colors.white.withValues(alpha: 0.05),
-                      child: Center(
-                        child: Text(sign.word.toUpperCase()[0],
-                          style: TextStyle(
-                            color: AppTheme.accent.withValues(alpha: 0.6),
-                            fontSize: 72, fontWeight: FontWeight.w900)),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            // Sign name + match indicator
-            Expanded(
-              flex: 4,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
+          ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+              child: Row(
                 children: [
-                  Text('Sign this:', style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.6), fontSize: 12, fontWeight: FontWeight.w500)),
-                  const SizedBox(height: 4),
-                  Text(sign.word, style: const TextStyle(
-                    color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
-                  if (sign.word.length == 1 && sign.description.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(sign.description, style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.5), fontSize: 11), maxLines: 3),
-                  ],
-                  const SizedBox(height: 12),
-                  // Match indicator dots
-                  if (matched)
-                    ScaleTransition(
-                      scale: matchAnim,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppTheme.success.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppTheme.success.withValues(alpha: 0.5)),
-                        ),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: const [
-                          Icon(Icons.check_circle_rounded, color: AppTheme.success, size: 16),
-                          SizedBox(width: 6),
-                          Text('Matched!', style: TextStyle(
-                            color: AppTheme.success, fontSize: 13, fontWeight: FontWeight.w700)),
-                        ]),
+                  _hudCircle(
+                    icon: Icons.close_rounded,
+                    onTap: () {
+                      _stopCamera();
+                      Navigator.pop(context);
+                    },
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppTheme.warmWhite,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppTheme.inkBlack, width: 3),
+                        boxShadow: const [
+                          BoxShadow(color: AppTheme.inkBlack, blurRadius: 0, offset: Offset(4, 4)),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              color: AppTheme.signalYellow,
+                              borderRadius: BorderRadius.circular(9),
+                              border: Border.all(color: AppTheme.inkBlack, width: 2),
+                            ),
+                            child: const Icon(Icons.front_hand, color: AppTheme.inkBlack, size: 18),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'TARGET: ${_current.word}',
+                                  style: const TextStyle(
+                                    color: AppTheme.inkBlack,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 3),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: LinearProgressIndicator(
+                                    value: progress,
+                                    minHeight: 7,
+                                    backgroundColor: AppTheme.paperCream,
+                                    valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.cobaltBlue),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${_index + 1}/$total',
+                            style: const TextStyle(
+                              color: AppTheme.inkBlack,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+                  ),
                 ],
               ),
             ),
-          ]),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Detection panel (bottom card) ─────────────────────────────
-class _DetectionPanel extends StatelessWidget {
-  final DetectionResult? result;
-  final String target;
-  final int matchCount;
-  final bool matched;
-  final bool isCameraOn;
-  final bool isLoading;
-  final bool hasPermission;
-  final Color Function(double) confColor;
-  final VoidCallback onGrantPermission;
-
-  const _DetectionPanel({
-    required this.result,
-    required this.target,
-    required this.matchCount,
-    required this.matched,
-    required this.isCameraOn,
-    required this.isLoading,
-    required this.hasPermission,
-    required this.confColor,
-    required this.onGrantPermission,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final bottom = MediaQuery.of(context).padding.bottom;
-
-    return Container(
-      padding: EdgeInsets.fromLTRB(20, 20, 20, bottom + 20),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0D0D12).withValues(alpha: 0.9),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.08))),
-      ),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        // Drag handle
-        Container(width: 36, height: 4,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(2))),
-        const SizedBox(height: 16),
-
-        if (isLoading)
-          const SizedBox(height: 60,
-            child: Center(child: CircularProgressIndicator(color: AppTheme.accent, strokeWidth: 2)))
-        else if (!hasPermission)
-          _PermissionView(onGrant: onGrantPermission)
-        else if (!isCameraOn)
-          const SizedBox(height: 60,
-            child: Center(child: Text('Camera starting…',
-              style: TextStyle(color: Colors.white54, fontSize: 14))))
-        else
-          _LiveResult(
-            result: result,
-            target: target,
-            matchCount: matchCount,
-            matched: matched,
-            confColor: confColor,
           ),
-      ]),
-    );
-  }
-}
-
-// Live detection result display
-class _LiveResult extends StatelessWidget {
-  final DetectionResult? result;
-  final String target;
-  final int matchCount;
-  final bool matched;
-  final Color Function(double) confColor;
-
-  const _LiveResult({
-    required this.result,
-    required this.target,
-    required this.matchCount,
-    required this.matched,
-    required this.confColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final r = result;
-    final handDetected = r?.handDetected ?? false;
-    final detected  = r?.detectedSign ?? '';
-    final confidence = r?.confidence ?? 0.0;
-    final isCorrect = handDetected && detected.toUpperCase() == target.toUpperCase();
-    final displayColor = isCorrect ? AppTheme.success : (handDetected ? confColor(confidence) : Colors.white38);
-
-    return Column(mainAxisSize: MainAxisSize.min, children: [
-      // Status line
-      Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Icon(
-          handDetected ? Icons.front_hand_rounded : Icons.pan_tool_outlined,
-          color: handDetected ? AppTheme.success : Colors.white30,
-          size: 18),
-        const SizedBox(width: 8),
-        Text(
-          handDetected ? 'Hand detected' : 'Show your hand to the camera',
-          style: TextStyle(
-            color: handDetected ? AppTheme.success : Colors.white38,
-            fontSize: 13, fontWeight: FontWeight.w600)),
-      ]),
-      const SizedBox(height: 14),
-
-      // Detected sign large display
-      Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-        AnimatedDefaultTextStyle(
-          duration: const Duration(milliseconds: 200),
-          style: TextStyle(
-            color: displayColor,
-            fontSize: 64,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 2,
-          ),
-          child: Text(detected.isNotEmpty ? detected : '—'),
-        ),
-        if (handDetected && detected.isNotEmpty) ...[
-          const SizedBox(width: 12),
-          Icon(
-            isCorrect ? Icons.check_circle_rounded : Icons.cancel_rounded,
-            color: isCorrect ? AppTheme.success : Colors.white24,
-            size: 28),
-        ],
-      ]),
-
-      if (handDetected && confidence > 0) ...[
-        const SizedBox(height: 8),
-        // Confidence bar
-        ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: LinearProgressIndicator(
-            value: confidence,
-            minHeight: 6,
-            backgroundColor: Colors.white.withValues(alpha: 0.08),
-            valueColor: AlwaysStoppedAnimation<Color>(confColor(confidence)),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text('${(confidence * 100).toStringAsFixed(0)}% confidence',
-          style: TextStyle(color: Colors.white38, fontSize: 11)),
-      ],
-
-      const SizedBox(height: 14),
-
-      // Match progress dots (need 3 to confirm)
-      if (handDetected)
-        Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          ...List.generate(3, (i) => Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              width: 10, height: 10,
+          Positioned(
+            top: 90,
+            left: 14,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: i < matchCount
-                    ? (matched ? AppTheme.success : AppTheme.accent)
-                    : Colors.white12,
-                boxShadow: i < matchCount
-                    ? [BoxShadow(color: AppTheme.accent.withValues(alpha: 0.4), blurRadius: 6)]
-                    : null,
+                color: (_result?.handDetected ?? false) ? AppTheme.mintGreen : AppTheme.signalYellow,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppTheme.inkBlack, width: 2.5),
+              ),
+              child: Text(
+                (_result?.handDetected ?? false) ? 'HAND DETECTED' : 'SHOW HAND',
+                style: const TextStyle(
+                  color: AppTheme.inkBlack,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
             ),
-          )),
-          const SizedBox(width: 8),
-          Text('Hold sign for 3 detections',
-            style: TextStyle(color: Colors.white30, fontSize: 11)),
-        ]),
-    ]);
+          ),
+          Positioned(
+            top: 90,
+            right: 14,
+            child: _hudCircle(
+              icon: Icons.cameraswitch_rounded,
+              onTap: () => _detection.switchCamera(),
+              background: AppTheme.electricBlue,
+            ),
+          ),
+          if (_matched)
+            Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppTheme.mintGreen,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppTheme.inkBlack, width: 3),
+                  boxShadow: const [
+                    BoxShadow(color: AppTheme.inkBlack, blurRadius: 0, offset: Offset(6, 6)),
+                  ],
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.check_circle, color: AppTheme.inkBlack),
+                    SizedBox(width: 8),
+                    Text(
+                      'NICE MOVE',
+                      style: TextStyle(
+                        color: AppTheme.inkBlack,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 20,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.fromLTRB(14, 12, 14, MediaQuery.of(context).padding.bottom + 14),
+              decoration: BoxDecoration(
+                color: AppTheme.warmWhite,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+                border: Border.all(color: AppTheme.inkBlack, width: 3),
+              ),
+              child: _loading
+                  ? const SizedBox(
+                      height: 68,
+                      child: Center(
+                        child: CircularProgressIndicator(color: AppTheme.cobaltBlue),
+                      ),
+                    )
+                  : !_hasPermission
+                      ? Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              'Need camera access to practice.',
+                              style: TextStyle(
+                                color: AppTheme.inkBlack,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            ElevatedButton.icon(
+                              onPressed: _initCamera,
+                              icon: const Icon(Icons.camera_alt_rounded),
+                              label: const Text('Enable Camera'),
+                            ),
+                          ],
+                        )
+                      : Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    _matchCount == 0
+                                        ? 'Hold steady'
+                                        : 'One more clean sign',
+                                    style: const TextStyle(
+                                      color: AppTheme.inkBlack,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  '${(confidence * 100).toStringAsFixed(0)}%',
+                                  style: const TextStyle(
+                                    color: AppTheme.inkBlack,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: LinearProgressIndicator(
+                                value: confidence,
+                                minHeight: 10,
+                                backgroundColor: AppTheme.paperCream,
+                                valueColor: AlwaysStoppedAnimation<Color>(confidenceColor),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                ...List.generate(
+                                  3,
+                                  (i) => Expanded(
+                                    child: Container(
+                                      margin: EdgeInsets.only(right: i == 2 ? 0 : 6),
+                                      height: 12,
+                                      decoration: BoxDecoration(
+                                        color: i < _matchCount ? AppTheme.mintGreen : AppTheme.paperCream,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: AppTheme.inkBlack, width: 2),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: () {
+                                      setState(() {
+                                        _result = null;
+                                        _matchCount = 0;
+                                        _matched = false;
+                                      });
+                                      _detection.resetPrediction().catchError((_) {});
+                                    },
+                                    icon: const Icon(Icons.refresh_rounded),
+                                    label: const Text('Retry'),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: _matched ? null : _nextSign,
+                                    icon: const Icon(Icons.skip_next_rounded),
+                                    label: const Text('Skip'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+            ),
+          ),
+          Positioned(
+            left: 14,
+            bottom: MediaQuery.of(context).padding.bottom + 170,
+            child: Container(
+              width: 90,
+              height: 110,
+              decoration: BoxDecoration(
+                color: AppTheme.warmWhite,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.inkBlack, width: 2.5),
+              ),
+              child: FutureBuilder<dynamic>(
+                future: _imageService.getRandomImage(_current.word),
+                builder: (context, snapshot) {
+                  if (snapshot.hasData && snapshot.data != null) {
+                    return ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.memory(snapshot.data!, fit: BoxFit.cover),
+                    );
+                  }
+                  return Center(
+                    child: Text(
+                      _current.word,
+                      style: const TextStyle(
+                        color: AppTheme.inkBlack,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 22,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
-}
 
-class _PermissionView extends StatelessWidget {
-  final VoidCallback onGrant;
-  const _PermissionView({required this.onGrant});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(mainAxisSize: MainAxisSize.min, children: [
-      const Icon(Icons.camera_alt_outlined, color: Colors.white38, size: 40),
-      const SizedBox(height: 8),
-      const Text('Camera permission needed', style: TextStyle(color: Colors.white60, fontSize: 14)),
-      const SizedBox(height: 12),
-      ElevatedButton(
-        onPressed: onGrant,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppTheme.accent,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-        child: const Text('Grant Permission')),
-    ]);
+  Widget _hudCircle({
+    required IconData icon,
+    required VoidCallback onTap,
+    Color background = AppTheme.warmWhite,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: background,
+          shape: BoxShape.circle,
+          border: Border.all(color: AppTheme.inkBlack, width: 3),
+          boxShadow: const [
+            BoxShadow(color: AppTheme.inkBlack, blurRadius: 0, offset: Offset(3, 3)),
+          ],
+        ),
+        child: Icon(icon, color: AppTheme.inkBlack, size: 20),
+      ),
+    );
   }
 }

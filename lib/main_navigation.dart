@@ -55,9 +55,7 @@ class _MainNavigationState extends State<MainNavigation>
   }
 }
 
-// ──────────────────────────────────────────────
-//  Floating pill nav bar
-// ──────────────────────────────────────────────
+// Brutalist control dock
 class _FloatingNavBar extends StatelessWidget {
   final int currentIndex;
   final List<_NavItem> items;
@@ -73,17 +71,21 @@ class _FloatingNavBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final bottom = MediaQuery.of(context).padding.bottom;
     return Container(
-      margin: EdgeInsets.fromLTRB(20, 0, 20, (bottom > 0 ? bottom : 16)),
-      height: 64,
+      margin: EdgeInsets.fromLTRB(14, 0, 14, (bottom > 0 ? bottom : 12)),
+      height: 78,
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: context.card,
-        borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: context.border),
-        boxShadow: [
+        color: context.cardAlt,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: context.isDark ? AppTheme.warmWhite : AppTheme.inkBlack,
+          width: 3,
+        ),
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.25),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
+            color: AppTheme.inkBlack,
+            blurRadius: 0,
+            offset: Offset(6, 6),
           ),
         ],
       ),
@@ -94,46 +96,43 @@ class _FloatingNavBar extends StatelessWidget {
             child: GestureDetector(
               onTap: () => onTap(i),
               behavior: HitTestBehavior.opaque,
-              child: AnimatedScale(
-                scale: selected ? 1.1 : 1.0,
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOutBack,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                decoration: BoxDecoration(
+                  color: selected ? AppTheme.cobaltBlue : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: context.isDark ? AppTheme.warmWhite : AppTheme.inkBlack,
+                    width: selected ? 2.5 : 0,
+                  ),
+                  boxShadow: selected
+                      ? const [
+                          BoxShadow(
+                            color: AppTheme.inkBlack,
+                            blurRadius: 0,
+                            offset: Offset(3, 3),
+                          ),
+                        ]
+                      : null,
+                ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 220),
-                      width: selected ? 44 : 36,
-                      height: selected ? 44 : 36,
-                      decoration: BoxDecoration(
-                        color: selected
-                            ? AppTheme.accent.withValues(alpha: 0.16)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: selected
-                            ? [BoxShadow(
-                                color: AppTheme.accent.withValues(alpha: 0.3),
-                                blurRadius: 12,
-                                spreadRadius: 1,
-                              )]
-                            : null,
-                      ),
-                      child: Icon(
-                        items[i].icon,
-                        size: selected ? 22 : 20,
-                        color: selected ? AppTheme.accent : context.textMuted,
-                      ),
+                    Icon(
+                      items[i].icon,
+                      size: 22,
+                      color: selected ? AppTheme.warmWhite : context.textMuted,
                     ),
                     const SizedBox(height: 2),
-                    AnimatedDefaultTextStyle(
-                      duration: const Duration(milliseconds: 220),
+                    Text(
+                      items[i].label,
                       style: TextStyle(
-                        color: selected ? AppTheme.accent : context.textMuted,
-                        fontSize: selected ? 10 : 10,
-                        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                        color: selected ? AppTheme.warmWhite : context.textMuted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
                         letterSpacing: 0.2,
                       ),
-                      child: Text(items[i].label),
                     ),
                   ],
                 ),

@@ -20,11 +20,14 @@ class AdminSegmentedControl<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = ac(context);
     return Container(
-      height: 64,
+      height: 66,
       decoration: BoxDecoration(
         color: c.bgSurface2,
         borderRadius: BorderRadius.circular(radiusCard), // Even if 0, it follows the token
-        border: Border.all(color: c.border),
+        border: Border.all(color: c.border, width: 2.5),
+        boxShadow: const [
+          BoxShadow(color: Color(0xFF111111), offset: Offset(4, 4), blurRadius: 0),
+        ],
       ),
       child: Row(
         children: options.map((opt) {
@@ -155,7 +158,7 @@ class _AdminButtonState extends State<AdminButton>
       case AdminButtonVariant.secondary:
         bg = c.btnSecondary;
         fg = c.btnSecondaryFg;
-        border = Border.all(color: c.border2);
+        border = Border.all(color: c.border2, width: 2);
       case AdminButtonVariant.accent:
         bg = c.accent;
         fg = Colors.white;
@@ -165,6 +168,7 @@ class _AdminButtonState extends State<AdminButton>
       case AdminButtonVariant.ghost:
         bg = Colors.transparent;
         fg = (c.isDark ? c.accentBright : c.accent);
+        border = Border.all(color: c.border, width: 2);
     }
 
     Widget content = Row(
@@ -218,6 +222,15 @@ class _AdminButtonState extends State<AdminButton>
               color: bg,
               borderRadius: BorderRadius.circular(radiusBtn),
               border: border,
+              boxShadow: disabled || widget.variant == AdminButtonVariant.ghost
+                  ? null
+                  : const [
+                      BoxShadow(
+                        color: Color(0xFF111111),
+                        offset: Offset(3, 3),
+                        blurRadius: 0,
+                      ),
+                    ],
             ),
             child: Center(child: content),
           ),
@@ -396,11 +409,11 @@ class AdminSearchBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = ac(context);
     return Container(
-      height: 36,
+      height: 40,
       decoration: BoxDecoration(
         color: c.bgSurface2,
         borderRadius: BorderRadius.circular(radiusInput),
-        border: Border.all(color: c.border2),
+        border: Border.all(color: c.border2, width: 2),
       ),
       child: TextField(
         controller: controller,
@@ -459,14 +472,20 @@ class AdminFilterChip extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        height: 28,
+        height: 30,
         padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
           color: selected ? c.accentFill : c.bgSurface2,
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: selected ? (c.isDark ? c.accentBright : c.accent) : c.border2,
+            width: 2,
           ),
+          boxShadow: selected
+              ? const [
+                  BoxShadow(color: Color(0xFF111111), offset: Offset(2, 2), blurRadius: 0),
+                ]
+              : null,
         ),
         child: Center(
           child: Text(

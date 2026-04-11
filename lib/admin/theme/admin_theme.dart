@@ -2,29 +2,29 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 // ── LIGHT MODE COLORS ──────────────────────────────────────────
-const Color lBgBase      = Color(0xFFFAFAFA);
-const Color lBgSurface   = Color(0xFFFFFFFF);
-const Color lBgSurface2  = Color(0xFFF9FAFB);
-const Color lBgSurface3  = Color(0xFFF3F4F6);
+const Color lBgBase      = Color(0xFFFFFCF7);
+const Color lBgSurface   = Color(0xFFFFF7E8);
+const Color lBgSurface2  = Color(0xFFFFFFFF);
+const Color lBgSurface3  = Color(0xFFFFEFD1);
 
-const Color lBorder      = Color(0xFFF3F4F6);
-const Color lBorder2     = Color(0xFFE5E7EB);
-const Color lBorder3     = Color(0xFFD1D5DB);
+const Color lBorder      = Color(0xFF111111);
+const Color lBorder2     = Color(0xFF1B1B1B);
+const Color lBorder3     = Color(0xFF303030);
 
-const Color lTextPrimary   = Color(0xFF111827);
-const Color lTextSecondary = Color(0xFF6B7280);
-const Color lTextMuted     = Color(0xFF9CA3AF);
-const Color lTextDisabled  = Color(0xFFD1D5DB);
+const Color lTextPrimary   = Color(0xFF111111);
+const Color lTextSecondary = Color(0xFF303030);
+const Color lTextMuted     = Color(0xFF525252);
+const Color lTextDisabled  = Color(0xFFA8A8A8);
 
-const Color lAccent        = Color(0xFF0284C7);
-const Color lAccentBright  = Color(0xFF38BDF8);
-const Color lAccentFill    = Color(0xFFEFF6FF);
-const Color lAccentFill2   = Color(0xFFDBEAFE);
+const Color lAccent        = Color(0xFF3559FF);
+const Color lAccentBright  = Color(0xFF58B9FF);
+const Color lAccentFill    = Color(0xFFE5ECFF);
+const Color lAccentFill2   = Color(0xFFCEE1FF);
 
-const Color lBtnPrimary    = Color(0xFF111827);
-const Color lBtnPrimaryFg  = Color(0xFFFFFFFF);
-const Color lBtnSecondary  = Color(0xFFF9FAFB);
-const Color lBtnSecondaryFg = Color(0xFF374151);
+const Color lBtnPrimary    = Color(0xFF171717);
+const Color lBtnPrimaryFg  = Color(0xFFFFFCF7);
+const Color lBtnSecondary  = Color(0xFFFFFCF7);
+const Color lBtnSecondaryFg = Color(0xFF111111);
 
 const Color lSuccess      = Color(0xFF10B981);
 const Color lSuccessFill  = Color(0xFFDCFCE7);
@@ -37,29 +37,29 @@ const Color lErrorFill    = Color(0xFFFEE2E2);
 const Color lErrorText    = Color(0xFF991B1B);
 
 // ── DARK MODE COLORS ──────────────────────────────────────────
-const Color dBgBase      = Color(0xFF0B1120);
-const Color dBgSurface   = Color(0xFF111827);
-const Color dBgSurface2  = Color(0xFF0B1120);
-const Color dBgSurface3  = Color(0xFF1F2937);
+const Color dBgBase      = Color(0xFF151515);
+const Color dBgSurface   = Color(0xFF1F1F1F);
+const Color dBgSurface2  = Color(0xFF262626);
+const Color dBgSurface3  = Color(0xFF2E2E2E);
 
-const Color dBorder      = Color(0xFF1F2937);
-const Color dBorder2     = Color(0xFF374151);
-const Color dBorder3     = Color(0xFF4B5563);
+const Color dBorder      = Color(0xFFF5F5F5);
+const Color dBorder2     = Color(0xFFDFDFDF);
+const Color dBorder3     = Color(0xFFC7C7C7);
 
-const Color dTextPrimary   = Color(0xFFF9FAFB);
-const Color dTextSecondary = Color(0xFF9CA3AF);
-const Color dTextMuted     = Color(0xFF4B5563);
-const Color dTextDisabled  = Color(0xFF374151);
+const Color dTextPrimary   = Color(0xFFFFFCF7);
+const Color dTextSecondary = Color(0xFFF0EBDD);
+const Color dTextMuted     = Color(0xFFD6D0C3);
+const Color dTextDisabled  = Color(0xFF8B8B8B);
 
-const Color dAccent        = Color(0xFF0284C7);
-const Color dAccentBright  = Color(0xFF38BDF8);
-const Color dAccentFill    = Color(0xFF1E3A5F);
-const Color dAccentFill2   = Color(0xFF1E3A5F);
+const Color dAccent        = Color(0xFF58B9FF);
+const Color dAccentBright  = Color(0xFF7FC7FF);
+const Color dAccentFill    = Color(0xFF24344A);
+const Color dAccentFill2   = Color(0xFF314666);
 
-const Color dBtnPrimary    = Color(0xFFF9FAFB);
-const Color dBtnPrimaryFg  = Color(0xFF111827);
-const Color dBtnSecondary  = Color(0xFF1F2937);
-const Color dBtnSecondaryFg = Color(0xFFD1D5DB);
+const Color dBtnPrimary    = Color(0xFFFFFCF7);
+const Color dBtnPrimaryFg  = Color(0xFF111111);
+const Color dBtnSecondary  = Color(0xFF2A2A2A);
+const Color dBtnSecondaryFg = Color(0xFFFFFCF7);
 
 const Color dSuccess      = Color(0xFF10B981);
 const Color dSuccessFill  = Color(0xFF064E3B);
@@ -72,64 +72,64 @@ const Color dErrorFill    = Color(0xFF450A0A);
 const Color dErrorText    = Color(0xFFFCA5A5);
 
 // ── DESIGN TOKENS ──────────────────────────────────────────────
-const double screenPad    = 14.0;
-const double rowPadV      = 9.0;
+const double screenPad    = 16.0;
+const double rowPadV      = 10.0;
 const double rowPadH      = 14.0;
-const double cardPad      = 14.0;
+const double cardPad      = 16.0;
 const double bottomBuf    = 80.0;
-const double radiusBtn    = 7.0;
-const double radiusCard   = 0.0; // Stripe-inspired uses sections/borders over cards
-const double radiusModal  = 12.0;
-const double radiusInput  = 7.0;
-const double radiusTag    = 4.0;
+const double radiusBtn    = 12.0;
+const double radiusCard   = 14.0;
+const double radiusModal  = 16.0;
+const double radiusInput  = 12.0;
+const double radiusTag    = 8.0;
 const double radiusPill   = 100.0;
 const double pillRadius   = 100.0;
-const double radiusSignCell = 7.0;
-const double navH         = 52.0;
-const double topBarH      = 44.0;
+const double radiusSignCell = 10.0;
+const double navH         = 58.0;
+const double topBarH      = 48.0;
 
 // ── TYPOGRAPHY ────────────────────────────────────────────────
-TextStyle adminH1(Color color) => GoogleFonts.inter(
-  fontSize: 16, fontWeight: FontWeight.w700,
+TextStyle adminH1(Color color) => GoogleFonts.archivoBlack(
+  fontSize: 18, fontWeight: FontWeight.w800,
   letterSpacing: -0.4, height: 1.2, color: color,
 );
-TextStyle adminH2(Color color) => GoogleFonts.inter(
-  fontSize: 14, fontWeight: FontWeight.w700,
+TextStyle adminH2(Color color) => GoogleFonts.archivoBlack(
+  fontSize: 15, fontWeight: FontWeight.w800,
   letterSpacing: -0.3, height: 1.25, color: color,
 );
-TextStyle adminH3(Color color) => GoogleFonts.inter(
-  fontSize: 13, fontWeight: FontWeight.w600,
+TextStyle adminH3(Color color) => GoogleFonts.spaceGrotesk(
+  fontSize: 13, fontWeight: FontWeight.w700,
   letterSpacing: -0.1, height: 1.3, color: color,
 );
-TextStyle adminBody(Color color) => GoogleFonts.inter(
-  fontSize: 12, fontWeight: FontWeight.w400,
+TextStyle adminBody(Color color) => GoogleFonts.spaceGrotesk(
+  fontSize: 13, fontWeight: FontWeight.w500,
   height: 1.5, color: color,
 );
-TextStyle adminBodySm(Color color) => GoogleFonts.inter(
-  fontSize: 11, fontWeight: FontWeight.w400,
+TextStyle adminBodySm(Color color) => GoogleFonts.spaceGrotesk(
+  fontSize: 12, fontWeight: FontWeight.w500,
   height: 1.5, color: color,
 );
-TextStyle adminMeta(Color color) => GoogleFonts.inter(
-  fontSize: 10, fontWeight: FontWeight.w500,
+TextStyle adminMeta(Color color) => GoogleFonts.spaceGrotesk(
+  fontSize: 10, fontWeight: FontWeight.w600,
   height: 1.4, color: color,
 );
-TextStyle adminLabel(Color color) => GoogleFonts.inter(
-  fontSize: 10, fontWeight: FontWeight.w700,
+TextStyle adminLabel(Color color) => GoogleFonts.ibmPlexMono(
+  fontSize: 10, fontWeight: FontWeight.w800,
   letterSpacing: 0.07, height: 1.2, color: color,
 );
 TextStyle adminMono(Color color) => GoogleFonts.robotoMono(
-  fontSize: 11, fontWeight: FontWeight.w500,
+  fontSize: 11, fontWeight: FontWeight.w700,
   height: 1.4, color: color,
 );
 TextStyle signLetter(Color color) => TextStyle(
   fontSize: 13, fontWeight: FontWeight.w700,
   fontFamily: 'serif', height: 1.0, color: color,
 );
-TextStyle statValue(Color color) => GoogleFonts.inter(
+TextStyle statValue(Color color) => GoogleFonts.archivoBlack(
   fontSize: 17, fontWeight: FontWeight.w700,
   letterSpacing: -0.5, height: 1.1, color: color,
 );
-TextStyle statValueSm(Color color) => GoogleFonts.inter(
+TextStyle statValueSm(Color color) => GoogleFonts.archivoBlack(
   fontSize: 14, fontWeight: FontWeight.w700,
   letterSpacing: -0.4, height: 1.1, color: color,
 );
@@ -301,37 +301,45 @@ ThemeData adminThemeLight() {
       onPrimary: Colors.white,
       onSurface: lTextPrimary,
     ),
-    textTheme: GoogleFonts.interTextTheme(base.textTheme),
+    textTheme: GoogleFonts.spaceGroteskTextTheme(base.textTheme),
     extensions: const [AdminColors.light],
     appBarTheme: AppBarTheme(
       backgroundColor: lBgSurface,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0,
-      shadowColor: Colors.black.withValues(alpha: 0.3),
+      shadowColor: Colors.transparent,
     ),
     dividerColor: lBorder,
-    dividerTheme: const DividerThemeData(color: lBorder, thickness: 1, space: 0),
+    dividerTheme: const DividerThemeData(color: lBorder, thickness: 1.5, space: 0),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: lBgSurface3,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radiusInput),
-        borderSide: const BorderSide(color: lBorder3),
+        borderSide: const BorderSide(color: lBorder2, width: 2),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radiusInput),
-        borderSide: const BorderSide(color: lBorder3),
+        borderSide: const BorderSide(color: lBorder2, width: 2),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radiusInput),
-        borderSide: const BorderSide(color: lAccent, width: 1.5),
+        borderSide: const BorderSide(color: lAccent, width: 2.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radiusInput),
-        borderSide: const BorderSide(color: lError, width: 1.5),
+        borderSide: const BorderSide(color: lError, width: 2.5),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    ),
+    cardTheme: CardThemeData(
+      color: lBgSurface,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(radiusCard),
+        side: const BorderSide(color: lBorder, width: 2.5),
+      ),
     ),
   );
 }
@@ -347,7 +355,7 @@ ThemeData adminThemeDark() {
       onPrimary: dBgBase,
       onSurface: dTextPrimary,
     ),
-    textTheme: GoogleFonts.interTextTheme(base.textTheme),
+    textTheme: GoogleFonts.spaceGroteskTextTheme(base.textTheme),
     extensions: const [AdminColors.dark],
     appBarTheme: const AppBarTheme(
       backgroundColor: dBgSurface,
@@ -356,27 +364,35 @@ ThemeData adminThemeDark() {
       scrolledUnderElevation: 0,
     ),
     dividerColor: dBorder,
-    dividerTheme: const DividerThemeData(color: dBorder, thickness: 1, space: 0),
+    dividerTheme: const DividerThemeData(color: dBorder, thickness: 1.5, space: 0),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: dBgSurface3,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radiusInput),
-        borderSide: const BorderSide(color: dBorder3),
+        borderSide: const BorderSide(color: dBorder2, width: 2),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radiusInput),
-        borderSide: const BorderSide(color: dBorder3),
+        borderSide: const BorderSide(color: dBorder2, width: 2),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radiusInput),
-        borderSide: const BorderSide(color: dAccentBright, width: 1.5),
+        borderSide: const BorderSide(color: dAccentBright, width: 2.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radiusInput),
-        borderSide: const BorderSide(color: dError, width: 1.5),
+        borderSide: const BorderSide(color: dError, width: 2.5),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    ),
+    cardTheme: CardThemeData(
+      color: dBgSurface,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(radiusCard),
+        side: const BorderSide(color: dBorder, width: 2.5),
+      ),
     ),
   );
 }

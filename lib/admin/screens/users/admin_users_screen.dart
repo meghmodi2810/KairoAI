@@ -135,7 +135,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     return Scaffold(
       backgroundColor: c.bgBase,
       appBar: AdminTopBar(
-        title: 'Users',
+        title: 'Learners',
         onMenuTap: widget.onMenuTap,
       ),
       body: Column(
@@ -256,7 +256,7 @@ class _UserRow extends StatelessWidget {
             children: [
               Icon(LucideIcons.zap, size: 10, color: c.accent),
               const SizedBox(width: 4),
-              Text('${user.xp} XP · Lvl ${user.currentLevel}', 
+              Text('${user.xp} XP · Lv ${user.currentLevel}',
                    style: adminMeta(c.textSecondary)),
             ],
           ),

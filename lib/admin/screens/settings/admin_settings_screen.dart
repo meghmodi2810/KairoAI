@@ -52,7 +52,7 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
     return Scaffold(
       backgroundColor: c.bgBase,
       appBar: AdminTopBar(
-        title: 'Platform',
+        title: 'Settings',
         onMenuTap: widget.onMenuTap,
       ),
       body: Column(

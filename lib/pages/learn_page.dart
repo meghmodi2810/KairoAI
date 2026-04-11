@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../theme/app_theme.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import '../models/app_models.dart';
+import '../theme/app_theme.dart';
+import '../theme/neo_brutal_widgets.dart';
 import 'category_lessons_page.dart';
 
 class LearnPage extends StatelessWidget {
@@ -13,121 +14,126 @@ class LearnPage extends StatelessWidget {
     final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
     return Scaffold(
-      backgroundColor: context.surface,
+      backgroundColor: AppTheme.paperCream,
       body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
         slivers: [
-          // ── Header ─────────────────────────────────────────────
           SliverToBoxAdapter(
             child: SafeArea(
               bottom: false,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Learn', style: TextStyle(
-                    color: context.textPrimary, fontSize: 28,
-                    fontWeight: FontWeight.w900, letterSpacing: -0.4)),
-                  const SizedBox(height: 2),
-                  Text('Indian Sign Language — A to Z and numbers',
-                    style: TextStyle(color: context.textMuted, fontSize: 13)),
-                ]),
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'LEARNING ROUTE',
+                      style: TextStyle(
+                        color: AppTheme.inkBlack,
+                        fontSize: 34,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.8,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Checkpoint by checkpoint. Hold your streak.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: AppTheme.inkBlack.withValues(alpha: 0.75),
+                          ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-
-          // ── Category cards (path style) ─────────────────────
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 100),
             sliver: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('categories')
-                  .orderBy('order')
-                  .snapshots(),
-              builder: (context, snap) {
-                if (snap.connectionState == ConnectionState.waiting) {
+              stream: FirebaseFirestore.instance.collection('categories').orderBy('order').snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
                   return const SliverFillRemaining(
-                    child: Center(child: CircularProgressIndicator(color: AppTheme.accent)));
-                }
-                if (!snap.hasData || snap.data!.docs.isEmpty) {
-                  return SliverFillRemaining(
-                    child: Center(child: Text('No categories yet.',
-                      style: TextStyle(color: context.textSecondary))));
+                    child: Center(child: CircularProgressIndicator(color: AppTheme.cobaltBlue)),
+                  );
                 }
 
-                  final docs = snap.data!.docs;
-                return SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, i) {
-                      final doc  = docs[i];
-                      final cat  = CategoryModel.fromFirestore(doc);
-                      final color = AppTheme.categoryColors[i % AppTheme.categoryColors.length];
-                      final isLast = i == docs.length - 1;
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return const SliverFillRemaining(
+                    child: NeoEmptyState(
+                      icon: Icons.route,
+                      title: 'No Learning Path Yet',
+                      subtitle: 'Your admin will add categories here.',
+                    ),
+                  );
+                }
 
-                      return IntrinsicHeight(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // ── Timeline Column ──
-                            SizedBox(
-                              width: 48,
-                              child: Column(
-                                children: [
-                                  // Circle Dot
-                                  Container(
-                                    width: 24,
-                                    height: 24,
-                                    decoration: BoxDecoration(
-                                      color: cat.isLocked ? context.card : color,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: cat.isLocked ? context.border : Colors.white,
-                                        width: 3,
-                                      ),
-                                      boxShadow: cat.isLocked ? null : [
-                                        BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 4))
-                                      ],
-                                    ),
-                                    child: cat.isLocked
-                                      ? Center(child: Icon(Icons.lock_rounded, size: 12, color: context.textMuted))
-                                      : const Center(child: Icon(Icons.check_rounded, size: 14, color: Colors.white)),
+                final docs = snapshot.data!.docs;
+
+                return SliverList.builder(
+                  itemCount: docs.length,
+                  itemBuilder: (context, index) {
+                    final category = CategoryModel.fromFirestore(docs[index]);
+                    final color = AppTheme.categoryColors[index % AppTheme.categoryColors.length];
+                    final isLast = index == docs.length - 1;
+
+                    return IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          SizedBox(
+                            width: 44,
+                            child: Column(
+                              children: [
+                                Container(
+                                  width: 26,
+                                  height: 26,
+                                  decoration: BoxDecoration(
+                                    color: category.isLocked ? AppTheme.paperCream : color,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: AppTheme.inkBlack, width: 3),
                                   ),
-                                  // Line
-                                  if (!isLast)
-                                    Expanded(
-                                      child: Container(
-                                        width: 3,
-                                        margin: const EdgeInsets.symmetric(vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: context.border,
-                                          borderRadius: BorderRadius.circular(1.5),
-                                        ),
+                                  child: Icon(
+                                    category.isLocked ? Icons.lock : Icons.flag,
+                                    color: AppTheme.inkBlack,
+                                    size: 14,
+                                  ),
+                                ),
+                                if (!isLast)
+                                  Expanded(
+                                    child: Container(
+                                      width: 6,
+                                      margin: const EdgeInsets.symmetric(vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.inkBlack,
+                                        borderRadius: BorderRadius.circular(4),
                                       ),
                                     ),
-                                ],
+                                  ),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
+                              child: _CategoryNode(
+                                uid: uid,
+                                category: category,
+                                color: color,
+                                onTap: category.isLocked
+                                    ? null
+                                    : () => Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => CategoryLessonsPage(category: category),
+                                          ),
+                                        ),
                               ),
                             ),
-                            
-                            // ── Card ──
-                            Expanded(
-                              child: Padding(
-                                padding: EdgeInsets.only(bottom: isLast ? 0 : 24),
-                                child: _CategoryNode(
-                                  category: cat,
-                                  color: color,
-                                  uid: uid,
-                                  onTap: cat.isLocked
-                                      ? null
-                                      : () => Navigator.push(context, MaterialPageRoute(
-                                          builder: (_) => CategoryLessonsPage(category: cat))),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                    childCount: docs.length,
-                  ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 );
               },
             ),
@@ -138,17 +144,16 @@ class LearnPage extends StatelessWidget {
   }
 }
 
-// ── Learning path node ────────────────────────────────────────
 class _CategoryNode extends StatelessWidget {
+  final String uid;
   final CategoryModel category;
   final Color color;
-  final String uid;
   final VoidCallback? onTap;
 
   const _CategoryNode({
+    required this.uid,
     required this.category,
     required this.color,
-    required this.uid,
     required this.onTap,
   });
 
@@ -156,84 +161,100 @@ class _CategoryNode extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: category.isLocked ? context.card.withValues(alpha: 0.5) : context.card,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: category.isLocked ? context.border : color.withValues(alpha: 0.4),
-              width: category.isLocked ? 1 : 1.5,
-            ),
-          ),
-          child: Row(children: [
-            // Icon container
+      child: NeoPanel(
+        radius: 16,
+        color: category.isLocked ? AppTheme.paperCream : AppTheme.warmWhite,
+        child: Row(
+          children: [
             Container(
-              width: 52, height: 52,
+              width: 54,
+              height: 54,
               decoration: BoxDecoration(
-                color: category.isLocked
-                    ? context.border
-                    : color.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(15),
+                color: category.isLocked ? AppTheme.paperCream : color.withValues(alpha: 0.25),
+                borderRadius: BorderRadius.circular(13),
+                border: Border.all(color: AppTheme.inkBlack, width: 2),
               ),
               child: Center(
                 child: category.isLocked
-                    ? Icon(Icons.lock_rounded, color: context.textMuted, size: 24)
-                    : Text(category.iconEmoji,
-                        style: const TextStyle(fontSize: 26)),
+                    ? const Icon(Icons.lock, color: AppTheme.inkBlack)
+                    : Text(category.iconEmoji, style: const TextStyle(fontSize: 28)),
               ),
             ),
-            const SizedBox(width: 14),
-            // Info
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(category.name,
-                style: TextStyle(
-                  color: category.isLocked ? context.textMuted : context.textPrimary,
-                  fontSize: 16, fontWeight: FontWeight.w800),
-                maxLines: 1, overflow: TextOverflow.ellipsis),
-              const SizedBox(height: 2),
-              Text(category.description,
-                style: TextStyle(color: context.textMuted, fontSize: 12),
-                maxLines: 1, overflow: TextOverflow.ellipsis),
-              const SizedBox(height: 8),
-              // Progress bar inside the card
-              StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('users').doc(uid)
-                    .collection('progress')
-                    .where('categoryId', isEqualTo: category.id)
-                    .where('status', isEqualTo: 'completed')
-                    .snapshots(),
-                builder: (context, pSnap) {
-                  final completed = pSnap.data?.docs.length ?? 0;
-                  final total = category.totalLessons;
-                  final pct = total > 0 ? completed / total : 0.0;
-                  return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: pct,
-                        minHeight: 5,
-                        backgroundColor: context.border,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          pct == 1.0 ? AppTheme.success : color),
-                      ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    category.name,
+                    style: TextStyle(
+                      color: AppTheme.inkBlack.withValues(alpha: category.isLocked ? 0.5 : 1),
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
                     ),
-                    const SizedBox(height: 3),
-                    Text('$completed/${category.totalLessons} lessons',
-                      style: TextStyle(color: context.textMuted, fontSize: 10)),
-                  ]);
-                },
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    category.description,
+                    style: const TextStyle(
+                      color: AppTheme.inkBlack,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  StreamBuilder<QuerySnapshot>(
+                    stream: FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(uid)
+                        .collection('progress')
+                        .where('categoryId', isEqualTo: category.id)
+                        .where('status', isEqualTo: 'completed')
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      final completed = snapshot.data?.docs.length ?? 0;
+                      final total = category.totalLessons;
+                      final progress = total > 0 ? completed / total : 0.0;
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(5),
+                            child: LinearProgressIndicator(
+                              value: progress,
+                              minHeight: 8,
+                              backgroundColor: AppTheme.paperCream,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                progress == 1.0 ? AppTheme.mintGreen : color,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '$completed/${category.totalLessons} lessons',
+                            style: const TextStyle(
+                              color: AppTheme.inkBlack,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
               ),
-            ])),
-            // Arrow
+            ),
             if (!category.isLocked)
-              Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: Icon(Icons.arrow_forward_ios_rounded,
-                  color: color.withValues(alpha: 0.6), size: 14)),
-          ]),
+              const Icon(Icons.arrow_forward_ios_rounded, color: AppTheme.inkBlack, size: 14),
+          ],
         ),
+      ),
     );
   }
 }

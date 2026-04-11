@@ -51,17 +51,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     try {
       // 1. Get Summary Stats
       final summary = await _db.getAnalyticsSummary();
-      
+
       // 2. Get Recent Activity
       final activity = await _db.auditLogsStream(limit: 5).first;
-      
+
       // 3. Get Recent Learners
-      // Note: We'll add a helper to service or query directly
       final learnersResult = await _db.getLearners(limit: 5);
-      
-      // 4. Get Chart Data (Mocking for now as full aggregation is complex, 
-      // but using real counts from summary or logs if available)
-      // In a real app, this would be a daily stats collection
+
+      // 4. Get chart data
       final chartData = await _getRealChartData();
 
       if (!mounted) return;
@@ -102,7 +99,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       return Scaffold(
         backgroundColor: c.bgBase,
         appBar: AdminTopBar(
-          title: 'Insights',
+          title: 'Dashboard',
           onMenuTap: widget.onMenuTap,
           action: AdminTopBarIconButton(
             icon: LucideIcons.bell,
@@ -116,7 +113,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (_error != null) {
       return Scaffold(
         backgroundColor: c.bgBase,
-        appBar: AdminTopBar(title: 'Insights', onMenuTap: widget.onMenuTap),
+        appBar: AdminTopBar(title: 'Dashboard', onMenuTap: widget.onMenuTap),
         body: AdminErrorState(message: _error, onRetry: _loadData),
       );
     }
@@ -124,7 +121,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return Scaffold(
       backgroundColor: c.bgBase,
       appBar: AdminTopBar(
-        title: 'Insights',
+        title: 'Dashboard',
         onMenuTap: widget.onMenuTap,
         action: AdminTopBarIconButton(
           icon: LucideIcons.bell,
@@ -143,8 +140,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             children: [
               // Header Block matching HTML
               Container(
-                color: c.bgSurface,
                 padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: c.bgSurface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: c.border, width: 2.5),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0xFF111111), offset: Offset(4, 4), blurRadius: 0),
+                  ],
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -156,7 +160,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       children: [
                         Container(
                           width: 5, height: 5,
-                          decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0xFF10B981)),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(0xFF10B981),
+                            border: Border.all(color: c.textPrimary, width: 1),
+                          ),
                         ),
                         const SizedBox(width: 5),
                         Text('All systems operational', style: adminMeta(c.textSecondary).copyWith(fontSize: 10)),
@@ -169,7 +177,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   ],
                 ),
               ),
-              const Divider(),
+              const SizedBox(height: 14),
 
               // Stat Strip matching HTML
               AdminStatStrip(
@@ -194,8 +202,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
               // Chart matching HTML
               Container(
-                color: c.bgSurface,
-                padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+                decoration: BoxDecoration(
+                  color: c.bgSurface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: c.border, width: 2),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0xFF111111), offset: Offset(4, 4), blurRadius: 0),
+                  ],
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -207,7 +222,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   ],
                 ),
               ),
-              const Divider(),
+              const SizedBox(height: 14),
 
               // Recent Learners Rows matching HTML
               AdminSectionHeader(
@@ -221,10 +236,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 return AdminRow(
                   isLast: i == _recentLearners.length - 1,
                   leading: Container(
-                    width: 28, height: 28,
+                    width: 32,
+                    height: 32,
                     decoration: BoxDecoration(
                       color: c.accentFill,
-                      shape: BoxShape.circle,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: c.border, width: 1.5),
                     ),
                     child: Center(
                       child: Text(
@@ -244,13 +261,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   },
                 );
               }),
-              const Divider(),
+              const SizedBox(height: 14),
 
               // Audit Logs
               AdminSectionHeader(
                 title: 'Operation Logs',
                 actionLabel: 'Logs',
-                onAction: () => widget.onTabChange(3),
+                onAction: () => widget.onTabChange(5, subIndex: 1),
               ),
               AdminCard(
                 padding: EdgeInsets.zero,
@@ -274,6 +291,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                               decoration: BoxDecoration(
                                 color: c.bgSurface2,
                                 borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: c.border, width: 1.5),
                               ),
                               child: Icon(
                                 _actionIcon(log.action),
@@ -368,44 +386,5 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
     ];
     return '${months[now.month - 1]} ${now.day}, ${now.year}';
-  }
-}
-
-class _KPIItem extends StatelessWidget {
-  final String label;
-  final String value;
-  final String trend;
-  final bool? trendPositive;
-
-  const _KPIItem({
-    required this.label,
-    required this.value,
-    required this.trend,
-    this.trendPositive,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final c = ac(context);
-    return AdminCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: adminLabel(c.textMuted)),
-          const SizedBox(height: 8),
-          Text(value, style: statValue(c.textPrimary)),
-          const SizedBox(height: 4),
-          Text(
-            trend,
-            style: adminMeta(
-              trendPositive == true 
-                ? c.successText 
-                : (trendPositive == false ? c.errorText : c.textSecondary)
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }

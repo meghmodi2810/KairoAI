@@ -132,7 +132,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
     return Scaffold(
       backgroundColor: c.bgBase,
       appBar: AdminTopBar(
-        title: 'Reports',
+        title: 'Analytics',
         onMenuTap: widget.onMenuTap,
         action: AdminTopBarIconButton(
           icon: LucideIcons.refreshCcw,
@@ -208,7 +208,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
               const SizedBox(height: 24),
 
               // Top Signs
-              AdminSectionHeader(title: 'High-frequency sign patterns'),
+              AdminSectionHeader(title: 'High-frequency sign usage'),
               AdminCard(
                 padding: EdgeInsets.zero,
                 child: Column(

@@ -29,16 +29,19 @@ class AdminTopBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final c = ac(context);
     final h = topBarH + 20;
-    
+
     return Container(
       height: h + MediaQuery.of(context).padding.top,
       padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
       decoration: BoxDecoration(
         color: c.bgSurface,
-        border: Border(bottom: BorderSide(color: c.border, width: 1)),
+        border: Border(bottom: BorderSide(color: c.border, width: 2)),
+        boxShadow: const [
+          BoxShadow(color: Color(0xFF111111), offset: Offset(0, 3), blurRadius: 0),
+        ],
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14),
         child: Row(
           children: [
             if (variant == AdminTopBarVariant.root)
@@ -76,12 +79,15 @@ class AdminTopBar extends StatelessWidget implements PreferredSizeWidget {
             else ...[
               const SizedBox(width: 8),
               Container(
-                width: 32,
-                height: 32,
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
                   color: c.bgSurface2,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: c.border),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: c.border, width: 2),
+                  boxShadow: const [
+                    BoxShadow(color: Color(0xFF111111), offset: Offset(2, 2), blurRadius: 0),
+                  ],
                 ),
                 child: Center(
                   child: Text(
@@ -106,12 +112,21 @@ class _TopBarButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = ac(context);
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 48,
-        height: topBarH,
+      child: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: c.bgSurface2,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: c.border, width: 2),
+          boxShadow: const [
+            BoxShadow(color: Color(0xFF111111), offset: Offset(2, 2), blurRadius: 0),
+          ],
+        ),
         child: Center(child: child),
       ),
     );
@@ -136,9 +151,17 @@ class AdminTopBarIconButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 48,
-        height: topBarH,
+      child: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: c.bgSurface2,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: c.border, width: 2),
+          boxShadow: const [
+            BoxShadow(color: Color(0xFF111111), offset: Offset(2, 2), blurRadius: 0),
+          ],
+        ),
         child: Center(
           child: Stack(
             children: [
@@ -148,10 +171,11 @@ class AdminTopBarIconButton extends StatelessWidget {
                   right: 0,
                   top: 0,
                   child: Container(
-                    width: 7,
-                    height: 7,
+                    width: 8,
+                    height: 8,
                     decoration: BoxDecoration(
                       color: c.error,
+                      border: Border.all(color: c.textPrimary, width: 1.5),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -182,9 +206,19 @@ class AdminTopBarSaveButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: SizedBox(
-        width: 56,
-        height: topBarH,
+      child: Container(
+        height: 38,
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: onTap != null ? c.btnPrimary : c.bgSurface2,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: c.border, width: 2),
+          boxShadow: onTap != null
+              ? const [
+                  BoxShadow(color: Color(0xFF111111), offset: Offset(2, 2), blurRadius: 0),
+                ]
+              : null,
+        ),
         child: Center(
           child: isLoading
               ? SizedBox(
@@ -192,15 +226,16 @@ class AdminTopBarSaveButton extends StatelessWidget {
                   height: 14,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: c.accent,
+                    color: c.btnPrimaryFg,
                   ),
                 )
               : Text(
                   label,
                   style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: onTap != null ? c.accent : c.textMuted,
+                    fontSize: 12,
+                    letterSpacing: 0.2,
+                    fontWeight: FontWeight.w900,
+                    color: onTap != null ? c.btnPrimaryFg : c.textMuted,
                   ),
                 ),
         ),

@@ -22,8 +22,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
   bool _isLoading = true;
   bool _onboardingComplete = false;
 
-  static const Color primaryBlue = Color(0xFF1A2151);
-  static const Color darkBlue = Color(0xFF141938);
+  static const Color ink = Color(0xFF111111);
+  static const Color paper = Color(0xFFFFF7E8);
+  static const Color blue = Color(0xFF58B9FF);
+  static const Color yellow = Color(0xFFFFD84D);
 
   @override
   void initState() {
@@ -69,63 +71,100 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   Widget _loadingScreen() {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [primaryBlue, darkBlue],
-          ),
-        ),
+      backgroundColor: paper,
+      body: SafeArea(
         child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      blurRadius: 20,
-                      spreadRadius: 5,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 150,
+                  height: 150,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: yellow,
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(color: ink, width: 4),
+                    boxShadow: const [
+                      BoxShadow(color: ink, blurRadius: 0, offset: Offset(8, 8)),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: Image.asset(
+                      'assets/logo/logo.jpeg',
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const ColoredBox(
+                          color: blue,
+                          child: Icon(
+                            Icons.sign_language,
+                            size: 64,
+                            color: ink,
+                          ),
+                        );
+                      },
                     ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(60),
-                  child: Image.asset(
-                    'assets/logo/logo.jpeg',
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        color: primaryBlue,
-                        child: const Icon(
-                          Icons.sign_language,
-                          size: 60,
-                          color: Color(0xFFFFD93D),
-                        ),
-                      );
-                    },
                   ),
                 ),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'KairoAI',
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                const SizedBox(height: 26),
+                const Text(
+                  'KAIROAI',
+                  style: TextStyle(
+                    color: ink,
+                    fontSize: 36,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.2,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 40),
-              const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFFD93D)),
-              ),
-            ],
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: blue,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: ink, width: 3),
+                  ),
+                  child: const Text(
+                    'GET YOUR HANDS READY',
+                    style: TextStyle(
+                      color: ink,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 12,
+                      letterSpacing: 0.6,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 26),
+                SizedBox(
+                  width: 170,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: List.generate(
+                      3,
+                      (i) => TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0.2, end: 1),
+                        duration: Duration(milliseconds: 520 + (i * 120)),
+                        curve: Curves.easeOut,
+                        builder: (context, v, child) => Opacity(opacity: v, child: child),
+                        child: Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: i.isEven ? yellow : blue,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: ink, width: 3),
+                          ),
+                          child: const Icon(Icons.front_hand, color: ink, size: 20),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

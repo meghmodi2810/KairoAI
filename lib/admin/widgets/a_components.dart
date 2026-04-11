@@ -20,7 +20,7 @@ class AdminCard extends StatelessWidget {
     this.radius,
     this.color,
     this.showBorder = true,
-    this.showShadow = false, // Stripe uses borders mostly
+    this.showShadow = true,
   });
 
   @override
@@ -31,12 +31,12 @@ class AdminCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: color ?? c.bgSurface,
         borderRadius: BorderRadius.circular(radius ?? radiusCard),
-        border: showBorder ? Border.all(color: c.border) : null,
+        border: showBorder ? Border.all(color: c.border, width: 2.5) : null,
         boxShadow: showShadow ? [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: c.isDark ? 0.2 : 0.05),
-            offset: const Offset(0, 1),
-            blurRadius: 3,
+          const BoxShadow(
+            color: Color(0xFF111111),
+            offset: Offset(5, 5),
+            blurRadius: 0,
           ),
         ] : null,
       ),
@@ -94,6 +94,7 @@ class AdminTag extends StatelessWidget {
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(radiusTag),
+        border: Border.all(color: c.isDark ? dBorder : lBorder, width: 1.5),
       ),
       child: Center(
         child: Text(
@@ -203,9 +204,15 @@ class _AdminRowState extends State<AdminRow> {
         ),
         decoration: BoxDecoration(
           color: _pressed ? c.bgSurface3 : c.bgSurface,
-          border: widget.isLast
-              ? null
-              : Border(bottom: BorderSide(color: c.border)),
+          borderRadius: BorderRadius.circular(8),
+          border: Border(
+            left: BorderSide(color: c.border, width: 1.5),
+            right: BorderSide(color: c.border, width: 1.5),
+            top: BorderSide(color: c.border, width: 1.5),
+            bottom: widget.isLast
+                ? BorderSide(color: c.border, width: 1.5)
+                : BorderSide(color: c.border, width: 1),
+          ),
         ),
         child: Row(
           children: [
@@ -256,9 +263,11 @@ class AdminStatStrip extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: c.bgSurface,
-        border: Border(
-          bottom: BorderSide(color: c.border),
-        ),
+        border: Border.all(color: c.border, width: 2),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [
+          BoxShadow(color: Color(0xFF111111), blurRadius: 0, offset: Offset(4, 4)),
+        ],
       ),
       child: Row(
         children: stats.asMap().entries.map((e) {
