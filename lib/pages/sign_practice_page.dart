@@ -177,12 +177,15 @@ class _SignPracticePageState extends State<SignPracticePage>
         children: [
           Positioned.fill(
             child: _detecting && _detectionService.textureId != null
-                ? FittedBox(
-                    fit: BoxFit.cover,
-                    child: SizedBox(
-                      width: 480,
-                      height: 640,
-                      child: Texture(textureId: _detectionService.textureId!),
+                ? Align(
+                    alignment: Alignment.topCenter,
+                    child: FittedBox(
+                      fit: BoxFit.cover,
+                      child: SizedBox(
+                        width: 480,
+                        height: 640,
+                        child: Texture(textureId: _detectionService.textureId!),
+                      ),
                     ),
                   )
                 : const ColoredBox(color: Colors.black),
@@ -303,7 +306,7 @@ class _SignPracticePageState extends State<SignPracticePage>
           Align(
             alignment: Alignment.bottomCenter,
             child: Container(
-              padding: EdgeInsets.fromLTRB(14, 12, 14, MediaQuery.of(context).padding.bottom + 14),
+              padding: EdgeInsets.fromLTRB(12, 10, 12, MediaQuery.of(context).padding.bottom + 10),
               decoration: BoxDecoration(
                 color: AppTheme.warmWhite,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),

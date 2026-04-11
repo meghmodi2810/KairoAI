@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/app_models.dart';
 import '../services/sign_detection_service.dart';
-import '../services/sign_image_service.dart';
 import '../theme/app_theme.dart';
 
 class LessonPracticePage extends StatefulWidget {
@@ -23,7 +22,6 @@ class LessonPracticePage extends StatefulWidget {
 class _LessonPracticePageState extends State<LessonPracticePage>
     with WidgetsBindingObserver {
   final SignDetectionService _detection = SignDetectionService();
-  final SignImageService _imageService = SignImageService();
 
   StreamSubscription<DetectionResult>? _sub;
   DetectionResult? _result;
@@ -182,8 +180,6 @@ class _LessonPracticePageState extends State<LessonPracticePage>
 
   @override
   Widget build(BuildContext context) {
-    final total = widget.signs.length;
-    final progress = (_index + (_matched ? 1 : 0)) / total;
     final confidence = _result?.confidence ?? 0;
     final confidenceColor = _confidenceColor(confidence);
 
@@ -196,8 +192,8 @@ class _LessonPracticePageState extends State<LessonPracticePage>
                 ? FittedBox(
                     fit: BoxFit.cover,
                     child: SizedBox(
-                      width: 480,
-                      height: 640,
+                      width: 720,
+                      height: 1280,
                       child: Texture(textureId: _detection.textureId!),
                     ),
                   )
@@ -234,69 +230,49 @@ class _LessonPracticePageState extends State<LessonPracticePage>
                     },
                   ),
                   const SizedBox(width: 10),
-                  Expanded(
+                  Container(
+                    width: 150,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                       decoration: BoxDecoration(
-                        color: AppTheme.warmWhite,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppTheme.inkBlack, width: 3),
-                        boxShadow: const [
-                          BoxShadow(color: AppTheme.inkBlack, blurRadius: 0, offset: Offset(4, 4)),
-                        ],
+                        color: AppTheme.warmWhite.withValues(alpha: 0.92),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.inkBlack, width: 2.5),
                       ),
                       child: Row(
                         children: [
-                          Container(
-                            width: 34,
-                            height: 34,
-                            decoration: BoxDecoration(
-                              color: AppTheme.signalYellow,
-                              borderRadius: BorderRadius.circular(9),
-                              border: Border.all(color: AppTheme.inkBlack, width: 2),
-                            ),
-                            child: const Icon(Icons.front_hand, color: AppTheme.inkBlack, size: 18),
-                          ),
-                          const SizedBox(width: 8),
+                          const Icon(Icons.gps_fixed, color: AppTheme.inkBlack, size: 16),
+                          const SizedBox(width: 6),
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'TARGET: ${_current.word}',
-                                  style: const TextStyle(
-                                    color: AppTheme.inkBlack,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 3),
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(6),
-                                  child: LinearProgressIndicator(
-                                    value: progress,
-                                    minHeight: 7,
-                                    backgroundColor: AppTheme.paperCream,
-                                    valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.cobaltBlue),
-                                  ),
-                                ),
-                              ],
+                            child: Text(
+                              'TARGET ${_current.word.toUpperCase()}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppTheme.inkBlack,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w900,
+                              ),
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           Text(
-                            '${_index + 1}/$total',
+                            '${_matchCount > 3 ? 3 : _matchCount}/3',
                             style: const TextStyle(
                               color: AppTheme.inkBlack,
-                              fontSize: 12,
+                              fontSize: 11,
                               fontWeight: FontWeight.w900,
                             ),
                           ),
                         ],
                       ),
                     ),
+                  ),
+                  const Spacer(),
+                  _hudCircle(
+                    icon: Icons.cameraswitch_rounded,
+                    onTap: () => _detection.switchCamera(),
+                    background: AppTheme.electricBlue,
                   ),
                 ],
               ),
@@ -320,15 +296,6 @@ class _LessonPracticePageState extends State<LessonPracticePage>
                   fontWeight: FontWeight.w900,
                 ),
               ),
-            ),
-          ),
-          Positioned(
-            top: 90,
-            right: 14,
-            child: _hudCircle(
-              icon: Icons.cameraswitch_rounded,
-              onTap: () => _detection.switchCamera(),
-              background: AppTheme.electricBlue,
             ),
           ),
           if (_matched)
@@ -364,7 +331,7 @@ class _LessonPracticePageState extends State<LessonPracticePage>
             alignment: Alignment.bottomCenter,
             child: Container(
               width: double.infinity,
-              padding: EdgeInsets.fromLTRB(14, 12, 14, MediaQuery.of(context).padding.bottom + 14),
+              padding: EdgeInsets.fromLTRB(12, 10, 12, MediaQuery.of(context).padding.bottom + 10),
               decoration: BoxDecoration(
                 color: AppTheme.warmWhite,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
@@ -409,7 +376,7 @@ class _LessonPracticePageState extends State<LessonPracticePage>
                                         : 'One more clean sign',
                                     style: const TextStyle(
                                       color: AppTheme.inkBlack,
-                                      fontSize: 16,
+                                      fontSize: 15,
                                       fontWeight: FontWeight.w900,
                                     ),
                                   ),
@@ -453,68 +420,16 @@ class _LessonPracticePageState extends State<LessonPracticePage>
                               ],
                             ),
                             const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton.icon(
-                                    onPressed: () {
-                                      setState(() {
-                                        _result = null;
-                                        _matchCount = 0;
-                                        _matched = false;
-                                      });
-                                      _detection.resetPrediction().catchError((_) {});
-                                    },
-                                    icon: const Icon(Icons.refresh_rounded),
-                                    label: const Text('Retry'),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: ElevatedButton.icon(
-                                    onPressed: _matched ? null : _nextSign,
-                                    icon: const Icon(Icons.skip_next_rounded),
-                                    label: const Text('Skip'),
-                                  ),
-                                ),
-                              ],
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton.icon(
+                                onPressed: _matched ? null : _nextSign,
+                                icon: const Icon(Icons.skip_next_rounded),
+                                label: const Text('Skip'),
+                              ),
                             ),
                           ],
                         ),
-            ),
-          ),
-          Positioned(
-            left: 14,
-            bottom: MediaQuery.of(context).padding.bottom + 170,
-            child: Container(
-              width: 90,
-              height: 110,
-              decoration: BoxDecoration(
-                color: AppTheme.warmWhite,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.inkBlack, width: 2.5),
-              ),
-              child: FutureBuilder<dynamic>(
-                future: _imageService.getRandomImage(_current.word),
-                builder: (context, snapshot) {
-                  if (snapshot.hasData && snapshot.data != null) {
-                    return ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.memory(snapshot.data!, fit: BoxFit.cover),
-                    );
-                  }
-                  return Center(
-                    child: Text(
-                      _current.word,
-                      style: const TextStyle(
-                        color: AppTheme.inkBlack,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 22,
-                      ),
-                    ),
-                  );
-                },
-              ),
             ),
           ),
         ],

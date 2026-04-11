@@ -374,7 +374,7 @@ class _SignLearningPageState extends State<SignLearningPage> {
               child: Row(
                 children: [
                   SizedBox(
-                    width: 78,
+                    width: 68,
                     child: OutlinedButton(
                       onPressed: _index > 0 ? _prev : null,
                       child: const Icon(Icons.arrow_back_rounded),
@@ -383,7 +383,7 @@ class _SignLearningPageState extends State<SignLearningPage> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: NeoPrimaryButton(
-                      label: isLast ? 'Practice with Camera' : 'Next Sign',
+                      label: isLast ? 'Start Practice' : 'Next Sign',
                       onPressed: isLast ? _startPractice : _next,
                       icon: isLast ? Icons.camera_alt : Icons.arrow_forward,
                     ),

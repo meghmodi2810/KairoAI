@@ -240,12 +240,17 @@ class _NeoButtonState extends State<NeoButton> {
                         Icon(widget.icon, color: widget.textColor ?? Colors.white),
                         const SizedBox(width: 10),
                       ],
-                      Text(
-                        widget.label.toUpperCase(),
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              color: widget.textColor ?? Colors.white,
-                              fontWeight: FontWeight.w900,
-                            ),
+                      Expanded(
+                        child: Text(
+                          widget.label.toUpperCase(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                color: widget.textColor ?? Colors.white,
+                                fontWeight: FontWeight.w900,
+                              ),
+                        ),
                       ),
                     ],
                   ),

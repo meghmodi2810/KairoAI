@@ -56,9 +56,15 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
     }
   }
 
+  Color _categoryTextColor(Color background) {
+    final brightness = ThemeData.estimateBrightnessForColor(background);
+    return brightness == Brightness.dark ? AppTheme.warmWhite : AppTheme.inkBlack;
+  }
+
   @override
   Widget build(BuildContext context) {
     final categoryColor = _categoryColor();
+    final categoryTextColor = _categoryTextColor(categoryColor);
     final completed = _progress.values.where((p) => p.status == 'completed').length;
     final ratio = _lessons.isEmpty ? 0.0 : completed / _lessons.length;
 
@@ -92,7 +98,7 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: NeoPanel(
-                        color: categoryColor.withValues(alpha: 0.24),
+                        color: categoryColor,
                         radius: 16,
                         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                         child: Row(
@@ -105,8 +111,8 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
                                 children: [
                                   Text(
                                     widget.category.name,
-                                    style: const TextStyle(
-                                      color: AppTheme.inkBlack,
+                                    style: TextStyle(
+                                      color: categoryTextColor,
                                       fontSize: 18,
                                       fontWeight: FontWeight.w900,
                                     ),
@@ -114,8 +120,8 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
                                   const SizedBox(height: 2),
                                   Text(
                                     widget.category.description,
-                                    style: const TextStyle(
-                                      color: AppTheme.inkBlack,
+                                    style: TextStyle(
+                                      color: categoryTextColor.withValues(alpha: 0.95),
                                       fontWeight: FontWeight.w700,
                                       fontSize: 12,
                                     ),

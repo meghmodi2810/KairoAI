@@ -161,8 +161,6 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    final topSpace = MediaQuery.of(context).padding.top;
-
     return Scaffold(
       backgroundColor: AppTheme.paperCream,
       body: SafeArea(
@@ -170,163 +168,131 @@ class _LoginPageState extends State<LoginPage> {
           key: _formKey,
           child: LayoutBuilder(
             builder: (context, constraints) {
+              final panelMinHeight =
+                  (constraints.maxHeight - 96).clamp(420.0, double.infinity).toDouble();
+
               return SingleChildScrollView(
                 keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.fromLTRB(18, 12, 18, 20),
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
                 child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: constraints.maxHeight - topSpace),
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      NeoPanel(
-                        color: AppTheme.signalYellow,
-                        radius: 18,
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 58,
-                              height: 58,
-                              decoration: BoxDecoration(
-                                color: AppTheme.electricBlue,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: AppTheme.inkBlack, width: 3),
-                              ),
-                              child: const Icon(Icons.smart_toy_rounded, color: AppTheme.inkBlack, size: 30),
-                            ),
-                            const SizedBox(width: 12),
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'HANDS READY?',
-                                    style: TextStyle(
-                                      color: AppTheme.inkBlack,
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                  SizedBox(height: 2),
-                                  Text(
-                                    'Log in and continue your sign streak.',
-                                    style: TextStyle(
-                                      color: AppTheme.inkBlack,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      NeoPanel(
-                        color: AppTheme.warmWhite,
-                        radius: 18,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'LOG IN',
-                              style: TextStyle(
-                                color: AppTheme.inkBlack,
-                                fontWeight: FontWeight.w900,
-                                fontSize: 28,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              'Need camera access to practice signs with AI.',
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                            const SizedBox(height: 14),
-                            TextFormField(
-                              controller: _emailCtrl,
-                              validator: _validateEmail,
-                              keyboardType: TextInputType.emailAddress,
-                              decoration: const InputDecoration(
-                                labelText: 'Email',
-                                hintText: 'you@example.com',
-                                prefixIcon: Icon(Icons.email_outlined),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            TextFormField(
-                              controller: _passCtrl,
-                              obscureText: _obscure,
-                              validator: _validatePassword,
-                              decoration: InputDecoration(
-                                labelText: 'Password',
-                                hintText: '********',
-                                prefixIcon: const Icon(Icons.lock_outline),
-                                suffixIcon: IconButton(
-                                  onPressed: () => setState(() => _obscure = !_obscure),
-                                  icon: Icon(_obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined),
-                                ),
-                              ),
-                            ),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton(
-                                onPressed: _loading ? null : _forgotPassword,
-                                child: const Text('Forgot password?'),
-                              ),
-                            ),
-                            NeoPrimaryButton(
-                              label: 'Let\'s Sign In',
-                              onPressed: _loading ? null : _signIn,
-                              loading: _loading,
-                              icon: Icons.login_rounded,
-                            ),
-                            const SizedBox(height: 12),
-                            NeoSecondaryButton(
-                              label: _googleLoading ? 'Connecting to Google...' : 'Continue with Google',
-                              onPressed: _googleLoading ? null : _signInWithGoogle,
-                              icon: Icons.g_mobiledata,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      Center(
-                        child: GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              PageRouteBuilder(
-                                pageBuilder: (_, __, ___) => const SignUpPage(),
-                                transitionDuration: const Duration(milliseconds: 240),
-                                transitionsBuilder: (_, animation, __, child) =>
-                                    FadeTransition(opacity: animation, child: child),
-                              ),
-                            );
-                          },
-                          child: const Text.rich(
-                            TextSpan(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const SizedBox(height: 8),
+                        NeoPanel(
+                          color: AppTheme.warmWhite,
+                          radius: 18,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(minHeight: panelMinHeight),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                TextSpan(
-                                  text: 'New here? ',
+                                const Text(
+                                  'LOG IN',
                                   style: TextStyle(
                                     color: AppTheme.inkBlack,
-                                    fontWeight: FontWeight.w600,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 28,
                                   ),
                                 ),
-                                TextSpan(
-                                  text: 'Create account',
-                                  style: TextStyle(
-                                    color: AppTheme.cobaltBlue,
-                                    fontWeight: FontWeight.w900,
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Need camera access to practice signs with AI.',
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
+                                const SizedBox(height: 14),
+                                TextFormField(
+                                  controller: _emailCtrl,
+                                  validator: _validateEmail,
+                                  keyboardType: TextInputType.emailAddress,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Email',
+                                    hintText: 'you@example.com',
+                                    prefixIcon: Icon(Icons.email_outlined),
                                   ),
+                                ),
+                                const SizedBox(height: 12),
+                                TextFormField(
+                                  controller: _passCtrl,
+                                  obscureText: _obscure,
+                                  validator: _validatePassword,
+                                  decoration: InputDecoration(
+                                    labelText: 'Password',
+                                    hintText: '********',
+                                    prefixIcon: const Icon(Icons.lock_outline),
+                                    suffixIcon: IconButton(
+                                      onPressed: () => setState(() => _obscure = !_obscure),
+                                      icon: Icon(_obscure
+                                          ? Icons.visibility_off_outlined
+                                          : Icons.visibility_outlined),
+                                    ),
+                                  ),
+                                ),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton(
+                                    onPressed: _loading ? null : _forgotPassword,
+                                    child: const Text('Forgot password?'),
+                                  ),
+                                ),
+                                NeoPrimaryButton(
+                                  label: 'Let\'s Sign In',
+                                  onPressed: _loading ? null : _signIn,
+                                  loading: _loading,
+                                  icon: Icons.login_rounded,
+                                ),
+                                const SizedBox(height: 12),
+                                NeoSecondaryButton(
+                                  label: _googleLoading
+                                      ? 'Connecting to Google...'
+                                      : 'Continue with Google',
+                                  onPressed: _googleLoading ? null : _signInWithGoogle,
+                                  icon: Icons.g_mobiledata,
                                 ),
                               ],
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 14),
+                        Center(
+                          child: GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                PageRouteBuilder(
+                                  pageBuilder: (_, __, ___) => const SignUpPage(),
+                                  transitionDuration: const Duration(milliseconds: 240),
+                                  transitionsBuilder: (_, animation, __, child) =>
+                                      FadeTransition(opacity: animation, child: child),
+                                ),
+                              );
+                            },
+                            child: const Text.rich(
+                              TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text: 'New here? ',
+                                    style: TextStyle(
+                                      color: AppTheme.inkBlack,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text: 'Create account',
+                                    style: TextStyle(
+                                      color: AppTheme.cobaltBlue,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
               );
             },
           ),

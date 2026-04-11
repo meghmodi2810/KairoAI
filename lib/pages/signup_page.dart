@@ -151,8 +151,6 @@ class _SignUpPageState extends State<SignUpPage> {
 
   @override
   Widget build(BuildContext context) {
-    final topSpace = MediaQuery.of(context).padding.top;
-
     return Scaffold(
       backgroundColor: AppTheme.paperCream,
       body: SafeArea(
@@ -160,165 +158,146 @@ class _SignUpPageState extends State<SignUpPage> {
           key: _formKey,
           child: LayoutBuilder(
             builder: (context, constraints) {
+              final panelMinHeight =
+                  (constraints.maxHeight - 168).clamp(420.0, double.infinity).toDouble();
+
               return SingleChildScrollView(
                 keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.fromLTRB(18, 12, 18, 20),
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
                 child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: constraints.maxHeight - topSpace),
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      GestureDetector(
-                        onTap: _goToLogin,
-                        child: Container(
-                          width: 46,
-                          height: 46,
-                          decoration: BoxDecoration(
-                            color: AppTheme.warmWhite,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppTheme.inkBlack, width: 3),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: AppTheme.inkBlack,
-                                offset: Offset(3, 3),
-                                blurRadius: 0,
-                              ),
-                            ],
-                          ),
-                          child: const Icon(Icons.arrow_back_rounded, color: AppTheme.inkBlack),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      NeoPanel(
-                        color: AppTheme.mintGreen,
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 56,
-                              height: 56,
-                              decoration: BoxDecoration(
-                                color: AppTheme.signalYellow,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: AppTheme.inkBlack, width: 3),
-                              ),
-                              child: const Icon(Icons.waving_hand_rounded, color: AppTheme.inkBlack, size: 28),
-                            ),
-                            const SizedBox(width: 12),
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'JOIN KAIROAI',
-                                    style: TextStyle(
-                                      color: AppTheme.inkBlack,
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 26,
-                                    ),
-                                  ),
-                                  Text(
-                                    'Build your sign learning streak from day one.',
-                                    style: TextStyle(
-                                      color: AppTheme.inkBlack,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      NeoPanel(
-                        color: AppTheme.warmWhite,
-                        child: Column(
-                          children: [
-                            TextFormField(
-                              controller: _emailCtrl,
-                              validator: _validateEmail,
-                              keyboardType: TextInputType.emailAddress,
-                              decoration: const InputDecoration(
-                                labelText: 'Email',
-                                hintText: 'you@example.com',
-                                prefixIcon: Icon(Icons.email_outlined),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            TextFormField(
-                              controller: _passCtrl,
-                              validator: _validatePassword,
-                              obscureText: _hidePass,
-                              decoration: InputDecoration(
-                                labelText: 'Password',
-                                hintText: '********',
-                                prefixIcon: const Icon(Icons.lock_outline),
-                                suffixIcon: IconButton(
-                                  onPressed: () => setState(() => _hidePass = !_hidePass),
-                                  icon: Icon(_hidePass ? Icons.visibility_off_outlined : Icons.visibility_outlined),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            TextFormField(
-                              controller: _confirmCtrl,
-                              validator: _validateConfirm,
-                              obscureText: _hideConfirm,
-                              decoration: InputDecoration(
-                                labelText: 'Confirm Password',
-                                hintText: '********',
-                                prefixIcon: const Icon(Icons.lock_clock_outlined),
-                                suffixIcon: IconButton(
-                                  onPressed: () => setState(() => _hideConfirm = !_hideConfirm),
-                                  icon: Icon(_hideConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 14),
-                            NeoPrimaryButton(
-                              label: 'Create Account',
-                              loading: _loading,
-                              onPressed: _loading ? null : _createAccount,
-                              icon: Icons.person_add_alt_rounded,
-                            ),
-                            const SizedBox(height: 10),
-                            NeoSecondaryButton(
-                              label: _googleLoading ? 'Connecting to Google...' : 'Continue with Google',
-                              onPressed: _googleLoading ? null : _signupWithGoogle,
-                              icon: Icons.g_mobiledata,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      Center(
-                        child: GestureDetector(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        GestureDetector(
                           onTap: _goToLogin,
-                          child: const Text.rich(
-                            TextSpan(
+                          child: Container(
+                            width: 46,
+                            height: 46,
+                            decoration: BoxDecoration(
+                              color: AppTheme.warmWhite,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppTheme.inkBlack, width: 3),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: AppTheme.inkBlack,
+                                  offset: Offset(3, 3),
+                                  blurRadius: 0,
+                                ),
+                              ],
+                            ),
+                            child: const Icon(Icons.arrow_back_rounded, color: AppTheme.inkBlack),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        NeoPanel(
+                          color: AppTheme.warmWhite,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(minHeight: panelMinHeight),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                TextSpan(
-                                  text: 'Already signed up? ',
+                                const Text(
+                                  'CREATE ACCOUNT',
                                   style: TextStyle(
                                     color: AppTheme.inkBlack,
-                                    fontWeight: FontWeight.w600,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 28,
                                   ),
                                 ),
-                                TextSpan(
-                                  text: 'Log in',
-                                  style: TextStyle(
-                                    color: AppTheme.cobaltBlue,
-                                    fontWeight: FontWeight.w900,
+                                const SizedBox(height: 8),
+                                TextFormField(
+                                  controller: _emailCtrl,
+                                  validator: _validateEmail,
+                                  keyboardType: TextInputType.emailAddress,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Email',
+                                    hintText: 'you@example.com',
+                                    prefixIcon: Icon(Icons.email_outlined),
                                   ),
+                                ),
+                                const SizedBox(height: 12),
+                                TextFormField(
+                                  controller: _passCtrl,
+                                  validator: _validatePassword,
+                                  obscureText: _hidePass,
+                                  decoration: InputDecoration(
+                                    labelText: 'Password',
+                                    hintText: '********',
+                                    prefixIcon: const Icon(Icons.lock_outline),
+                                    suffixIcon: IconButton(
+                                      onPressed: () => setState(() => _hidePass = !_hidePass),
+                                      icon: Icon(_hidePass
+                                          ? Icons.visibility_off_outlined
+                                          : Icons.visibility_outlined),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                TextFormField(
+                                  controller: _confirmCtrl,
+                                  validator: _validateConfirm,
+                                  obscureText: _hideConfirm,
+                                  decoration: InputDecoration(
+                                    labelText: 'Confirm Password',
+                                    hintText: '********',
+                                    prefixIcon: const Icon(Icons.lock_clock_outlined),
+                                    suffixIcon: IconButton(
+                                      onPressed: () => setState(() => _hideConfirm = !_hideConfirm),
+                                      icon: Icon(_hideConfirm
+                                          ? Icons.visibility_off_outlined
+                                          : Icons.visibility_outlined),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 14),
+                                NeoPrimaryButton(
+                                  label: 'Create Account',
+                                  loading: _loading,
+                                  onPressed: _loading ? null : _createAccount,
+                                  icon: Icons.person_add_alt_rounded,
+                                ),
+                                const SizedBox(height: 10),
+                                NeoSecondaryButton(
+                                  label: _googleLoading
+                                      ? 'Connecting to Google...'
+                                      : 'Continue with Google',
+                                  onPressed: _googleLoading ? null : _signupWithGoogle,
+                                  icon: Icons.g_mobiledata,
                                 ),
                               ],
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 14),
+                        Center(
+                          child: GestureDetector(
+                            onTap: _goToLogin,
+                            child: const Text.rich(
+                              TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text: 'Already signed up? ',
+                                    style: TextStyle(
+                                      color: AppTheme.inkBlack,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text: 'Log in',
+                                    style: TextStyle(
+                                      color: AppTheme.cobaltBlue,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
               );
             },
           ),
