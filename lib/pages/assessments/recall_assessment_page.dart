@@ -5,6 +5,7 @@ import '../../models/app_models.dart';
 import '../../models/lesson_assessment_models.dart';
 import '../../services/sign_detection_service.dart';
 import '../../theme/app_theme.dart';
+import '../../theme/neo_brutal_widgets.dart';
 
 class RecallAssessmentPage extends StatefulWidget {
   final List<SignModel> signs;
@@ -19,6 +20,7 @@ class _RecallAssessmentPageState extends State<RecallAssessmentPage>
     with WidgetsBindingObserver {
   static const int _requiredStableDetections = 3;
   static const double _minConfidence = 0.65;
+  static const int _promptCountPerAttempt = 1;
 
   final SignDetectionService _detection = SignDetectionService();
 
@@ -30,11 +32,12 @@ class _RecallAssessmentPageState extends State<RecallAssessmentPage>
 
   int _index = 0;
   int _matchCount = 0;
-  int _attemptCount = 1;
+  int _attemptCount = 0;
   bool _promptLocked = false;
   bool _cameraOn = false;
   bool _loading = true;
   bool _hasPermission = false;
+  bool _lastFrameHadHand = false;
   bool get _hasPrompts => _promptOrder.isNotEmpty;
 
   SignModel get _currentPrompt => _promptOrder[_index];
@@ -43,11 +46,15 @@ class _RecallAssessmentPageState extends State<RecallAssessmentPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    final shuffled = List<SignModel>.from(widget.signs)..shuffle();
-    _promptOrder = shuffled.isEmpty
-        ? <SignModel>[]
-        : <SignModel>[shuffled.first];
+    _promptOrder = _selectPromptOrder(widget.signs);
     _initCamera();
+  }
+
+  List<SignModel> _selectPromptOrder(List<SignModel> sourceSigns) {
+    final shuffled = List<SignModel>.from(sourceSigns)..shuffle();
+    if (shuffled.isEmpty) return <SignModel>[];
+
+    return shuffled.take(_promptCountPerAttempt).toList(growable: false);
   }
 
   @override
@@ -125,6 +132,25 @@ class _RecallAssessmentPageState extends State<RecallAssessmentPage>
 
     setState(() => _result = result);
 
+    if (result.handDetected && !_lastFrameHadHand) {
+      _lastFrameHadHand = true;
+      _attemptCount += 1;
+
+      _perPromptResults.add(
+        RecallPromptResult(
+          targetSign: _currentPrompt.word.toUpperCase().trim(),
+          detectedSign: result.detectedSign.toUpperCase().trim(),
+          passed: false,
+          confidence: result.confidence,
+          stableDetectionsAchieved: 0,
+          requiredStableDetections: _requiredStableDetections,
+          timestamp: DateTime.now(),
+        ),
+      );
+    } else if (!result.handDetected) {
+      _lastFrameHadHand = false;
+    }
+
     final target = _currentPrompt.word.toUpperCase().trim();
     final detected = result.detectedSign.toUpperCase().trim();
 
@@ -173,6 +199,7 @@ class _RecallAssessmentPageState extends State<RecallAssessmentPage>
       _promptLocked = false;
       _matchCount = 0;
       _result = null;
+      _lastFrameHadHand = false;
     });
 
     _detection.resetPrediction().catchError((_) {});
@@ -240,14 +267,39 @@ class _RecallAssessmentPageState extends State<RecallAssessmentPage>
           ),
         ),
         body: Center(
-          child: ElevatedButton.icon(
-            onPressed: () {
-              Navigator.of(context).pop(
-                const RecallAssessmentResult(status: AssessmentStatus.skipped),
-              );
-            },
-            icon: const Icon(Icons.arrow_back),
-            label: const Text('Back'),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: NeoPanel(
+              color: AppTheme.softPeach,
+              radius: 16,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Recall content unavailable for this lesson.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: AppTheme.inkBlack,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop(
+                        const RecallAssessmentResult(
+                          status: AssessmentStatus.failed,
+                          errorMessage: 'No recall prompts available.',
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.arrow_back),
+                    label: const Text('Back'),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       );

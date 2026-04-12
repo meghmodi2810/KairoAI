@@ -344,14 +344,21 @@ class SignModel {
 
   factory SignModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    final resolvedImageRef =
+        (data['imageUrl'] ?? data['assetPathImage'] ?? data['pictureUrl'] ?? '')
+            .toString()
+            .trim();
+    final resolvedGifRef =
+        (data['gifUrl'] ?? data['assetPathGif'] ?? '').toString().trim();
+
     return SignModel(
       id: doc.id,
       lessonId: data['lessonId'] ?? '',
       word: data['word'] ?? '',
       wordInHindi: data['wordInHindi'],
       order: data['order'] ?? 0,
-      imageUrl: data['imageUrl'],
-      gifUrl: data['gifUrl'],
+      imageUrl: resolvedImageRef.isEmpty ? null : resolvedImageRef,
+      gifUrl: resolvedGifRef.isEmpty ? null : resolvedGifRef,
       videoUrl: data['videoUrl'],
       description: data['description'] ?? '',
       instructions: List<String>.from(data['instructions'] ?? []),
@@ -388,9 +395,12 @@ class LessonProgress {
   final int attemptsCount;
   final List<String> signsCompleted;
   final List<String> signsSkipped;
+  final bool guidedPracticeCompleted;
   final int? guidedCurrentIndex;
   final List<String> assessmentsSkipped;
   final String? assessmentResumeFrom;
+  final bool assessmentSummaryReady;
+  final Map<String, dynamic> assessmentResults;
   final int gemsEarned;
   final int coinsEarned;
 
@@ -405,9 +415,12 @@ class LessonProgress {
     this.attemptsCount = 0,
     this.signsCompleted = const [],
     this.signsSkipped = const [],
+    this.guidedPracticeCompleted = false,
     this.guidedCurrentIndex,
     this.assessmentsSkipped = const [],
     this.assessmentResumeFrom,
+    this.assessmentSummaryReady = false,
+    this.assessmentResults = const <String, dynamic>{},
     this.gemsEarned = 0,
     this.coinsEarned = 0,
   });
@@ -425,9 +438,14 @@ class LessonProgress {
       attemptsCount: data['attemptsCount'] ?? 0,
       signsCompleted: List<String>.from(data['signsCompleted'] ?? []),
       signsSkipped: List<String>.from(data['signsSkipped'] ?? []),
+      guidedPracticeCompleted: data['guidedPracticeCompleted'] == true,
       guidedCurrentIndex: (data['guidedCurrentIndex'] as num?)?.toInt(),
       assessmentsSkipped: List<String>.from(data['assessmentsSkipped'] ?? []),
       assessmentResumeFrom: data['assessmentResumeFrom'],
+      assessmentSummaryReady: data['assessmentSummaryReady'] == true,
+      assessmentResults: data['assessmentResults'] is Map
+          ? Map<String, dynamic>.from(data['assessmentResults'] as Map)
+          : const <String, dynamic>{},
       gemsEarned: data['gemsEarned'] ?? 0,
       coinsEarned: data['coinsEarned'] ?? 0,
     );
@@ -446,9 +464,12 @@ class LessonProgress {
       'attemptsCount': attemptsCount,
       'signsCompleted': signsCompleted,
       'signsSkipped': signsSkipped,
+      'guidedPracticeCompleted': guidedPracticeCompleted,
       'guidedCurrentIndex': guidedCurrentIndex,
       'assessmentsSkipped': assessmentsSkipped,
       'assessmentResumeFrom': assessmentResumeFrom,
+      'assessmentSummaryReady': assessmentSummaryReady,
+      'assessmentResults': assessmentResults,
       'gemsEarned': gemsEarned,
       'coinsEarned': coinsEarned,
     };

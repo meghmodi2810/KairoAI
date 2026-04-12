@@ -6,12 +6,12 @@ import '../../theme/neo_brutal_widgets.dart';
 
 class MatchingAssessmentPage extends StatefulWidget {
   final List<SignModel> signs;
-  final Map<String, String> imageUrlsBySignId;
+  final Map<String, String> imageRefsBySignId;
 
   const MatchingAssessmentPage({
     super.key,
     required this.signs,
-    required this.imageUrlsBySignId,
+    required this.imageRefsBySignId,
   });
 
   @override
@@ -19,11 +19,11 @@ class MatchingAssessmentPage extends StatefulWidget {
 }
 
 class _MatchingAssessmentPageState extends State<MatchingAssessmentPage> {
-  static const double _slotHeight = 126;
+  static const double _slotHeight = 158;
   static const double _slotSpacing = 10;
 
-  late final List<SignModel> _signs;
-  late final List<String> _labels;
+  final List<SignModel> _signs = <SignModel>[];
+  final List<String> _labels = <String>[];
 
   final Map<String, String> _assignedBySignId = <String, String>{};
   final Set<String> _incorrectSignIds = <String>{};
@@ -32,6 +32,7 @@ class _MatchingAssessmentPageState extends State<MatchingAssessmentPage> {
 
   String? _selectedSignId;
   String? _feedback;
+  String? _contentError;
   bool _feedbackError = false;
   bool _readyForNextAssessment = false;
   int _attemptCount = 0;
@@ -41,16 +42,24 @@ class _MatchingAssessmentPageState extends State<MatchingAssessmentPage> {
   @override
   void initState() {
     super.initState();
-    _signs = List<SignModel>.from(widget.signs)..shuffle();
-    _labels =
-        widget.signs
-            .map((sign) => sign.word.toUpperCase().trim())
-            .toList(growable: false)
-          ..shuffle();
+    _initializeBoard();
+  }
 
-    if (_signs.isNotEmpty) {
-      _selectedSignId = _signs.first.id;
+  void _initializeBoard() {
+    if (widget.signs.length < 2) {
+      _contentError = 'Matching requires at least two signs in this lesson.';
+      return;
     }
+
+    final shuffledSigns = List<SignModel>.from(widget.signs)..shuffle();
+    final shuffledLabels = shuffledSigns
+        .map((sign) => sign.word.toUpperCase().trim())
+        .toList(growable: false)
+      ..shuffle();
+
+    _signs.addAll(shuffledSigns);
+    _labels.addAll(shuffledLabels);
+    _selectedSignId = _signs.first.id;
   }
 
   bool get _hasSigns => _signs.isNotEmpty;
@@ -190,34 +199,58 @@ class _MatchingAssessmentPageState extends State<MatchingAssessmentPage> {
         _feedbackError = false;
       } else {
         _feedback =
-            'Some pairs are wrong. Answers are shown below. Tap Next to continue.';
+            'Some pairs are wrong. This attempt is recorded. Tap Next to continue.';
         _feedbackError = true;
       }
     });
   }
 
-  void _goNextAssessment() {
+  void _finishAssessment({
+    required AssessmentStatus status,
+    String? errorMessage,
+  }) {
     Navigator.of(context).pop(
       MatchingAssessmentResult(
-        status: AssessmentStatus.passed,
+        status: status,
         attemptCount: _attemptCount,
         completedAt: DateTime.now(),
         submittedPairs: Map<String, String>.from(_assignedBySignId),
         incorrectPairs: Map<String, String>.from(_latestIncorrectPairs),
+        errorMessage: errorMessage,
       ),
     );
   }
 
-  void _skipAssessment() {
-    Navigator.of(context).pop(
-      MatchingAssessmentResult(
-        status: AssessmentStatus.skipped,
-        attemptCount: _attemptCount,
-        completedAt: DateTime.now(),
-        submittedPairs: Map<String, String>.from(_assignedBySignId),
-        incorrectPairs: const <String, String>{},
-      ),
+  void _goNextAssessment() {
+    final status = _latestIncorrectPairs.isEmpty
+        ? AssessmentStatus.passed
+        : AssessmentStatus.attempted;
+
+    _finishAssessment(status: status);
+  }
+
+  void _failDueToContent() {
+    _finishAssessment(
+      status: AssessmentStatus.failed,
+      errorMessage: _contentError,
     );
+  }
+
+  void _skipAssessment() {
+    if (_contentError != null) {
+      _failDueToContent();
+      return;
+    }
+
+    if (_attemptCount > 0) {
+      final status = _latestIncorrectPairs.isEmpty
+          ? AssessmentStatus.passed
+          : AssessmentStatus.attempted;
+      _finishAssessment(status: status);
+      return;
+    }
+
+    _finishAssessment(status: AssessmentStatus.skipped);
   }
 
   Widget _buildImageOrPlaceholder(
@@ -226,35 +259,42 @@ class _MatchingAssessmentPageState extends State<MatchingAssessmentPage> {
     required double height,
     double fontSize = 28,
   }) {
-    final imageUrl = widget.imageUrlsBySignId[sign.id]?.trim() ?? '';
-    if (imageUrl.isEmpty) {
-      return Container(
-        width: width,
-        height: height,
-        color: AppTheme.paperCream,
-        alignment: Alignment.center,
-        child: Icon(
-          Icons.image_not_supported_outlined,
-          color: AppTheme.cobaltBlue.withValues(alpha: 0.45),
-          size: fontSize,
-        ),
-      );
+    final imageRef = (widget.imageRefsBySignId[sign.id] ?? '').trim();
+    if (imageRef.isEmpty) {
+      return _buildSignPlaceholder(sign, width: width, height: height, fontSize: fontSize);
     }
 
-    return Image.network(
-      imageUrl,
+    return Image.asset(
+      imageRef,
       width: width,
       height: height,
-      fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => Container(
+      fit: BoxFit.contain,
+      errorBuilder: (_, error, stackTrace) => _buildSignPlaceholder(
+        sign,
         width: width,
         height: height,
-        color: AppTheme.paperCream,
-        alignment: Alignment.center,
-        child: Icon(
-          Icons.image_not_supported_outlined,
+        fontSize: fontSize,
+      ),
+    );
+  }
+
+  Widget _buildSignPlaceholder(
+    SignModel sign, {
+    required double width,
+    required double height,
+    required double fontSize,
+  }) {
+    return Container(
+      width: width,
+      height: height,
+      color: AppTheme.paperCream,
+      alignment: Alignment.center,
+      child: Text(
+        sign.word.toUpperCase().trim(),
+        style: TextStyle(
           color: AppTheme.cobaltBlue.withValues(alpha: 0.45),
-          size: fontSize,
+          fontWeight: FontWeight.w900,
+          fontSize: fontSize,
         ),
       ),
     );
@@ -277,7 +317,7 @@ class _MatchingAssessmentPageState extends State<MatchingAssessmentPage> {
       onTap: () => _selectSign(sign.id),
       child: Container(
         height: _slotHeight,
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: isPaired
               ? AppTheme.mintGreen.withValues(alpha: 0.2)
@@ -295,11 +335,11 @@ class _MatchingAssessmentPageState extends State<MatchingAssessmentPage> {
                   sign,
                   width: double.infinity,
                   height: double.infinity,
-                  fontSize: 32,
+                  fontSize: 44,
                 ),
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Text(
@@ -401,8 +441,8 @@ class _MatchingAssessmentPageState extends State<MatchingAssessmentPage> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final totalWidth = constraints.maxWidth;
-        final leftWidth = totalWidth * 0.55;
-        final rightWidth = totalWidth * 0.30;
+        final leftWidth = totalWidth * 0.62;
+        final rightWidth = totalWidth * 0.24;
         final gapWidth = totalWidth - leftWidth - rightWidth;
 
         return Column(
@@ -566,7 +606,9 @@ class _MatchingAssessmentPageState extends State<MatchingAssessmentPage> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildUnavailableState() {
+    final hasContentIssue = _contentError != null;
+
     return Center(
       child: NeoPanel(
         color: AppTheme.softPeach,
@@ -574,20 +616,33 @@ class _MatchingAssessmentPageState extends State<MatchingAssessmentPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              'No signs available for this matching test.',
+            Text(
+              hasContentIssue
+                  ? 'Matching content unavailable for this lesson.'
+                  : 'No signs available for this matching test.',
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 color: AppTheme.inkBlack,
                 fontWeight: FontWeight.w900,
                 fontSize: 16,
               ),
             ),
+            if (hasContentIssue) ...[
+              const SizedBox(height: 8),
+              Text(
+                _contentError!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppTheme.inkBlack,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
             const SizedBox(height: 10),
             _buildActionButton(
               label: 'Back',
               icon: Icons.arrow_back,
-              onPressed: _skipAssessment,
+              onPressed: hasContentIssue ? _failDueToContent : _skipAssessment,
             ),
           ],
         ),
@@ -629,7 +684,7 @@ class _MatchingAssessmentPageState extends State<MatchingAssessmentPage> {
           ],
         ),
         body: !_hasSigns
-            ? _buildEmptyState()
+          ? _buildUnavailableState()
             : SafeArea(
                 top: false,
                 child: Padding(

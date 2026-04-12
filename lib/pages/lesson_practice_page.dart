@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/app_models.dart';
+import '../services/sign_image_service.dart';
 import '../services/sign_detection_service.dart';
 import '../theme/app_theme.dart';
 
@@ -26,6 +27,7 @@ class LessonPracticePage extends StatefulWidget {
 class _LessonPracticePageState extends State<LessonPracticePage>
     with WidgetsBindingObserver {
   final SignDetectionService _detection = SignDetectionService();
+  final SignImageService _imageService = SignImageService();
 
   StreamSubscription<DetectionResult>? _sub;
   DetectionResult? _result;
@@ -204,6 +206,28 @@ class _LessonPracticePageState extends State<LessonPracticePage>
     return AppTheme.punchRed;
   }
 
+  Widget _buildReferenceMedia(String ref) {
+    return Image.asset(
+      ref,
+      fit: BoxFit.contain,
+      errorBuilder: (context, error, stackTrace) => _buildReferenceFallback(),
+    );
+  }
+
+  Widget _buildReferenceFallback() {
+    return Center(
+      child: Text(
+        _current.word.toUpperCase(),
+        style: const TextStyle(
+          color: AppTheme.cobaltBlue,
+          fontWeight: FontWeight.w900,
+          fontSize: 24,
+        ),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final confidence = _result?.confidence ?? 0;
@@ -372,6 +396,45 @@ class _LessonPracticePageState extends State<LessonPracticePage>
                   fontSize: 11,
                   fontWeight: FontWeight.w900,
                 ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 90,
+            right: 14,
+            child: Container(
+              width: 114,
+              height: 114,
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: AppTheme.warmWhite,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.inkBlack, width: 3),
+              ),
+              child: FutureBuilder<String?>(
+                future: _imageService.resolveImageRefForWord(
+                  _current.word,
+                  lessonImageRef: _current.imageUrl,
+                  lessonFallbackRef: _current.gifUrl,
+                  fallbackLabel: _current.id,
+                ),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: CircularProgressIndicator(
+                        color: AppTheme.cobaltBlue,
+                        strokeWidth: 2,
+                      ),
+                    );
+                  }
+
+                  final ref = (snapshot.data ?? '').trim();
+                  if (ref.isNotEmpty) {
+                    return _buildReferenceMedia(ref);
+                  }
+
+                  return _buildReferenceFallback();
+                },
               ),
             ),
           ),

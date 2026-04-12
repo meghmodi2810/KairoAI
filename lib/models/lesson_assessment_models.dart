@@ -44,7 +44,36 @@ List<String> normalizeAssessmentTypes(List<String>? rawTypes) {
   return ordered;
 }
 
-enum AssessmentStatus { notStarted, inProgress, passed, failed, skipped }
+enum AssessmentStatus {
+  notStarted,
+  inProgress,
+  attempted,
+  passed,
+  failed,
+  skipped,
+}
+
+AssessmentStatus assessmentStatusFromValue(String? rawValue) {
+  final value = (rawValue ?? '').trim().toLowerCase();
+
+  switch (value) {
+    case 'in_progress':
+    case 'inprogress':
+      return AssessmentStatus.inProgress;
+    case 'attempted':
+      return AssessmentStatus.attempted;
+    case 'passed':
+      return AssessmentStatus.passed;
+    case 'failed':
+      return AssessmentStatus.failed;
+    case 'skipped':
+      return AssessmentStatus.skipped;
+    case 'not_started':
+    case 'notstarted':
+    default:
+      return AssessmentStatus.notStarted;
+  }
+}
 
 extension AssessmentStatusX on AssessmentStatus {
   String get value {
@@ -53,6 +82,8 @@ extension AssessmentStatusX on AssessmentStatus {
         return 'not_started';
       case AssessmentStatus.inProgress:
         return 'in_progress';
+      case AssessmentStatus.attempted:
+        return 'attempted';
       case AssessmentStatus.passed:
         return 'passed';
       case AssessmentStatus.failed:
@@ -61,6 +92,70 @@ extension AssessmentStatusX on AssessmentStatus {
         return 'skipped';
     }
   }
+}
+
+DateTime? _coerceDateTime(dynamic value) {
+  if (value == null) return null;
+  if (value is DateTime) return value;
+  if (value is String) return DateTime.tryParse(value);
+
+  try {
+    final converted = (value as dynamic).toDate();
+    if (converted is DateTime) return converted;
+  } catch (_) {}
+
+  return null;
+}
+
+Map<String, dynamic> _coerceStringDynamicMap(dynamic value) {
+  if (value is! Map) return <String, dynamic>{};
+  final map = <String, dynamic>{};
+
+  for (final entry in value.entries) {
+    final key = entry.key?.toString();
+    if (key == null || key.isEmpty) continue;
+    map[key] = entry.value;
+  }
+
+  return map;
+}
+
+Map<String, String> _coerceStringStringMap(dynamic value) {
+  final source = _coerceStringDynamicMap(value);
+  final map = <String, String>{};
+
+  for (final entry in source.entries) {
+    final normalizedValue = (entry.value ?? '').toString().trim();
+    if (normalizedValue.isEmpty) continue;
+    map[entry.key] = normalizedValue;
+  }
+
+  return map;
+}
+
+Map<int, String> _coerceIntStringMap(dynamic value) {
+  final source = _coerceStringDynamicMap(value);
+  final map = <int, String>{};
+
+  for (final entry in source.entries) {
+    final key = int.tryParse(entry.key);
+    if (key == null) continue;
+
+    final normalizedValue = (entry.value ?? '').toString().trim();
+    if (normalizedValue.isEmpty) continue;
+
+    map[key] = normalizedValue;
+  }
+
+  return map;
+}
+
+Map<String, String> _stringifyIntStringMap(Map<int, String> source) {
+  final map = <String, String>{};
+  for (final entry in source.entries) {
+    map[entry.key.toString()] = entry.value;
+  }
+  return map;
 }
 
 class MatchingAssessmentResult {
@@ -97,6 +192,30 @@ class MatchingAssessmentResult {
       errorMessage: errorMessage ?? this.errorMessage,
     );
   }
+
+  factory MatchingAssessmentResult.fromMap(Map<String, dynamic> data) {
+    return MatchingAssessmentResult(
+      status: assessmentStatusFromValue(data['status']?.toString()),
+      attemptCount: (data['attemptCount'] as num?)?.toInt() ?? 0,
+      completedAt: _coerceDateTime(data['completedAt']),
+      submittedPairs: _coerceStringStringMap(data['submittedPairs']),
+      incorrectPairs: _coerceStringStringMap(data['incorrectPairs']),
+      errorMessage: (data['errorMessage'] ?? '').toString().trim().isEmpty
+          ? null
+          : data['errorMessage'].toString(),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'status': status.value,
+      'attemptCount': attemptCount,
+      'completedAt': completedAt?.toIso8601String(),
+      'submittedPairs': submittedPairs,
+      'incorrectPairs': incorrectPairs,
+      'errorMessage': errorMessage,
+    };
+  }
 }
 
 class RecallPromptResult {
@@ -117,6 +236,32 @@ class RecallPromptResult {
     required this.requiredStableDetections,
     required this.timestamp,
   });
+
+  factory RecallPromptResult.fromMap(Map<String, dynamic> data) {
+    return RecallPromptResult(
+      targetSign: (data['targetSign'] ?? '').toString(),
+      detectedSign: (data['detectedSign'] ?? '').toString(),
+      passed: data['passed'] == true,
+      confidence: (data['confidence'] as num?)?.toDouble() ?? 0,
+      stableDetectionsAchieved:
+          (data['stableDetectionsAchieved'] as num?)?.toInt() ?? 0,
+      requiredStableDetections:
+          (data['requiredStableDetections'] as num?)?.toInt() ?? 0,
+      timestamp: _coerceDateTime(data['timestamp']) ?? DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'targetSign': targetSign,
+      'detectedSign': detectedSign,
+      'passed': passed,
+      'confidence': confidence,
+      'stableDetectionsAchieved': stableDetectionsAchieved,
+      'requiredStableDetections': requiredStableDetections,
+      'timestamp': timestamp.toIso8601String(),
+    };
+  }
 }
 
 class RecallAssessmentResult {
@@ -153,6 +298,49 @@ class RecallAssessmentResult {
       errorMessage: errorMessage ?? this.errorMessage,
     );
   }
+
+  factory RecallAssessmentResult.fromMap(Map<String, dynamic> data) {
+    final rawPromptOrder = data['promptOrder'];
+    final promptOrder = rawPromptOrder is List
+        ? rawPromptOrder.map((item) => item.toString()).toList(growable: false)
+        : const <String>[];
+
+    final rawPerPrompt = data['perPromptResults'];
+    final perPromptResults = rawPerPrompt is List
+        ? rawPerPrompt
+              .whereType<Map>()
+              .map(
+                (item) => RecallPromptResult.fromMap(
+                  _coerceStringDynamicMap(item),
+                ),
+              )
+              .toList(growable: false)
+        : const <RecallPromptResult>[];
+
+    return RecallAssessmentResult(
+      status: assessmentStatusFromValue(data['status']?.toString()),
+      attemptCount: (data['attemptCount'] as num?)?.toInt() ?? 0,
+      completedAt: _coerceDateTime(data['completedAt']),
+      promptOrder: promptOrder,
+      perPromptResults: perPromptResults,
+      errorMessage: (data['errorMessage'] ?? '').toString().trim().isEmpty
+          ? null
+          : data['errorMessage'].toString(),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'status': status.value,
+      'attemptCount': attemptCount,
+      'completedAt': completedAt?.toIso8601String(),
+      'promptOrder': promptOrder,
+      'perPromptResults': perPromptResults
+          .map((result) => result.toMap())
+          .toList(growable: false),
+      'errorMessage': errorMessage,
+    };
+  }
 }
 
 class McqQuestionRecord {
@@ -165,6 +353,26 @@ class McqQuestionRecord {
     required this.options,
     required this.correctAnswer,
   });
+
+  factory McqQuestionRecord.fromMap(Map<String, dynamic> data) {
+    final rawOptions = data['options'];
+
+    return McqQuestionRecord(
+      promptSign: (data['promptSign'] ?? '').toString(),
+      options: rawOptions is List
+          ? rawOptions.map((item) => item.toString()).toList(growable: false)
+          : const <String>[],
+      correctAnswer: (data['correctAnswer'] ?? '').toString(),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'promptSign': promptSign,
+      'options': options,
+      'correctAnswer': correctAnswer,
+    };
+  }
 }
 
 class McqAssessmentResult {
@@ -208,6 +416,48 @@ class McqAssessmentResult {
       score: score ?? this.score,
       errorMessage: errorMessage ?? this.errorMessage,
     );
+  }
+
+  factory McqAssessmentResult.fromMap(Map<String, dynamic> data) {
+    final rawQuestions = data['questions'];
+    final questions = rawQuestions is List
+        ? rawQuestions
+              .whereType<Map>()
+              .map(
+                (item) => McqQuestionRecord.fromMap(
+                  _coerceStringDynamicMap(item),
+                ),
+              )
+              .toList(growable: false)
+        : const <McqQuestionRecord>[];
+
+    return McqAssessmentResult(
+      status: assessmentStatusFromValue(data['status']?.toString()),
+      attemptCount: (data['attemptCount'] as num?)?.toInt() ?? 0,
+      completedAt: _coerceDateTime(data['completedAt']),
+      questions: questions,
+      selectedAnswers: _coerceIntStringMap(data['selectedAnswers']),
+      correctAnswers: _coerceIntStringMap(data['correctAnswers']),
+      score: (data['score'] as num?)?.toInt() ?? 0,
+      errorMessage: (data['errorMessage'] ?? '').toString().trim().isEmpty
+          ? null
+          : data['errorMessage'].toString(),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'status': status.value,
+      'attemptCount': attemptCount,
+      'completedAt': completedAt?.toIso8601String(),
+      'questions': questions
+          .map((question) => question.toMap())
+          .toList(growable: false),
+      'selectedAnswers': _stringifyIntStringMap(selectedAnswers),
+      'correctAnswers': _stringifyIntStringMap(correctAnswers),
+      'score': score,
+      'errorMessage': errorMessage,
+    };
   }
 }
 
@@ -253,15 +503,49 @@ class LessonAssessmentSession {
     if (!guidedPracticePassed) return false;
 
     for (final assessment in enabledAssessments) {
-      if (_statusFor(assessment) != AssessmentStatus.passed) {
+      if (!_isCompletionStateSatisfied(
+        type: assessment,
+        status: _statusFor(assessment),
+      )) {
         return false;
       }
     }
 
-    return !wasSkipped;
+    return true;
   }
 
   bool get rewardEligible => canCompleteLesson;
+
+  bool get allRequiredAssessmentsPassed {
+    for (final assessment in enabledAssessments) {
+      if (_statusFor(assessment) != AssessmentStatus.passed) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  String? get firstIncompleteAssessmentType {
+    for (final assessment in enabledAssessments) {
+      if (!_isCompletionStateSatisfied(
+        type: assessment,
+        status: _statusFor(assessment),
+      )) {
+        return assessment;
+      }
+    }
+    return null;
+  }
+
+  List<String> get skippedAssessmentTypes {
+    final skipped = <String>[];
+    for (final assessment in enabledAssessments) {
+      if (_statusFor(assessment) == AssessmentStatus.skipped) {
+        skipped.add(assessment);
+      }
+    }
+    return skipped;
+  }
 
   AssessmentStatus _statusFor(String assessment) {
     switch (assessment) {
@@ -274,5 +558,28 @@ class LessonAssessmentSession {
       default:
         return AssessmentStatus.notStarted;
     }
+  }
+
+  bool _isCompletionStateSatisfied({
+    required String type,
+    required AssessmentStatus status,
+  }) {
+    if (status == AssessmentStatus.skipped ||
+        status == AssessmentStatus.failed ||
+        status == AssessmentStatus.notStarted ||
+        status == AssessmentStatus.inProgress) {
+      return false;
+    }
+
+    if (type == 'recall') {
+      return status == AssessmentStatus.passed;
+    }
+
+    if (type == 'matching' || type == 'mcq') {
+      return status == AssessmentStatus.passed ||
+          status == AssessmentStatus.attempted;
+    }
+
+    return status == AssessmentStatus.passed;
   }
 }

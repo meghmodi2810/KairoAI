@@ -19,6 +19,18 @@ class LessonCompletionSummaryPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final practiceMinutes = (practiceSeconds / 60).ceil();
+    final completionEligible = session.canCompleteLesson;
+    final allRequiredPassed = session.allRequiredAssessmentsPassed;
+
+    final subtitle = completionEligible
+      ? (allRequiredPassed
+          ? 'Guided practice complete. All required assessments passed.'
+          : 'Guided practice complete. Required assessments attempted. You can still finish this lesson.')
+      : 'Lesson has required steps pending. Resume from the first incomplete assessment.';
+
+    final finishLabel = completionEligible
+      ? 'Finish Lesson'
+      : 'Resume Required Assessment';
 
     return Scaffold(
       backgroundColor: AppTheme.paperCream,
@@ -56,7 +68,7 @@ class LessonCompletionSummaryPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Guided practice complete. All required assessments passed.',
+                      subtitle,
                       style: const TextStyle(
                         color: AppTheme.inkBlack,
                         fontWeight: FontWeight.w700,
@@ -137,9 +149,11 @@ class LessonCompletionSummaryPage extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: NeoPrimaryButton(
-                      label: 'Finish Lesson',
+                      label: finishLabel,
                       icon: Icons.check_circle,
-                      onPressed: () => Navigator.of(context).pop(true),
+                      onPressed: completionEligible
+                          ? () => Navigator.of(context).pop(true)
+                          : () => Navigator.of(context).pop(false),
                     ),
                   ),
                 ],
@@ -186,6 +200,8 @@ class LessonCompletionSummaryPage extends StatelessWidget {
     switch (status) {
       case AssessmentStatus.passed:
         return 'PASSED';
+      case AssessmentStatus.attempted:
+        return 'ATTEMPTED';
       case AssessmentStatus.failed:
         return 'FAILED';
       case AssessmentStatus.skipped:
@@ -201,6 +217,8 @@ class LessonCompletionSummaryPage extends StatelessWidget {
     switch (status) {
       case AssessmentStatus.passed:
         return AppTheme.mintGreen;
+      case AssessmentStatus.attempted:
+        return AppTheme.signalYellow;
       case AssessmentStatus.failed:
       case AssessmentStatus.skipped:
         return AppTheme.punchRed;

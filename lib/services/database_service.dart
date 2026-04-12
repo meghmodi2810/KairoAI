@@ -231,7 +231,7 @@ class DatabaseService {
 
     for (final doc in snapshot.docs) {
       final data = doc.data();
-      final label = _normalizeSignLabel(data);
+      final label = _normalizeSignLabel(data, fallbackId: doc.id);
       if (label.isNotEmpty) {
         labels.add(label);
       }
@@ -247,22 +247,37 @@ class DatabaseService {
 
     for (final doc in snapshot.docs) {
       final data = doc.data();
-      final label = _normalizeSignLabel(data);
+      final label = _normalizeSignLabel(data, fallbackId: doc.id);
       if (label.isEmpty) continue;
 
       final imageUrl = (data['imageUrl'] ?? data['pictureUrl'] ?? '')
           .toString()
           .trim();
-      if (imageUrl.isNotEmpty) {
-        imageByLabel[label] = imageUrl;
+      final assetPathImage = (data['assetPathImage'] ?? '').toString().trim();
+      final gifUrl = (data['gifUrl'] ?? '').toString().trim();
+
+      final resolvedRef = imageUrl.isNotEmpty
+          ? imageUrl
+          : assetPathImage.isNotEmpty
+          ? assetPathImage
+          : gifUrl;
+
+      if (resolvedRef.isNotEmpty) {
+        imageByLabel[label] = resolvedRef;
       }
     }
 
     return imageByLabel;
   }
 
-  String _normalizeSignLabel(Map<String, dynamic> data) {
-    final raw = (data['word'] ?? data['character'] ?? '').toString().trim();
+  String _normalizeSignLabel(
+    Map<String, dynamic> data, {
+    String? fallbackId,
+  }) {
+    final raw =
+        (data['word'] ?? data['character'] ?? data['label'] ?? fallbackId ?? '')
+            .toString()
+            .trim();
     if (raw.isEmpty) return '';
     return raw.toUpperCase();
   }
@@ -382,18 +397,35 @@ class DatabaseService {
     required String lessonId,
     required List<String> skippedAssessmentTypes,
     String? resumeAssessmentType,
+    Map<String, dynamic>? assessmentResults,
+    bool? guidedPracticeCompleted,
+    bool? assessmentSummaryReady,
   }) async {
     if (currentUserId == null) return;
+
+    final payload = <String, dynamic>{
+      'assessmentsSkipped': skippedAssessmentTypes,
+      'assessmentResumeFrom': resumeAssessmentType,
+    };
+
+    if (assessmentResults != null) {
+      payload['assessmentResults'] = assessmentResults;
+    }
+
+    if (guidedPracticeCompleted != null) {
+      payload['guidedPracticeCompleted'] = guidedPracticeCompleted;
+    }
+
+    if (assessmentSummaryReady != null) {
+      payload['assessmentSummaryReady'] = assessmentSummaryReady;
+    }
 
     await _db
         .collection('users')
         .doc(currentUserId)
         .collection('progress')
         .doc(lessonId)
-        .set({
-          'assessmentsSkipped': skippedAssessmentTypes,
-          'assessmentResumeFrom': resumeAssessmentType,
-        }, SetOptions(merge: true));
+        .set(payload, SetOptions(merge: true));
   }
 
   Future<void> restartLessonProgress({
@@ -429,9 +461,12 @@ class DatabaseService {
       'xpEarned': 0,
       'signsCompleted': <String>[],
       'signsSkipped': <String>[],
+      'guidedPracticeCompleted': false,
       'guidedCurrentIndex': 0,
       'assessmentsSkipped': <String>[],
       'assessmentResumeFrom': null,
+      'assessmentSummaryReady': false,
+      'assessmentResults': <String, dynamic>{},
     }, SetOptions(merge: true));
   }
 
@@ -444,6 +479,7 @@ class DatabaseService {
     required int coinsEarned,
     required int xpEarned,
     required int signsCount,
+    Map<String, dynamic>? assessmentResults,
   }) async {
     if (currentUserId == null) return;
 
@@ -477,9 +513,17 @@ class DatabaseService {
         'coinsEarned': safeCoinsEarned,
         'xpEarned': safeXpEarned,
         'signsSkipped': <String>[],
+        'guidedPracticeCompleted': true,
         'guidedCurrentIndex': signsCount > 0 ? signsCount - 1 : 0,
         'assessmentsSkipped': <String>[],
         'assessmentResumeFrom': null,
+        'assessmentSummaryReady': false,
+        'assessmentResults': assessmentResults ??
+            (existingData?['assessmentResults'] is Map
+                ? Map<String, dynamic>.from(
+                    existingData!['assessmentResults'] as Map,
+                  )
+                : <String, dynamic>{}),
       }, SetOptions(merge: true));
 
       final updates = <String, dynamic>{

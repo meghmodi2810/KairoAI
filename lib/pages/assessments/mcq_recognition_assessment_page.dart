@@ -5,16 +5,20 @@ import '../../models/lesson_assessment_models.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/neo_brutal_widgets.dart';
 
+enum McqQuestionScope { oneRandom, allSigns }
+
 class McqRecognitionAssessmentPage extends StatefulWidget {
   final List<SignModel> signs;
-  final Map<String, String> imageUrlsBySignId;
+  final Map<String, String> imageRefsBySignId;
   final List<String> globalDistractorPool;
+  final McqQuestionScope questionScope;
 
   const McqRecognitionAssessmentPage({
     super.key,
     required this.signs,
-    required this.imageUrlsBySignId,
+    required this.imageRefsBySignId,
     required this.globalDistractorPool,
+    this.questionScope = McqQuestionScope.allSigns,
   });
 
   @override
@@ -32,13 +36,35 @@ class _McqRecognitionAssessmentPageState
   final Map<int, String> _selectedAnswers = <int, String>{};
   final Map<int, String> _correctAnswers = <int, String>{};
 
-  int _attemptCount = 1;
+  int _attemptCount = 0;
   int _index = 0;
   bool _lockedQuestion = false;
   String? _feedback;
   String? _contentError;
 
   _McqQuestionData get _currentQuestion => _questions[_index];
+
+  bool get _hasAnsweredAnyQuestion {
+    return _selectedAnswers.values.any((answer) => answer != _kSkippedAnswer);
+  }
+
+  bool get _allQuestionsAnswered {
+    if (_questions.isEmpty) return false;
+    if (_selectedAnswers.length != _questions.length) return false;
+    return !_selectedAnswers.values.contains(_kSkippedAnswer);
+  }
+
+  bool get _allAnswersCorrect {
+    if (!_allQuestionsAnswered) return false;
+
+    for (var i = 0; i < _questions.length; i++) {
+      if (_selectedAnswers[i] != _correctAnswers[i]) {
+        return false;
+      }
+    }
+
+    return true;
+  }
 
   @override
   void initState() {
@@ -48,9 +74,15 @@ class _McqRecognitionAssessmentPageState
 
   void _setupQuestions() {
     _contentError = null;
+    _selectedAnswers.clear();
+    _correctAnswers.clear();
+    _attemptCount = 0;
+    _index = 0;
+    _lockedQuestion = false;
+    _feedback = null;
     _questions = _buildQuestions();
 
-    if (_questions.isEmpty) {
+    if (_questions.isEmpty && _contentError == null) {
       _contentError =
           'Could not generate recognition questions from this lesson sign pool.';
     }
@@ -58,19 +90,40 @@ class _McqRecognitionAssessmentPageState
 
   List<_McqQuestionData> _buildQuestions() {
     if (widget.signs.isEmpty) {
+      _contentError = 'This lesson has no signs for recognition questions.';
       return <_McqQuestionData>[];
+    }
+
+    final signsWithMedia = widget.signs
+        .where(
+          (sign) => (widget.imageRefsBySignId[sign.id] ?? '').trim().isNotEmpty,
+        )
+        .toList(growable: false);
+
+    List<SignModel> selectedSigns;
+
+    if (widget.questionScope == McqQuestionScope.oneRandom) {
+      if (signsWithMedia.isEmpty) {
+        _contentError =
+            'Recognition requires at least one lesson sign with a valid image.';
+        return <_McqQuestionData>[];
+      }
+
+      final randomPool = List<SignModel>.from(signsWithMedia)..shuffle(_random);
+      selectedSigns = <SignModel>[randomPool.first];
+    } else {
+      if (signsWithMedia.length != widget.signs.length) {
+        _contentError =
+            'Recognition requires valid images for all lesson signs in all-sign mode.';
+        return <_McqQuestionData>[];
+      }
+
+      selectedSigns = List<SignModel>.from(signsWithMedia)..shuffle(_random);
     }
 
     final lessonLabels = widget.signs
         .map((sign) => sign.word.toUpperCase().trim())
         .toSet();
-
-    final randomizedSignPool = List<SignModel>.from(widget.signs)
-      ..shuffle(_random);
-    final questionCount = _random.nextInt(randomizedSignPool.length) + 1;
-    final selectedSigns = randomizedSignPool
-        .take(questionCount)
-        .toList(growable: false);
 
     final globalPool = widget.globalDistractorPool
         .map((label) => label.toUpperCase().trim())
@@ -115,12 +168,19 @@ class _McqRecognitionAssessmentPageState
 
       final options = <String>[correct, ...wrongSet.take(3)]..shuffle(_random);
 
+      final imageRef = (widget.imageRefsBySignId[sign.id] ?? '').trim();
+      if (imageRef.isEmpty) {
+        _contentError =
+            'Recognition requires a valid image for each question sign.';
+        return <_McqQuestionData>[];
+      }
+
       questions.add(
         _McqQuestionData(
           promptSign: correct,
           correctAnswer: correct,
           options: options,
-          imageUrl: widget.imageUrlsBySignId[sign.id]?.trim(),
+          imageRef: imageRef,
         ),
       );
     }
@@ -165,6 +225,22 @@ class _McqRecognitionAssessmentPageState
     return score;
   }
 
+  AssessmentStatus _resolveResultStatus({required bool completedAllQuestions}) {
+    if (_contentError != null) {
+      return AssessmentStatus.failed;
+    }
+
+    if (!_hasAnsweredAnyQuestion) {
+      return AssessmentStatus.skipped;
+    }
+
+    if (completedAllQuestions && _allAnswersCorrect) {
+      return AssessmentStatus.passed;
+    }
+
+    return AssessmentStatus.attempted;
+  }
+
   McqAssessmentResult _buildResult(AssessmentStatus status, {String? error}) {
     final score = _calculateScore();
 
@@ -200,6 +276,7 @@ class _McqRecognitionAssessmentPageState
     final isCorrect = selectedOption == correct;
 
     setState(() {
+      _attemptCount += 1;
       _lockedQuestion = true;
       _selectedAnswers[_index] = selectedOption;
       _correctAnswers[_index] = correct;
@@ -213,7 +290,8 @@ class _McqRecognitionAssessmentPageState
     if (!_lockedQuestion) return;
 
     if (_index >= _questions.length - 1) {
-      Navigator.of(context).pop(_buildResult(AssessmentStatus.passed));
+      final status = _resolveResultStatus(completedAllQuestions: true);
+      Navigator.of(context).pop(_buildResult(status));
       return;
     }
 
@@ -231,7 +309,8 @@ class _McqRecognitionAssessmentPageState
     _correctAnswers[_index] = _currentQuestion.correctAnswer;
 
     if (_index >= _questions.length - 1) {
-      Navigator.of(context).pop(_buildResult(AssessmentStatus.passed));
+      final status = _resolveResultStatus(completedAllQuestions: true);
+      Navigator.of(context).pop(_buildResult(status));
       return;
     }
 
@@ -243,10 +322,11 @@ class _McqRecognitionAssessmentPageState
   }
 
   void _skipAssessment() {
-    Navigator.of(context).pop(_buildResult(AssessmentStatus.skipped));
+    final status = _resolveResultStatus(completedAllQuestions: false);
+    Navigator.of(context).pop(_buildResult(status));
   }
 
-  Widget _buildOption(String option, int displayIndex) {
+  Widget _buildOption(String option) {
     final selected = _selectedAnswers[_index] == option;
     final correct = _currentQuestion.correctAnswer == option;
 
@@ -276,25 +356,6 @@ class _McqRecognitionAssessmentPageState
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 22,
-              height: 22,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppTheme.paperCream,
-                borderRadius: BorderRadius.circular(99),
-                border: Border.all(color: AppTheme.inkBlack, width: 1.8),
-              ),
-              child: Text(
-                '$displayIndex',
-                style: const TextStyle(
-                  color: AppTheme.inkBlack,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 11,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
             Expanded(
               child: Text(
                 option,
@@ -313,43 +374,38 @@ class _McqRecognitionAssessmentPageState
   }
 
   Widget _buildQuestionImage(_McqQuestionData question) {
-    final imageUrl = question.imageUrl;
-    if (imageUrl == null || imageUrl.isEmpty) {
-      return Container(
-        width: double.infinity,
-        height: double.infinity,
-        color: AppTheme.paperCream,
-        alignment: Alignment.center,
-        child: Text(
-          question.promptSign,
-          style: TextStyle(
-            color: AppTheme.cobaltBlue.withValues(alpha: 0.45),
-            fontWeight: FontWeight.w900,
-            fontSize: 84,
-            height: 1,
-          ),
-        ),
-      );
+    if (question.imageRef.isEmpty) {
+      return _buildQuestionPlaceholder(question.promptSign);
     }
 
-    return Image.network(
-      imageUrl,
+    return Container(
       width: double.infinity,
       height: double.infinity,
-      fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => Container(
+      color: AppTheme.paperCream,
+      alignment: Alignment.center,
+      child: Image.asset(
+        question.imageRef,
         width: double.infinity,
         height: double.infinity,
-        color: AppTheme.paperCream,
-        alignment: Alignment.center,
-        child: Text(
-          question.promptSign,
-          style: TextStyle(
-            color: AppTheme.cobaltBlue.withValues(alpha: 0.45),
-            fontWeight: FontWeight.w900,
-            fontSize: 84,
-            height: 1,
-          ),
+        fit: BoxFit.contain,
+        errorBuilder: (_, error, stackTrace) =>
+            _buildQuestionPlaceholder(question.promptSign),
+      ),
+    );
+  }
+
+  Widget _buildQuestionPlaceholder(String signLabel) {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: AppTheme.paperCream,
+      alignment: Alignment.center,
+      child: Text(
+        signLabel.toUpperCase().trim(),
+        style: TextStyle(
+          color: AppTheme.cobaltBlue.withValues(alpha: 0.45),
+          fontSize: 72,
+          fontWeight: FontWeight.w900,
         ),
       ),
     );
@@ -479,10 +535,12 @@ class _McqRecognitionAssessmentPageState
                             children: [
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
-                                child: SizedBox(
-                                  height: 180,
-                                  width: double.infinity,
-                                  child: _buildQuestionImage(_currentQuestion),
+                                child: AspectRatio(
+                                  aspectRatio: 4 / 3,
+                                  child: SizedBox(
+                                    width: double.infinity,
+                                    child: _buildQuestionImage(_currentQuestion),
+                                  ),
                                 ),
                               ),
                               const SizedBox(height: 10),
@@ -506,7 +564,6 @@ class _McqRecognitionAssessmentPageState
                                         itemBuilder: (context, i) {
                                           return _buildOption(
                                             _currentQuestion.options[i],
-                                            i + 1,
                                           );
                                         },
                                       ),
@@ -591,12 +648,12 @@ class _McqQuestionData {
   final String promptSign;
   final String correctAnswer;
   final List<String> options;
-  final String? imageUrl;
+  final String imageRef;
 
   const _McqQuestionData({
     required this.promptSign,
     required this.correctAnswer,
     required this.options,
-    required this.imageUrl,
+    required this.imageRef,
   });
 }
