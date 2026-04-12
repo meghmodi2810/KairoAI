@@ -793,22 +793,24 @@ class AdminDatabaseService {
     try {
       final now = DateTime.now();
       final List<double> dailyCounts = [0, 0, 0, 0, 0, 0, 0];
-      
+
       // We look at all users' progress
       final usersSnapshot = await _db.collection('users').get();
-      
+
       for (final userDoc in usersSnapshot.docs) {
-        final weekAgo = now.subtract(const Duration(days: 7));
         final completedSnapshot = await userDoc.reference
             .collection('progress')
             .where('status', isEqualTo: 'completed')
-            .where('updatedAt', isGreaterThan: Timestamp.fromDate(weekAgo))
             .get();
-        
+
         for (final progressDoc in completedSnapshot.docs) {
-          final updatedAt = (progressDoc.data()['updatedAt'] as Timestamp?)?.toDate();
-          if (updatedAt != null) {
-            final dayIndex = 6 - now.difference(updatedAt).inDays;
+          final data = progressDoc.data();
+          final completedAt =
+              (data['completedAt'] as Timestamp?)?.toDate() ??
+              (data['updatedAt'] as Timestamp?)?.toDate();
+
+          if (completedAt != null) {
+            final dayIndex = 6 - now.difference(completedAt).inDays;
             if (dayIndex >= 0 && dayIndex < 7) {
               dailyCounts[dayIndex]++;
             }

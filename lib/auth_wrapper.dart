@@ -68,6 +68,13 @@ class _AuthWrapperState extends State<AuthWrapper> {
     );
   }
 
+  Widget _transitionPlaceholder() {
+    return const Scaffold(
+      backgroundColor: paper,
+      body: SizedBox.expand(),
+    );
+  }
+
   Widget _loadingScreen() {
     return Scaffold(
       backgroundColor: paper,
@@ -187,7 +194,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
       builder: (context, snapshot) {
         // Show loading while checking auth state
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return _loadingScreen();
+          return _transitionPlaceholder();
         }
 
         // User is logged in - check if admin or learner
@@ -196,7 +203,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
             future: _checkAdminStatus(snapshot.data!.uid),
             builder: (context, adminSnapshot) {
               if (adminSnapshot.connectionState == ConnectionState.waiting) {
-                return _loadingScreen();
+                return _transitionPlaceholder();
               }
 
               // Check if user is an admin

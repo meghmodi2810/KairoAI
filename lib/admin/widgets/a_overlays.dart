@@ -396,78 +396,97 @@ class _AdminDrawerState extends State<AdminDrawer>
     final c = ac(context);
     final screenWidth = MediaQuery.of(context).size.width;
     final drawerWidth = (screenWidth * 0.82).clamp(0.0, 320.0);
-    final safeTop = MediaQuery.of(context).padding.top;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
 
     return Material(
       color: c.bgBase,
       child: SizedBox(
         width: drawerWidth,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              color: c.bgSurface,
-              padding: EdgeInsets.fromLTRB(14, safeTop + 24, 14, 20),
-              decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: c.border, width: 2)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  AdminAvatar(name: widget.adminName, size: 48),
-                  const SizedBox(height: 14),
-                  Text(widget.adminName, style: adminH1(c.textPrimary)),
-                  Text(widget.adminEmail, style: adminMeta(c.textSecondary)),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 14),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              child: Text('NAVIGATION', style: adminLabel(c.textMuted)),
-            ),
-            ..._navItems.take(3).toList().asMap().entries.map((e) => _item(e, c)),
-
-            const SizedBox(height: 8),
-            Divider(indent: 14, endIndent: 14, height: 24, color: c.border),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              child: Text('SYSTEM', style: adminLabel(c.textMuted)),
-            ),
-            ..._navItems.skip(3).toList().asMap().entries.map((e) => _item(e, c, offset: 3)),
-
-            const Spacer(),
-            Divider(height: 1, color: c.border),
-            GestureDetector(
-              onTap: widget.onSignOut,
-              behavior: HitTestBehavior.opaque,
-              child: Container(
-                height: 52,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                padding: const EdgeInsets.fromLTRB(14, 18, 14, 20),
                 decoration: BoxDecoration(
-                  color: c.errorFill,
-                  border: Border(top: BorderSide(color: c.error, width: 2)),
+                  color: c.bgSurface,
+                  border: Border(bottom: BorderSide(color: c.border, width: 2)),
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(LucideIcons.logOut, size: 16, color: c.error),
-                    const SizedBox(width: 10),
-                    Text('Sign out', 
-                         style: TextStyle(
-                           fontSize: 13,
-                           fontWeight: FontWeight.w600,
-                           color: c.error,
-                         )),
+                    AdminAvatar(name: widget.adminName, size: 48),
+                    const SizedBox(height: 14),
+                    Text(
+                      widget.adminName,
+                      style: adminH1(c.textPrimary),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      widget.adminEmail,
+                      style: adminMeta(c.textSecondary),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
                 ),
               ),
-            ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(14, 0, 14, 24 + MediaQuery.of(context).padding.bottom),
-              child: Text('KairoAI Admin v1.4', style: adminMeta(c.textMuted)),
-            ),
-          ],
+
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.only(top: 14, bottom: 14),
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      child: Text('NAVIGATION', style: adminLabel(c.textMuted)),
+                    ),
+                    ..._navItems.take(3).toList().asMap().entries.map((e) => _item(e, c)),
+                    const SizedBox(height: 8),
+                    Divider(indent: 14, endIndent: 14, height: 24, color: c.border),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      child: Text('SYSTEM', style: adminLabel(c.textMuted)),
+                    ),
+                    ..._navItems.skip(3).toList().asMap().entries.map((e) => _item(e, c, offset: 3)),
+                  ],
+                ),
+              ),
+
+              Divider(height: 1, color: c.border),
+              GestureDetector(
+                onTap: widget.onSignOut,
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  height: 52,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  decoration: BoxDecoration(
+                    color: c.errorFill,
+                    border: Border(top: BorderSide(color: c.error, width: 2)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(LucideIcons.logOut, size: 16, color: c.error),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Sign out',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: c.error,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(14, 0, 14, 14 + safeBottom),
+                child: Text('KairoAI Admin v1.4', style: adminMeta(c.textMuted)),
+              ),
+            ],
+          ),
         ),
       ),
     );

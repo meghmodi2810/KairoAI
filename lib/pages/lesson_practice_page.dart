@@ -8,11 +8,15 @@ import '../theme/app_theme.dart';
 class LessonPracticePage extends StatefulWidget {
   final LessonModel lesson;
   final List<SignModel> signs;
+  final int? lessonSignNumber;
+  final int? lessonSignTotal;
 
   const LessonPracticePage({
     super.key,
     required this.lesson,
     required this.signs,
+    this.lessonSignNumber,
+    this.lessonSignTotal,
   });
 
   @override
@@ -144,6 +148,25 @@ class _LessonPracticePageState extends State<LessonPracticePage>
     Future.delayed(const Duration(milliseconds: 900), _nextSign);
   }
 
+  Future<void> _skipCurrentSign() async {
+    HapticFeedback.selectionClick();
+
+    if (_index >= widget.signs.length - 1) {
+      await _stopCamera();
+      if (!mounted) return;
+      Navigator.pop(context, -1);
+      return;
+    }
+
+    setState(() {
+      _index++;
+      _result = null;
+      _matchCount = 0;
+      _matched = false;
+    });
+    _detection.resetPrediction().catchError((_) {});
+  }
+
   void _nextSign() {
     if (_index >= widget.signs.length - 1) {
       _finish();
@@ -182,6 +205,8 @@ class _LessonPracticePageState extends State<LessonPracticePage>
   Widget build(BuildContext context) {
     final confidence = _result?.confidence ?? 0;
     final confidenceColor = _confidenceColor(confidence);
+    final displaySignNumber = widget.lessonSignNumber ?? (_index + 1);
+    final displaySignTotal = widget.lessonSignTotal ?? widget.signs.length;
 
     return Scaffold(
       backgroundColor: AppTheme.charcoalNight,
@@ -192,12 +217,34 @@ class _LessonPracticePageState extends State<LessonPracticePage>
                 ? FittedBox(
                     fit: BoxFit.cover,
                     child: SizedBox(
-                      width: 720,
-                      height: 1280,
+                      width: 1080,
+                      height: 1440,
                       child: Texture(textureId: _detection.textureId!),
                     ),
                   )
                 : const ColoredBox(color: Colors.black),
+          ),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final squareSize = constraints.maxWidth * 0.88;
+                  return Center(
+                    child: Container(
+                      width: squareSize,
+                      height: squareSize,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: AppTheme.warmWhite.withValues(alpha: 0.9),
+                          width: 2.2,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
           ),
           Positioned.fill(
             child: IgnorePointer(
@@ -230,8 +277,7 @@ class _LessonPracticePageState extends State<LessonPracticePage>
                     },
                   ),
                   const SizedBox(width: 10),
-                  Container(
-                    width: 150,
+                  Expanded(
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                       decoration: BoxDecoration(
@@ -245,7 +291,7 @@ class _LessonPracticePageState extends State<LessonPracticePage>
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
-                              'TARGET ${_current.word.toUpperCase()}',
+                              'PRACTICE ${_current.word.toUpperCase()}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
@@ -256,6 +302,15 @@ class _LessonPracticePageState extends State<LessonPracticePage>
                             ),
                           ),
                           const SizedBox(width: 6),
+                          Text(
+                            '$displaySignNumber/$displaySignTotal',
+                            style: const TextStyle(
+                              color: AppTheme.inkBlack,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
                           Text(
                             '${_matchCount > 3 ? 3 : _matchCount}/3',
                             style: const TextStyle(
@@ -268,7 +323,7 @@ class _LessonPracticePageState extends State<LessonPracticePage>
                       ),
                     ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 10),
                   _hudCircle(
                     icon: Icons.cameraswitch_rounded,
                     onTap: () => _detection.switchCamera(),
@@ -410,7 +465,9 @@ class _LessonPracticePageState extends State<LessonPracticePage>
                                       margin: EdgeInsets.only(right: i == 2 ? 0 : 6),
                                       height: 12,
                                       decoration: BoxDecoration(
-                                        color: i < _matchCount ? AppTheme.mintGreen : AppTheme.paperCream,
+                                        color: i < _matchCount
+                                            ? AppTheme.mintGreen
+                                            : AppTheme.paperCream,
                                         borderRadius: BorderRadius.circular(8),
                                         border: Border.all(color: AppTheme.inkBlack, width: 2),
                                       ),
@@ -420,12 +477,36 @@ class _LessonPracticePageState extends State<LessonPracticePage>
                               ],
                             ),
                             const SizedBox(height: 10),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                onPressed: _matched ? null : _nextSign,
-                                icon: const Icon(Icons.skip_next_rounded),
-                                label: const Text('Skip'),
+                            Row(
+                              children: [
+                                const Expanded(
+                                  child: Text(
+                                    'Perform the target sign correctly to continue.',
+                                    style: TextStyle(
+                                      color: AppTheme.inkBlack,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                OutlinedButton.icon(
+                                  onPressed: _matched ? null : _skipCurrentSign,
+                                  icon: const Icon(Icons.skip_next_rounded),
+                                  label: const Text('Skip'),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            const Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                'Skipping moves to the next sign.',
+                                style: TextStyle(
+                                  color: AppTheme.inkBlack,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 10,
+                                ),
                               ),
                             ),
                           ],

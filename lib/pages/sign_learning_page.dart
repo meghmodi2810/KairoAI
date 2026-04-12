@@ -29,6 +29,8 @@ class _SignLearningPageState extends State<SignLearningPage> {
   bool _loading = true;
   bool _showTips = false;
   bool _completed = false;
+  int _totalPracticeSeconds = 0;
+  final Set<String> _practicedSignIds = <String>{};
 
   SignModel get _current => _signs[_index];
 
@@ -70,36 +72,89 @@ class _SignLearningPageState extends State<SignLearningPage> {
     } catch (_) {}
   }
 
-  void _next() {
-    if (_index >= _signs.length - 1) return;
-    setState(() {
-      _index++;
-      _showTips = false;
-    });
-  }
-
-  void _prev() {
-    if (_index <= 0) return;
-    setState(() {
-      _index--;
-      _showTips = false;
-    });
-  }
-
-  Future<void> _startPractice() async {
+  Future<void> _practiceCurrentSign() async {
     final result = await Navigator.push<int>(
       context,
       MaterialPageRoute(
         builder: (_) => LessonPracticePage(
           lesson: widget.lesson,
-          signs: _signs,
+          signs: [_current],
+          lessonSignNumber: _index + 1,
+          lessonSignTotal: _signs.length,
         ),
       ),
     );
 
-    if (result != null && result > 0 && mounted) {
-      await _completeLesson(result);
+    if (!mounted) return;
+
+    if (result == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Complete this sign practice to unlock the next sign.'),
+        ),
+      );
+      return;
+    }
+
+    if (result < 0) {
+      final skippedWord = _current.word.toUpperCase();
+
+      if (_index >= _signs.length - 1) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Lesson skipped. No rewards granted.'),
+          ),
+        );
+        Navigator.of(context).pop();
+        return;
+      }
+
+      setState(() {
+        _index++;
+        _showTips = false;
+      });
+
+      final nextWord = _current.word.toUpperCase();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppTheme.signalYellow,
+          content: Text('Skipped $skippedWord. Next sign: $nextWord'),
+          duration: const Duration(milliseconds: 950),
+        ),
+      );
+      return;
+    }
+
+    final completedSignId = _current.id;
+    final nextSignWord = _index < _signs.length - 1
+        ? _signs[_index + 1].word.toUpperCase()
+        : null;
+
+    setState(() {
+      _practicedSignIds.add(completedSignId);
+      _totalPracticeSeconds += result;
+    });
+
+    if (_index >= _signs.length - 1) {
+      await _completeLesson(_totalPracticeSeconds);
+      if (!mounted) return;
       _showCompletionDialog();
+      return;
+    }
+
+    setState(() {
+      _index++;
+      _showTips = false;
+    });
+
+    if (nextSignWord != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppTheme.mintGreen,
+          content: Text('Great! Next sign: $nextSignWord'),
+          duration: const Duration(milliseconds: 950),
+        ),
+      );
     }
   }
 
@@ -371,21 +426,29 @@ class _SignLearningPageState extends State<SignLearningPage> {
               ),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 10, 14, 16),
-              child: Row(
+              child: Column(
                 children: [
-                  SizedBox(
-                    width: 68,
-                    child: OutlinedButton(
-                      onPressed: _index > 0 ? _prev : null,
-                      child: const Icon(Icons.arrow_back_rounded),
+                  if (_practicedSignIds.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        'PRACTICED ${_practicedSignIds.length}/${_signs.length}',
+                        style: const TextStyle(
+                          color: AppTheme.inkBlack,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 12,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
+                  SizedBox(
+                    width: double.infinity,
                     child: NeoPrimaryButton(
-                      label: isLast ? 'Start Practice' : 'Next Sign',
-                      onPressed: isLast ? _startPractice : _next,
-                      icon: isLast ? Icons.camera_alt : Icons.arrow_forward,
+                      label: isLast
+                          ? 'Practice & Complete Lesson'
+                          : 'Practice This Sign',
+                      onPressed: _practiceCurrentSign,
+                      icon: Icons.camera_alt,
                     ),
                   ),
                 ],

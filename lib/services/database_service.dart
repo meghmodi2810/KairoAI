@@ -283,31 +283,52 @@ class DatabaseService {
     required int signsCount,
   }) async {
     if (currentUserId == null) return;
-    
-    // Update progress
-    await _db
-        .collection('users')
-        .doc(currentUserId)
-        .collection('progress')
-        .doc(lessonId)
-        .update({
-      'status': 'completed',
-      'completedAt': Timestamp.now(),
-      'accuracy': accuracy,
-      'timeSpentSeconds': timeSpentSeconds,
-      'gemsEarned': gemsEarned,
-      'coinsEarned': coinsEarned,
+
+    final userRef = _db.collection('users').doc(currentUserId);
+    final progressRef = userRef.collection('progress').doc(lessonId);
+    final now = Timestamp.now();
+    final practiceMinutes = (timeSpentSeconds / 60).ceil();
+
+    await _db.runTransaction((tx) async {
+      final progressSnap = await tx.get(progressRef);
+      final existingData = progressSnap.data();
+      final wasAlreadyCompleted = existingData?['status'] == 'completed';
+      final firstCompletedAt = existingData?['completedAt'] as Timestamp?;
+
+      final safeXpEarned = xpEarned < 0 ? 0 : xpEarned;
+      final safeGemsEarned = wasAlreadyCompleted ? 0 : (gemsEarned < 0 ? 0 : gemsEarned);
+      final safeCoinsEarned = wasAlreadyCompleted ? 0 : (coinsEarned < 0 ? 0 : coinsEarned);
+
+      tx.set(
+        progressRef,
+        {
+          'categoryId': categoryId,
+          'status': 'completed',
+          'completedAt': firstCompletedAt ?? now,
+          'lastAttemptAt': now,
+          'accuracy': accuracy,
+          'timeSpentSeconds': timeSpentSeconds,
+          'gemsEarned': safeGemsEarned,
+          'coinsEarned': safeCoinsEarned,
+          'xpEarned': safeXpEarned,
+        },
+        SetOptions(merge: true),
+      );
+
+      final updates = <String, dynamic>{
+        'xp': FieldValue.increment(safeXpEarned),
+        'totalPracticeMinutes': FieldValue.increment(practiceMinutes),
+      };
+
+      if (!wasAlreadyCompleted) {
+        updates['gems'] = FieldValue.increment(safeGemsEarned);
+        updates['coins'] = FieldValue.increment(safeCoinsEarned);
+        updates['totalLessonsCompleted'] = FieldValue.increment(1);
+        updates['totalSignsLearned'] = FieldValue.increment(signsCount);
+      }
+
+      tx.update(userRef, updates);
     });
-    
-    // Update user stats
-    await updateUserStats(
-      gemsToAdd: gemsEarned,
-      coinsToAdd: coinsEarned,
-      xpToAdd: xpEarned,
-      lessonsCompleted: 1,
-      signsLearned: signsCount,
-      practiceMinutes: (timeSpentSeconds / 60).ceil(),
-    );
 
     // Track lesson-only time for the daily goal widget.
     await _updateTodayLessonPracticeMinutes(timeSpentSeconds);
