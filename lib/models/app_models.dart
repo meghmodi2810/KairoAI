@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'lesson_assessment_models.dart';
 
 class UserModel {
   final String uid;
@@ -7,19 +8,19 @@ class UserModel {
   final String? photoUrl;
   final DateTime createdAt;
   final DateTime lastLoginAt;
-  
+
   // Gamification
   final int gems;
   final int coins;
   final int streakDays;
   final DateTime? lastStreakDate;
-  
+
   // Settings
   final String? learningGoal;
   final int dailyGoalMinutes;
   final int todayLessonPracticeMinutes;
   final DateTime? todayLessonPracticeDate;
-  
+
   // Progress summary
   final int totalLessonsCompleted;
   final int totalSignsLearned;
@@ -59,7 +60,8 @@ class UserModel {
       displayName: data['displayName'] ?? '',
       photoUrl: data['photoUrl'],
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      lastLoginAt: (data['lastLoginAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      lastLoginAt:
+          (data['lastLoginAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       gems: data['gems'] ?? 0,
       coins: data['coins'] ?? 0,
       streakDays: data['streakDays'] ?? 0,
@@ -67,7 +69,8 @@ class UserModel {
       learningGoal: data['learningGoal'],
       dailyGoalMinutes: data['dailyGoalMinutes'] ?? 10,
       todayLessonPracticeMinutes: data['todayLessonPracticeMinutes'] ?? 0,
-      todayLessonPracticeDate: (data['todayLessonPracticeDate'] as Timestamp?)?.toDate(),
+      todayLessonPracticeDate: (data['todayLessonPracticeDate'] as Timestamp?)
+          ?.toDate(),
       totalLessonsCompleted: data['totalLessonsCompleted'] ?? 0,
       totalSignsLearned: data['totalSignsLearned'] ?? 0,
       totalPracticeMinutes: data['totalPracticeMinutes'] ?? 0,
@@ -87,7 +90,9 @@ class UserModel {
       'gems': gems,
       'coins': coins,
       'streakDays': streakDays,
-      'lastStreakDate': lastStreakDate != null ? Timestamp.fromDate(lastStreakDate!) : null,
+      'lastStreakDate': lastStreakDate != null
+          ? Timestamp.fromDate(lastStreakDate!)
+          : null,
       'learningGoal': learningGoal,
       'dailyGoalMinutes': dailyGoalMinutes,
       'todayLessonPracticeMinutes': todayLessonPracticeMinutes,
@@ -142,7 +147,8 @@ class UserModel {
           todayLessonPracticeMinutes ?? this.todayLessonPracticeMinutes,
       todayLessonPracticeDate:
           todayLessonPracticeDate ?? this.todayLessonPracticeDate,
-      totalLessonsCompleted: totalLessonsCompleted ?? this.totalLessonsCompleted,
+      totalLessonsCompleted:
+          totalLessonsCompleted ?? this.totalLessonsCompleted,
       totalSignsLearned: totalSignsLearned ?? this.totalSignsLearned,
       totalPracticeMinutes: totalPracticeMinutes ?? this.totalPracticeMinutes,
       currentLevel: currentLevel ?? this.currentLevel,
@@ -230,6 +236,7 @@ class LessonModel {
   final bool isLocked;
   final String? requiredLessonId;
   final List<String> focusPoints;
+  final List<String> testTypes;
 
   LessonModel({
     required this.id,
@@ -249,6 +256,7 @@ class LessonModel {
     this.isLocked = false,
     this.requiredLessonId,
     required this.focusPoints,
+    this.testTypes = kDefaultLessonAssessments,
   });
 
   factory LessonModel.fromFirestore(DocumentSnapshot doc) {
@@ -271,6 +279,11 @@ class LessonModel {
       isLocked: data['isLocked'] ?? false,
       requiredLessonId: data['requiredLessonId'],
       focusPoints: List<String>.from(data['focusPoints'] ?? []),
+      testTypes: normalizeAssessmentTypes(
+        (data['testTypes'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList(),
+      ),
     );
   }
 
@@ -292,8 +305,12 @@ class LessonModel {
       'isLocked': isLocked,
       'requiredLessonId': requiredLessonId,
       'focusPoints': focusPoints,
+      'testTypes': normalizeAssessmentTypes(testTypes),
     };
   }
+
+  List<String> get enabledAssessmentTypes =>
+      normalizeAssessmentTypes(testTypes);
 }
 
 class SignModel {
@@ -370,6 +387,10 @@ class LessonProgress {
   final int timeSpentSeconds;
   final int attemptsCount;
   final List<String> signsCompleted;
+  final List<String> signsSkipped;
+  final int? guidedCurrentIndex;
+  final List<String> assessmentsSkipped;
+  final String? assessmentResumeFrom;
   final int gemsEarned;
   final int coinsEarned;
 
@@ -383,6 +404,10 @@ class LessonProgress {
     this.timeSpentSeconds = 0,
     this.attemptsCount = 0,
     this.signsCompleted = const [],
+    this.signsSkipped = const [],
+    this.guidedCurrentIndex,
+    this.assessmentsSkipped = const [],
+    this.assessmentResumeFrom,
     this.gemsEarned = 0,
     this.coinsEarned = 0,
   });
@@ -399,6 +424,10 @@ class LessonProgress {
       timeSpentSeconds: data['timeSpentSeconds'] ?? 0,
       attemptsCount: data['attemptsCount'] ?? 0,
       signsCompleted: List<String>.from(data['signsCompleted'] ?? []),
+      signsSkipped: List<String>.from(data['signsSkipped'] ?? []),
+      guidedCurrentIndex: (data['guidedCurrentIndex'] as num?)?.toInt(),
+      assessmentsSkipped: List<String>.from(data['assessmentsSkipped'] ?? []),
+      assessmentResumeFrom: data['assessmentResumeFrom'],
       gemsEarned: data['gemsEarned'] ?? 0,
       coinsEarned: data['coinsEarned'] ?? 0,
     );
@@ -408,12 +437,18 @@ class LessonProgress {
     return {
       'categoryId': categoryId,
       'status': status,
-      'completedAt': completedAt != null ? Timestamp.fromDate(completedAt!) : null,
+      'completedAt': completedAt != null
+          ? Timestamp.fromDate(completedAt!)
+          : null,
       'startedAt': startedAt != null ? Timestamp.fromDate(startedAt!) : null,
       'accuracy': accuracy,
       'timeSpentSeconds': timeSpentSeconds,
       'attemptsCount': attemptsCount,
       'signsCompleted': signsCompleted,
+      'signsSkipped': signsSkipped,
+      'guidedCurrentIndex': guidedCurrentIndex,
+      'assessmentsSkipped': assessmentsSkipped,
+      'assessmentResumeFrom': assessmentResumeFrom,
       'gemsEarned': gemsEarned,
       'coinsEarned': coinsEarned,
     };

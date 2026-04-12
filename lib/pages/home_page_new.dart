@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -77,7 +78,9 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       backgroundColor: AppTheme.paperCream,
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppTheme.cobaltBlue))
+          ? const Center(
+              child: CircularProgressIndicator(color: AppTheme.cobaltBlue),
+            )
           : SafeArea(
               child: RefreshIndicator(
                 color: AppTheme.cobaltBlue,
@@ -118,9 +121,12 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _header() {
-    final name = _user?.displayName ?? _auth.currentUser?.displayName ?? 'Learner';
+    final name =
+        _user?.displayName ?? _auth.currentUser?.displayName ?? 'Learner';
     final hour = DateTime.now().hour;
-    final greeting = hour < 12 ? 'Good morning' : (hour < 17 ? 'Good afternoon' : 'Good evening');
+    final greeting = hour < 12
+        ? 'Good morning'
+        : (hour < 17 ? 'Good afternoon' : 'Good evening');
 
     return Row(
       children: [
@@ -264,7 +270,11 @@ class _HomePageState extends State<HomePage> {
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: AppTheme.inkBlack, width: 2.5),
                   ),
-                  child: const Icon(Icons.sign_language, color: AppTheme.inkBlack, size: 28),
+                  child: const Icon(
+                    Icons.sign_language,
+                    color: AppTheme.inkBlack,
+                    size: 28,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -299,7 +309,10 @@ class _HomePageState extends State<HomePage> {
                     shape: BoxShape.circle,
                     border: Border.all(color: AppTheme.inkBlack, width: 2),
                   ),
-                  child: const Icon(Icons.play_arrow_rounded, color: AppTheme.inkBlack),
+                  child: const Icon(
+                    Icons.play_arrow_rounded,
+                    color: AppTheme.inkBlack,
+                  ),
                 ),
               ],
             ),
@@ -362,7 +375,9 @@ class _HomePageState extends State<HomePage> {
                 value: value,
                 minHeight: 10,
                 backgroundColor: AppTheme.warmWhite,
-                valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.mintGreen),
+                valueColor: const AlwaysStoppedAnimation<Color>(
+                  AppTheme.mintGreen,
+                ),
               ),
             ),
           ),
@@ -421,14 +436,18 @@ class _HomePageState extends State<HomePage> {
         return GestureDetector(
           onTap: category.isLocked
               ? () => ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Reach level ${category.requiredLevel} to unlock ${category.name}.'),
+                  SnackBar(
+                    content: Text(
+                      'Reach level ${category.requiredLevel} to unlock ${category.name}.',
                     ),
-                  )
-              : () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => CategoryLessonsPage(category: category)),
                   ),
+                )
+              : () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => CategoryLessonsPage(category: category),
+                  ),
+                ),
           child: NeoPanel(
             radius: 16,
             color: AppTheme.warmWhite,
@@ -438,14 +457,19 @@ class _HomePageState extends State<HomePage> {
                   width: 50,
                   height: 50,
                   decoration: BoxDecoration(
-                    color: category.isLocked ? AppTheme.paperCream : color.withValues(alpha: 0.24),
+                    color: category.isLocked
+                        ? AppTheme.paperCream
+                        : color.withValues(alpha: 0.24),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: AppTheme.inkBlack, width: 2),
                   ),
                   child: Center(
                     child: category.isLocked
                         ? const Icon(Icons.lock, color: AppTheme.inkBlack)
-                        : Text(category.iconEmoji, style: const TextStyle(fontSize: 24)),
+                        : Text(
+                            category.iconEmoji,
+                            style: const TextStyle(fontSize: 24),
+                          ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -456,7 +480,9 @@ class _HomePageState extends State<HomePage> {
                       Text(
                         category.name,
                         style: TextStyle(
-                          color: category.isLocked ? AppTheme.inkBlack.withValues(alpha: 0.6) : AppTheme.inkBlack,
+                          color: category.isLocked
+                              ? AppTheme.inkBlack.withValues(alpha: 0.6)
+                              : AppTheme.inkBlack,
                           fontSize: 16,
                           fontWeight: FontWeight.w900,
                         ),
@@ -476,26 +502,39 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '${category.totalLessons}',
-                      style: TextStyle(
-                        color: color,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const Text(
-                      'LESSONS',
-                      style: TextStyle(
-                        color: AppTheme.inkBlack,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
+                StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('categories')
+                      .doc(category.id)
+                      .collection('lessons')
+                      .snapshots(),
+                  builder: (context, lessonsSnapshot) {
+                    final totalLessons =
+                        lessonsSnapshot.data?.docs.length ??
+                        category.totalLessons;
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '$totalLessons',
+                          style: TextStyle(
+                            color: color,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const Text(
+                          'LESSONS',
+                          style: TextStyle(
+                            color: AppTheme.inkBlack,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),

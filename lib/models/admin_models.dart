@@ -36,7 +36,8 @@ class AdminModel {
       role: AdminRole.fromString(data['role'] ?? 'admin'),
       permissions: List<String>.from(data['permissions'] ?? []),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      lastLoginAt: (data['lastLoginAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      lastLoginAt:
+          (data['lastLoginAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       isActive: data['isActive'] ?? true,
       createdBy: data['createdBy'],
     );
@@ -176,7 +177,7 @@ class AdminLessonModel {
     required this.description,
     required this.type,
     this.signs = const [],
-    this.testTypes = const [],
+    this.testTypes = const [TestType.matching, TestType.recall, TestType.mcq],
     required this.order,
     this.totalSigns = 0,
     this.estimatedMinutes = 5,
@@ -194,6 +195,36 @@ class AdminLessonModel {
     this.isPublished = true,
   });
 
+  static List<TestType> _normalizeTestTypes(List<dynamic>? rawTypes) {
+    final raw =
+        rawTypes
+            ?.map((e) => e.toString().trim().toLowerCase())
+            .toList(growable: false) ??
+        const <String>[];
+
+    if (raw.isEmpty) {
+      return const <TestType>[TestType.matching, TestType.recall, TestType.mcq];
+    }
+
+    final normalized = <TestType>{};
+    for (final type in raw) {
+      normalized.add(TestType.fromString(type));
+    }
+
+    final ordered = <TestType>[];
+    for (final type in const <TestType>[
+      TestType.matching,
+      TestType.recall,
+      TestType.mcq,
+    ]) {
+      if (normalized.contains(type)) {
+        ordered.add(type);
+      }
+    }
+
+    return ordered;
+  }
+
   factory AdminLessonModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     return AdminLessonModel(
@@ -203,10 +234,7 @@ class AdminLessonModel {
       subtitle: data['subtitle'] ?? '',
       description: data['description'] ?? '',
       type: LessonType.fromString(data['type'] ?? 'alphabet'),
-      testTypes: (data['testTypes'] as List<dynamic>?)
-              ?.map((e) => TestType.fromString(e as String))
-              .toList() ??
-          [],
+      testTypes: _normalizeTestTypes(data['testTypes'] as List<dynamic>?),
       order: data['order'] ?? 0,
       totalSigns: data['totalSigns'] ?? 0,
       estimatedMinutes: data['estimatedMinutes'] ?? 5,
@@ -349,15 +377,20 @@ enum LessonType {
 /// Test types enumeration
 enum TestType {
   mcq('mcq'),
-  match('match'),
+  matching('matching'),
   recall('recall');
 
   const TestType(this.value);
   final String value;
 
   static TestType fromString(String value) {
+    final normalized = value.trim().toLowerCase();
+    if (normalized == 'match' || normalized == 'matching') {
+      return TestType.matching;
+    }
+
     return TestType.values.firstWhere(
-      (type) => type.value == value,
+      (type) => type.value == normalized,
       orElse: () => TestType.mcq,
     );
   }
@@ -366,7 +399,7 @@ enum TestType {
     switch (this) {
       case TestType.mcq:
         return 'Multiple Choice (MCQ)';
-      case TestType.match:
+      case TestType.matching:
         return 'Match';
       case TestType.recall:
         return 'Recall';
@@ -558,7 +591,8 @@ class WordModel {
       id: doc.id,
       wordGroupId: data['wordGroupId'] ?? '',
       text: data['text'] ?? '',
-      characters: (data['characters'] as List<dynamic>?)
+      characters:
+          (data['characters'] as List<dynamic>?)
               ?.map((e) => WordCharacter.fromMap(e as Map<String, dynamic>))
               .toList() ??
           [],
@@ -585,10 +619,7 @@ class WordCharacter {
   final String char;
   final String? signReference;
 
-  WordCharacter({
-    required this.char,
-    this.signReference,
-  });
+  WordCharacter({required this.char, this.signReference});
 
   factory WordCharacter.fromMap(Map<String, dynamic> map) {
     return WordCharacter(
@@ -598,10 +629,7 @@ class WordCharacter {
   }
 
   Map<String, dynamic> toMap() {
-    return {
-      'char': char,
-      'signReference': signReference,
-    };
+    return {'char': char, 'signReference': signReference};
   }
 }
 
@@ -658,7 +686,8 @@ class IssueModel {
       attachments: List<String>.from(data['attachments'] ?? []),
       deviceInfo: data['deviceInfo'] as Map<String, dynamic>?,
       appVersion: data['appVersion'],
-      adminNotes: (data['adminNotes'] as List<dynamic>?)
+      adminNotes:
+          (data['adminNotes'] as List<dynamic>?)
               ?.map((e) => AdminNote.fromMap(e as Map<String, dynamic>))
               .toList() ??
           [],
@@ -864,7 +893,8 @@ class MaintenanceModeModel {
 
   MaintenanceModeModel({
     this.isEnabled = false,
-    this.message = 'The app is currently under maintenance. Please try again later.',
+    this.message =
+        'The app is currently under maintenance. Please try again later.',
     this.scheduledStart,
     this.scheduledEnd,
     this.enabledBy,
@@ -875,7 +905,9 @@ class MaintenanceModeModel {
     final data = doc.data() as Map<String, dynamic>;
     return MaintenanceModeModel(
       isEnabled: data['isEnabled'] ?? false,
-      message: data['message'] ?? 'The app is currently under maintenance. Please try again later.',
+      message:
+          data['message'] ??
+          'The app is currently under maintenance. Please try again later.',
       scheduledStart: (data['scheduledStart'] as Timestamp?)?.toDate(),
       scheduledEnd: (data['scheduledEnd'] as Timestamp?)?.toDate(),
       enabledBy: data['enabledBy'],
@@ -887,8 +919,12 @@ class MaintenanceModeModel {
     return {
       'isEnabled': isEnabled,
       'message': message,
-      'scheduledStart': scheduledStart != null ? Timestamp.fromDate(scheduledStart!) : null,
-      'scheduledEnd': scheduledEnd != null ? Timestamp.fromDate(scheduledEnd!) : null,
+      'scheduledStart': scheduledStart != null
+          ? Timestamp.fromDate(scheduledStart!)
+          : null,
+      'scheduledEnd': scheduledEnd != null
+          ? Timestamp.fromDate(scheduledEnd!)
+          : null,
       'enabledBy': enabledBy,
       'enabledAt': enabledAt != null ? Timestamp.fromDate(enabledAt!) : null,
     };
@@ -1092,7 +1128,8 @@ class LearnerModel {
       displayName: data['displayName'] ?? '',
       photoUrl: data['photoUrl'],
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      lastLoginAt: (data['lastLoginAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      lastLoginAt:
+          (data['lastLoginAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       gems: data['gems'] ?? 0,
       coins: data['coins'] ?? 0,
       streakDays: data['streakDays'] ?? 0,
@@ -1120,7 +1157,9 @@ class LearnerModel {
       'gems': gems,
       'coins': coins,
       'streakDays': streakDays,
-      'lastStreakDate': lastStreakDate != null ? Timestamp.fromDate(lastStreakDate!) : null,
+      'lastStreakDate': lastStreakDate != null
+          ? Timestamp.fromDate(lastStreakDate!)
+          : null,
       'learningGoal': learningGoal,
       'dailyGoalMinutes': dailyGoalMinutes,
       'totalLessonsCompleted': totalLessonsCompleted,
@@ -1129,7 +1168,9 @@ class LearnerModel {
       'currentLevel': currentLevel,
       'xp': xp,
       'isActive': isActive,
-      'deactivatedAt': deactivatedAt != null ? Timestamp.fromDate(deactivatedAt!) : null,
+      'deactivatedAt': deactivatedAt != null
+          ? Timestamp.fromDate(deactivatedAt!)
+          : null,
       'deactivatedBy': deactivatedBy,
     };
   }

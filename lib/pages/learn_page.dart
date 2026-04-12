@@ -38,8 +38,8 @@ class LearnPage extends StatelessWidget {
                     Text(
                       'Checkpoint by checkpoint. Hold your streak.',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppTheme.inkBlack.withValues(alpha: 0.75),
-                          ),
+                        color: AppTheme.inkBlack.withValues(alpha: 0.75),
+                      ),
                     ),
                   ],
                 ),
@@ -49,11 +49,18 @@ class LearnPage extends StatelessWidget {
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 100),
             sliver: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance.collection('categories').orderBy('order').snapshots(),
+              stream: FirebaseFirestore.instance
+                  .collection('categories')
+                  .orderBy('order')
+                  .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const SliverFillRemaining(
-                    child: Center(child: CircularProgressIndicator(color: AppTheme.cobaltBlue)),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: AppTheme.cobaltBlue,
+                      ),
+                    ),
                   );
                 }
 
@@ -73,7 +80,8 @@ class LearnPage extends StatelessWidget {
                   itemCount: docs.length,
                   itemBuilder: (context, index) {
                     final category = CategoryModel.fromFirestore(docs[index]);
-                    final color = AppTheme.categoryColors[index % AppTheme.categoryColors.length];
+                    final color = AppTheme
+                        .categoryColors[index % AppTheme.categoryColors.length];
                     final isLast = index == docs.length - 1;
 
                     return IntrinsicHeight(
@@ -88,9 +96,14 @@ class LearnPage extends StatelessWidget {
                                   width: 26,
                                   height: 26,
                                   decoration: BoxDecoration(
-                                    color: category.isLocked ? AppTheme.paperCream : color,
+                                    color: category.isLocked
+                                        ? AppTheme.paperCream
+                                        : color,
                                     shape: BoxShape.circle,
-                                    border: Border.all(color: AppTheme.inkBlack, width: 3),
+                                    border: Border.all(
+                                      color: AppTheme.inkBlack,
+                                      width: 3,
+                                    ),
                                   ),
                                   child: Icon(
                                     category.isLocked ? Icons.lock : Icons.flag,
@@ -102,7 +115,9 @@ class LearnPage extends StatelessWidget {
                                   Expanded(
                                     child: Container(
                                       width: 6,
-                                      margin: const EdgeInsets.symmetric(vertical: 4),
+                                      margin: const EdgeInsets.symmetric(
+                                        vertical: 4,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: AppTheme.inkBlack,
                                         borderRadius: BorderRadius.circular(4),
@@ -122,11 +137,13 @@ class LearnPage extends StatelessWidget {
                                 onTap: category.isLocked
                                     ? null
                                     : () => Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => CategoryLessonsPage(category: category),
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => CategoryLessonsPage(
+                                            category: category,
                                           ),
                                         ),
+                                      ),
                               ),
                             ),
                           ),
@@ -170,14 +187,19 @@ class _CategoryNode extends StatelessWidget {
               width: 54,
               height: 54,
               decoration: BoxDecoration(
-                color: category.isLocked ? AppTheme.paperCream : color.withValues(alpha: 0.25),
+                color: category.isLocked
+                    ? AppTheme.paperCream
+                    : color.withValues(alpha: 0.25),
                 borderRadius: BorderRadius.circular(13),
                 border: Border.all(color: AppTheme.inkBlack, width: 2),
               ),
               child: Center(
                 child: category.isLocked
                     ? const Icon(Icons.lock, color: AppTheme.inkBlack)
-                    : Text(category.iconEmoji, style: const TextStyle(fontSize: 28)),
+                    : Text(
+                        category.iconEmoji,
+                        style: const TextStyle(fontSize: 28),
+                      ),
               ),
             ),
             const SizedBox(width: 12),
@@ -188,7 +210,9 @@ class _CategoryNode extends StatelessWidget {
                   Text(
                     category.name,
                     style: TextStyle(
-                      color: AppTheme.inkBlack.withValues(alpha: category.isLocked ? 0.5 : 1),
+                      color: AppTheme.inkBlack.withValues(
+                        alpha: category.isLocked ? 0.5 : 1,
+                      ),
                       fontSize: 17,
                       fontWeight: FontWeight.w900,
                     ),
@@ -209,41 +233,56 @@ class _CategoryNode extends StatelessWidget {
                   const SizedBox(height: 8),
                   StreamBuilder<QuerySnapshot>(
                     stream: FirebaseFirestore.instance
-                        .collection('users')
-                        .doc(uid)
-                        .collection('progress')
-                        .where('categoryId', isEqualTo: category.id)
-                        .where('status', isEqualTo: 'completed')
+                        .collection('categories')
+                        .doc(category.id)
+                        .collection('lessons')
                         .snapshots(),
-                    builder: (context, snapshot) {
-                      final completed = snapshot.data?.docs.length ?? 0;
-                      final total = category.totalLessons;
-                      final progress = total > 0 ? completed / total : 0.0;
+                    builder: (context, lessonsSnapshot) {
+                      final total =
+                          lessonsSnapshot.data?.docs.length ??
+                          category.totalLessons;
 
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(5),
-                            child: LinearProgressIndicator(
-                              value: progress,
-                              minHeight: 8,
-                              backgroundColor: AppTheme.paperCream,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                progress == 1.0 ? AppTheme.mintGreen : color,
+                      return StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance
+                            .collection('users')
+                            .doc(uid)
+                            .collection('progress')
+                            .where('categoryId', isEqualTo: category.id)
+                            .where('status', isEqualTo: 'completed')
+                            .snapshots(),
+                        builder: (context, progressSnapshot) {
+                          final completed =
+                              progressSnapshot.data?.docs.length ?? 0;
+                          final progress = total > 0 ? completed / total : 0.0;
+
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(5),
+                                child: LinearProgressIndicator(
+                                  value: progress,
+                                  minHeight: 8,
+                                  backgroundColor: AppTheme.paperCream,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    progress == 1.0
+                                        ? AppTheme.mintGreen
+                                        : color,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '$completed/${category.totalLessons} lessons',
-                            style: const TextStyle(
-                              color: AppTheme.inkBlack,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
+                              const SizedBox(height: 4),
+                              Text(
+                                '$completed/$total lessons',
+                                style: const TextStyle(
+                                  color: AppTheme.inkBlack,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       );
                     },
                   ),
@@ -251,7 +290,11 @@ class _CategoryNode extends StatelessWidget {
               ),
             ),
             if (!category.isLocked)
-              const Icon(Icons.arrow_forward_ios_rounded, color: AppTheme.inkBlack, size: 14),
+              const Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: AppTheme.inkBlack,
+                size: 14,
+              ),
           ],
         ),
       ),
