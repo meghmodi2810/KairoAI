@@ -122,10 +122,18 @@ class SignDetectionService {
   /// Request camera permission
   Future<bool> requestCameraPermission() async {
     try {
-      await _methodChannel.invokeMethod('requestCameraPermission');
-      // Wait a bit for permission dialog
-      await Future.delayed(const Duration(milliseconds: 500));
-      return await checkCameraPermission();
+      final dynamic result = await _methodChannel.invokeMethod('requestCameraPermission');
+      if (result is bool && result) {
+        return true;
+      }
+
+      for (int i = 0; i < 8; i++) {
+        final granted = await checkCameraPermission();
+        if (granted) return true;
+        await Future.delayed(const Duration(milliseconds: 250));
+      }
+
+      return false;
     } on PlatformException catch (e) {
       debugPrint('❌ Error requesting permission: ${e.message}');
       return false;

@@ -308,9 +308,44 @@ class DatabaseService {
       signsLearned: signsCount,
       practiceMinutes: (timeSpentSeconds / 60).ceil(),
     );
+
+    // Track lesson-only time for the daily goal widget.
+    await _updateTodayLessonPracticeMinutes(timeSpentSeconds);
     
     // Update streak
     await updateStreak();
+  }
+
+  Future<void> _updateTodayLessonPracticeMinutes(int timeSpentSeconds) async {
+    if (currentUserId == null) return;
+
+    final minutesToAdd = (timeSpentSeconds / 60).ceil();
+    if (minutesToAdd <= 0) return;
+
+    final userRef = _db.collection('users').doc(currentUserId);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(userRef);
+      if (!snap.exists) return;
+
+      final data = snap.data() ?? <String, dynamic>{};
+      final previousDate = (data['todayLessonPracticeDate'] as Timestamp?)?.toDate();
+      final existingMinutes = (data['todayLessonPracticeMinutes'] ?? 0) as int;
+
+      final sameDay = previousDate != null && _isSameCalendarDay(previousDate, today);
+      final updatedMinutes = sameDay ? existingMinutes + minutesToAdd : minutesToAdd;
+
+      tx.update(userRef, {
+        'todayLessonPracticeMinutes': updatedMinutes,
+        'todayLessonPracticeDate': Timestamp.fromDate(today),
+      });
+    });
+  }
+
+  bool _isSameCalendarDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
   // ==================== DAILY INSIGHT OPERATIONS ====================

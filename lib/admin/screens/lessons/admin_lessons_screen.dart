@@ -124,7 +124,11 @@ class _AdminLessonsScreenState extends State<AdminLessonsScreen> {
           height: 52,
           decoration: BoxDecoration(
             color: c.btnPrimary,
-            shape: BoxShape.circle,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: c.border, width: 2.5),
+            boxShadow: const [
+              BoxShadow(color: Color(0xFF111111), offset: Offset(3, 3), blurRadius: 0),
+            ],
           ),
           child: Icon(
             LucideIcons.plus,
@@ -251,6 +255,7 @@ class _LessonRow extends StatelessWidget {
       decoration: BoxDecoration(
         color: c.accentFill,
         borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: c.border, width: 1.5),
       ),
       child: Center(
         child: Icon(LucideIcons.bookOpen, size: 16, color: c.isDark ? c.accentBright : c.accent),
@@ -271,6 +276,7 @@ class _LessonRow extends StatelessWidget {
           decoration: BoxDecoration(
             color: c.accentFill,
             borderRadius: BorderRadius.circular(3),
+            border: Border.all(color: c.border, width: 1.5),
           ),
           child: Text(
             typeLabel,

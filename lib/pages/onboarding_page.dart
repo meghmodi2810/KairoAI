@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../theme/app_theme.dart';
+import '../theme/neo_brutal_widgets.dart';
 import 'login_page.dart';
 import 'signup_page.dart';
 
@@ -10,467 +12,147 @@ class OnboardingPage extends StatefulWidget {
   State<OnboardingPage> createState() => _OnboardingPageState();
 }
 
-class _OnboardingPageState extends State<OnboardingPage>
-    with TickerProviderStateMixin {
-  final PageController _pageController = PageController();
-  int _currentPage = 0;
+class _OnboardingPageState extends State<OnboardingPage> {
+  final PageController _controller = PageController();
+
+  int _page = 0;
+  bool _animating = false;
   String? _selectedGoal;
   String? _selectedDailyGoal;
 
-  late final AnimationController _fadeController;
-  late final Animation<double> _fadeAnim;
-
-  // Design tokens
-  static const _bg       = Color(0xFF0D0D12);
-  static const _card     = Color(0xFF14141C);
-  static const _border   = Color(0xFF252530);
-  static const _accent   = Color(0xFF6C63FF);
-  static const _textP    = Color(0xFFF0F0FF);
-  static const _textS    = Color(0xFF8888A8);
-
-  final List<String> _goals = [
-    'Communicate with family',
-    'Boost my career',
-    'Help others',
-    'Just for fun',
+  final List<String> _goals = const [
+    'Talk with family',
+    'Learn for school',
+    'Build confidence',
+    'Learn for fun',
   ];
 
-  final List<IconData> _goalIcons = [
-    Icons.family_restroom_rounded,
-    Icons.work_outline_rounded,
-    Icons.volunteer_activism_rounded,
-    Icons.emoji_emotions_outlined,
+  final List<String> _dailyGoals = const [
+    '5 min',
+    '10 min',
+    '15 min',
+    '20 min',
   ];
-
-  final List<Map<String, dynamic>> _dailyGoals = [
-    {'title': 'Casual',  'sub': '5 min/day',  'mins': 5},
-    {'title': 'Regular', 'sub': '10 min/day', 'mins': 10},
-    {'title': 'Serious', 'sub': '15 min/day', 'mins': 15},
-    {'title': 'Intense', 'sub': '20 min/day', 'mins': 20},
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _fadeController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    )..forward();
-    _fadeAnim = CurvedAnimation(parent: _fadeController, curve: Curves.easeOut);
-  }
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    _fadeController.dispose();
-    super.dispose();
-  }
 
   Future<void> _completeOnboarding() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('onboarding_complete', true);
-    if (_selectedGoal != null) await prefs.setString('user_goal', _selectedGoal!);
-    if (_selectedDailyGoal != null) await prefs.setString('daily_goal', _selectedDailyGoal!);
-  }
-
-  void _nextPage() {
-    if (_currentPage < 3) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 400),
-        curve: Curves.easeInOutCubic,
-      );
+    if (_selectedGoal != null) {
+      await prefs.setString('user_goal', _selectedGoal!);
+    }
+    if (_selectedDailyGoal != null) {
+      await prefs.setString('daily_goal', _selectedDailyGoal!);
     }
   }
 
-  void _goTo(String page) async {
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _nextPage() async {
+    if (_animating) return;
+    if (_page >= 3) return;
+
+    setState(() => _animating = true);
+    await _controller.animateToPage(
+      _page + 1,
+      duration: const Duration(milliseconds: 380),
+      curve: Curves.easeOutCubic,
+    );
+
+    if (!mounted) return;
+    setState(() => _animating = false);
+  }
+
+  Future<void> _goToAuth({required bool signup}) async {
     await _completeOnboarding();
     if (!mounted) return;
     Navigator.pushReplacement(
       context,
-      PageRouteBuilder(
-        pageBuilder: (_, __, ___) =>
-            page == 'signup' ? const SignUpPage() : const LoginPage(),
-        transitionsBuilder: (_, anim, __, child) =>
-            FadeTransition(opacity: anim, child: child),
-        transitionDuration: const Duration(milliseconds: 300),
-      ),
+      MaterialPageRoute(builder: (_) => signup ? const SignUpPage() : const LoginPage()),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _bg,
-      body: FadeTransition(
-        opacity: _fadeAnim,
-        child: SafeArea(
-          child: Column(
-            children: [
-              // ── Top bar (skip + dots) ──────────────────────────
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Page dots
-                    Row(
-                      children: List.generate(4, (i) {
-                        final active = i == _currentPage;
-                        return AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          margin: const EdgeInsets.only(right: 6),
-                          width: active ? 20 : 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: active ? _accent : _border,
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                        );
-                      }),
-                    ),
-                    // Skip
-                    if (_currentPage < 3)
-                      TextButton(
-                        onPressed: () => _goTo('login'),
-                        child: const Text('Skip',
-                          style: TextStyle(color: _textS, fontSize: 14, fontWeight: FontWeight.w500)),
-                      ),
-                  ],
-                ),
-              ),
-
-              // ── Pages ─────────────────────────────────────────
-              Expanded(
-                child: PageView(
-                  controller: _pageController,
-                  onPageChanged: (i) => setState(() => _currentPage = i),
-                  physics: const NeverScrollableScrollPhysics(),
-                  children: [
-                    _WelcomePage(onNext: _nextPage),
-                    _GoalPage(
-                      goals: _goals,
-                      icons: _goalIcons,
-                      selected: _selectedGoal,
-                      onSelect: (g) => setState(() => _selectedGoal = g),
-                      onNext: _selectedGoal != null ? _nextPage : null,
-                    ),
-                    _DailyGoalPage(
-                      goals: _dailyGoals,
-                      selected: _selectedDailyGoal,
-                      onSelect: (g) => setState(() => _selectedDailyGoal = g),
-                      onNext: _selectedDailyGoal != null ? _nextPage : null,
-                    ),
-                    _ReadyPage(
-                      onSignUp: () => _goTo('signup'),
-                      onLogin:  () => _goTo('login'),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ────────────────────────────────────────────────
-//  Shared button
-// ────────────────────────────────────────────────
-class _ContinueButton extends StatelessWidget {
-  final String label;
-  final VoidCallback? onPressed;
-  const _ContinueButton({required this.label, this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = onPressed != null;
-    return SizedBox(
-      width: double.infinity,
-      height: 52,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: enabled
-                ? [const Color(0xFF6C63FF), const Color(0xFF9B94FF)]
-                : [const Color(0xFF6C63FF).withValues(alpha: 0.3), const Color(0xFF9B94FF).withValues(alpha: 0.3)],
-          ),
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: enabled
-              ? [BoxShadow(color: const Color(0xFF6C63FF).withValues(alpha: 0.4), blurRadius: 20, offset: const Offset(0, 6))]
-              : null,
-        ),
-        child: ElevatedButton(
-          onPressed: onPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            shadowColor: Colors.transparent,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          ),
-          child: Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-        ),
-      ),
-    );
-  }
-}
-
-// ────────────────────────────────────────────────
-//  Page 1 — Welcome
-// ────────────────────────────────────────────────
-class _WelcomePage extends StatelessWidget {
-  final VoidCallback onNext;
-  const _WelcomePage({required this.onNext});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 32, 28, 32),
-      child: Column(
-        children: [
-          const Spacer(),
-          // Hero icon
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF6C63FF), Color(0xFF9B94FF)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(36),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF6C63FF).withValues(alpha: 0.4),
-                  blurRadius: 32,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: const Icon(Icons.sign_language_rounded, color: Colors.white, size: 56),
-          ),
-          const SizedBox(height: 40),
-          // Headline
-          RichText(
-            textAlign: TextAlign.center,
-            text: const TextSpan(
-              style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800, height: 1.2, letterSpacing: -0.5),
-              children: [
-                TextSpan(text: 'Learn ISL\n', style: TextStyle(color: Color(0xFFF0F0FF))),
-                TextSpan(text: 'Speak without\nwords', style: TextStyle(color: Color(0xFF6C63FF))),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            'Master Indian Sign Language through AI-powered interactive lessons.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Color(0xFF8888A8), fontSize: 16, height: 1.6),
-          ),
-          const Spacer(),
-          // Feature pills
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            alignment: WrapAlignment.center,
-            children: const [
-              _FeaturePill(icon: Icons.auto_awesome_rounded, label: 'AI Recognition'),
-              _FeaturePill(icon: Icons.school_rounded, label: 'Structured Lessons'),
-              _FeaturePill(icon: Icons.local_fire_department_rounded, label: 'Daily Streaks'),
-            ],
-          ),
-          const SizedBox(height: 40),
-          _ContinueButton(label: 'Get Started', onPressed: onNext),
-        ],
-      ),
-    );
-  }
-}
-
-class _FeaturePill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _FeaturePill({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF14141C),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF252530), width: 1),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 15, color: const Color(0xFF6C63FF)),
-          const SizedBox(width: 6),
-          Text(label, style: const TextStyle(color: Color(0xFF8888A8), fontSize: 13, fontWeight: FontWeight.w500)),
-        ],
-      ),
-    );
-  }
-}
-
-// ────────────────────────────────────────────────
-//  Page 2 — Goal Selection
-// ────────────────────────────────────────────────
-class _GoalPage extends StatelessWidget {
-  final List<String> goals;
-  final List<IconData> icons;
-  final String? selected;
-  final ValueChanged<String> onSelect;
-  final VoidCallback? onNext;
-
-  const _GoalPage({
-    required this.goals,
-    required this.icons,
-    required this.selected,
-    required this.onSelect,
-    required this.onNext,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 32, 28, 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('What brings\nyou here?',
-            style: TextStyle(color: Color(0xFFF0F0FF), fontSize: 30, fontWeight: FontWeight.w800, height: 1.2, letterSpacing: -0.5)),
-          const SizedBox(height: 8),
-          const Text('This helps us personalise your experience.',
-            style: TextStyle(color: Color(0xFF8888A8), fontSize: 15, height: 1.5)),
-          const SizedBox(height: 32),
-          Expanded(
-            child: ListView.separated(
-              itemCount: goals.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, i) {
-                final isSelected = selected == goals[i];
-                return _OptionTile(
-                  icon: icons[i],
-                  label: goals[i],
-                  isSelected: isSelected,
-                  onTap: () => onSelect(goals[i]),
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 24),
-          _ContinueButton(label: 'Continue', onPressed: onNext),
-        ],
-      ),
-    );
-  }
-}
-
-// ────────────────────────────────────────────────
-//  Page 3 — Daily Goal
-// ────────────────────────────────────────────────
-class _DailyGoalPage extends StatelessWidget {
-  final List<Map<String, dynamic>> goals;
-  final String? selected;
-  final ValueChanged<String> onSelect;
-  final VoidCallback? onNext;
-
-  const _DailyGoalPage({
-    required this.goals,
-    required this.selected,
-    required this.onSelect,
-    required this.onNext,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 32, 28, 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Set your\ndaily goal',
-            style: TextStyle(color: Color(0xFFF0F0FF), fontSize: 30, fontWeight: FontWeight.w800, height: 1.2, letterSpacing: -0.5)),
-          const SizedBox(height: 8),
-          const Text("We'll gently remind you to keep the streak alive.",
-            style: TextStyle(color: Color(0xFF8888A8), fontSize: 15, height: 1.5)),
-          const SizedBox(height: 32),
-          Expanded(
-            child: ListView.separated(
-              itemCount: goals.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, i) {
-                final g = goals[i];
-                final isSelected = selected == g['title'];
-                return _DailyGoalTile(
-                  title: g['title'] as String,
-                  sub: g['sub'] as String,
-                  isSelected: isSelected,
-                  onTap: () => onSelect(g['title'] as String),
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 24),
-          _ContinueButton(label: 'Continue', onPressed: onNext),
-        ],
-      ),
-    );
-  }
-}
-
-class _DailyGoalTile extends StatelessWidget {
-  final String title;
-  final String sub;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _DailyGoalTile({
-    required this.title,
-    required this.sub,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF6C63FF).withValues(alpha: 0.12) : const Color(0xFF14141C),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isSelected ? const Color(0xFF6C63FF) : const Color(0xFF252530),
-            width: isSelected ? 1.5 : 1,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      backgroundColor: AppTheme.paperCream,
+      body: SafeArea(
+        child: Column(
           children: [
-            Text(title,
-              style: TextStyle(
-                color: isSelected ? const Color(0xFFF0F0FF) : const Color(0xFF8888A8),
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              )),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-              decoration: BoxDecoration(
-                color: isSelected ? const Color(0xFF6C63FF) : const Color(0xFF252530),
-                borderRadius: BorderRadius.circular(20),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+              child: Row(
+                children: [
+                  ...List.generate(4, (i) {
+                    final active = _page == i;
+                    return Expanded(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 220),
+                        margin: EdgeInsets.only(right: i == 3 ? 0 : 8),
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: active ? AppTheme.cobaltBlue : AppTheme.warmWhite,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppTheme.inkBlack, width: 2),
+                          boxShadow: active
+                              ? const [
+                                  BoxShadow(
+                                    color: AppTheme.inkBlack,
+                                    blurRadius: 0,
+                                    offset: Offset(2, 2),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                      ),
+                    );
+                  }),
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    width: 64,
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 180),
+                      opacity: _page < 3 ? 1 : 0,
+                      child: IgnorePointer(
+                        ignoring: _page >= 3,
+                        child: TextButton(
+                          onPressed: () => _goToAuth(signup: false),
+                          child: const Text('Skip'),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              child: Text(sub,
-                style: TextStyle(
-                  color: isSelected ? Colors.white : const Color(0xFF8888A8),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                )),
+            ),
+            Expanded(
+              child: PageView(
+                controller: _controller,
+                onPageChanged: (value) => setState(() => _page = value),
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  _WelcomeSlide(onNext: _nextPage),
+                  _GoalSlide(
+                    goals: _goals,
+                    selectedGoal: _selectedGoal,
+                    onSelect: (value) => setState(() => _selectedGoal = value),
+                    onNext: _selectedGoal == null ? null : _nextPage,
+                  ),
+                  _DailySlide(
+                    goals: _dailyGoals,
+                    selectedGoal: _selectedDailyGoal,
+                    onSelect: (value) => setState(() => _selectedDailyGoal = value),
+                    onNext: _selectedDailyGoal == null ? null : _nextPage,
+                  ),
+                  _ReadySlide(
+                    onSignup: () => _goToAuth(signup: true),
+                    onLogin: () => _goToAuth(signup: false),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -479,118 +161,439 @@ class _DailyGoalTile extends StatelessWidget {
   }
 }
 
-// ────────────────────────────────────────────────
-//  Page 4 — Ready
-// ────────────────────────────────────────────────
-class _ReadyPage extends StatelessWidget {
-  final VoidCallback onSignUp;
-  final VoidCallback onLogin;
+class _WelcomeSlide extends StatelessWidget {
+  final VoidCallback onNext;
 
-  const _ReadyPage({required this.onSignUp, required this.onLogin});
+  const _WelcomeSlide({required this.onNext});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 32, 28, 32),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Spacer(),
-          // Celebration
-          Container(
-            width: 112,
-            height: 112,
-            decoration: BoxDecoration(
-              color: const Color(0xFF4ADE80).withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(36),
-              border: Border.all(color: const Color(0xFF4ADE80).withValues(alpha: 0.3)),
-            ),
-            child: const Icon(Icons.celebration_rounded, color: Color(0xFF4ADE80), size: 52),
+          const NeoSticker(
+            label: 'WELCOME TO SIGN STUDIO',
+            color: AppTheme.signalYellow,
+            icon: Icons.rocket_launch,
           ),
-          const SizedBox(height: 36),
-          const Text("You're all set!", textAlign: TextAlign.center,
-            style: TextStyle(color: Color(0xFFF0F0FF), fontSize: 32, fontWeight: FontWeight.w800, letterSpacing: -0.5)),
-          const SizedBox(height: 16),
-          const Text('Create your profile to start learning ISL with AI.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Color(0xFF8888A8), fontSize: 16, height: 1.6)),
-          const Spacer(),
-          _ContinueButton(label: 'Create Profile', onPressed: onSignUp),
+          const SizedBox(height: 18),
+          const Text(
+            'LEARN\nINDIAN SIGN\nLANGUAGE',
+            style: TextStyle(
+              color: AppTheme.inkBlack,
+              fontSize: 44,
+              height: 0.95,
+              letterSpacing: -0.8,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
           const SizedBox(height: 14),
-          GestureDetector(
-            onTap: onLogin,
-            child: RichText(
-              text: const TextSpan(
-                style: TextStyle(fontSize: 14),
+          Text(
+            'Practice real signs with camera AI. Win streaks, gems, and confidence every day.',
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: AppTheme.inkBlack.withValues(alpha: 0.8),
+                ),
+          ),
+          const SizedBox(height: 18),
+          Expanded(
+            child: NeoPanel(
+              color: AppTheme.electricBlue,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  TextSpan(text: 'Already have an account? ', style: TextStyle(color: Color(0xFF8888A8))),
-                  TextSpan(text: 'Sign in', style: TextStyle(color: Color(0xFF6C63FF), fontWeight: FontWeight.w600)),
+                  Row(
+                    children: const [
+                      _IconTile(icon: Icons.front_hand, label: 'Signs'),
+                      SizedBox(width: 10),
+                      _IconTile(icon: Icons.camera_alt, label: 'Camera'),
+                      SizedBox(width: 10),
+                      _IconTile(icon: Icons.emoji_events, label: 'Rewards'),
+                    ],
+                  ),
+                  const Spacer(),
+                  const Text(
+                    'HANDS READY?',
+                    style: TextStyle(
+                      color: AppTheme.inkBlack,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Let us set your learning rhythm in 20 seconds.',
+                    style: TextStyle(
+                      color: AppTheme.inkBlack,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ],
               ),
             ),
           ),
+          const SizedBox(height: 18),
+          NeoPrimaryButton(label: 'Start', onPressed: onNext),
         ],
       ),
     );
   }
 }
 
-// ────────────────────────────────────────────────
-//  Reusable option tile
-// ────────────────────────────────────────────────
-class _OptionTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
+class _GoalSlide extends StatelessWidget {
+  final List<String> goals;
+  final String? selectedGoal;
+  final ValueChanged<String> onSelect;
+  final VoidCallback? onNext;
 
-  const _OptionTile({
-    required this.icon,
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
+  const _GoalSlide({
+    required this.goals,
+    required this.selectedGoal,
+    required this.onSelect,
+    required this.onNext,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF6C63FF).withValues(alpha: 0.12) : const Color(0xFF14141C),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isSelected ? const Color(0xFF6C63FF) : const Color(0xFF252530),
-            width: isSelected ? 1.5 : 1,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'WHY ARE YOU LEARNING?',
+            style: TextStyle(
+              color: AppTheme.inkBlack,
+              fontSize: 34,
+              height: 1,
+              letterSpacing: -0.7,
+              fontWeight: FontWeight.w900,
+            ),
           ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: isSelected ? const Color(0xFF6C63FF).withValues(alpha: 0.2) : const Color(0xFF252530),
-                borderRadius: BorderRadius.circular(10),
+          const SizedBox(height: 8),
+          Text(
+            'Pick one. We will tune your path around it.',
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: ListView.separated(
+              itemCount: goals.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final goal = goals[index];
+                final selected = goal == selectedGoal;
+                return GestureDetector(
+                  onTap: () => onSelect(goal),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: selected ? AppTheme.mintGreen : AppTheme.warmWhite,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppTheme.inkBlack, width: 3),
+                      boxShadow: selected
+                          ? const [
+                              BoxShadow(
+                                color: AppTheme.inkBlack,
+                                blurRadius: 0,
+                                offset: Offset(4, 4),
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: selected ? AppTheme.signalYellow : AppTheme.electricBlue,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: AppTheme.inkBlack, width: 2),
+                          ),
+                          child: Icon(
+                            selected ? Icons.check_rounded : Icons.flag_rounded,
+                            color: AppTheme.inkBlack,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            goal,
+                            style: const TextStyle(
+                              color: AppTheme.inkBlack,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 14),
+          NeoPrimaryButton(label: 'Continue', onPressed: onNext),
+        ],
+      ),
+    );
+  }
+}
+
+class _DailySlide extends StatelessWidget {
+  final List<String> goals;
+  final String? selectedGoal;
+  final ValueChanged<String> onSelect;
+  final VoidCallback? onNext;
+
+  const _DailySlide({
+    required this.goals,
+    required this.selectedGoal,
+    required this.onSelect,
+    required this.onNext,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'DAILY RHYTHM',
+            style: TextStyle(
+              color: AppTheme.inkBlack,
+              fontSize: 34,
+              letterSpacing: -0.7,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Small steps keep streaks alive.',
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: GridView.builder(
+              itemCount: goals.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 1.25,
               ),
-              child: Icon(icon,
-                size: 20,
-                color: isSelected ? const Color(0xFF6C63FF) : const Color(0xFF8888A8)),
+              itemBuilder: (context, index) {
+                final label = goals[index];
+                final selected = label == selectedGoal;
+                return GestureDetector(
+                  onTap: () => onSelect(label),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: selected ? AppTheme.signalYellow : AppTheme.warmWhite,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppTheme.inkBlack, width: 3),
+                      boxShadow: selected
+                          ? const [
+                              BoxShadow(color: AppTheme.inkBlack, blurRadius: 0, offset: Offset(4, 4)),
+                            ]
+                          : null,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: AppTheme.electricBlue,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: AppTheme.inkBlack, width: 2),
+                          ),
+                          child: const Icon(Icons.timer_rounded, color: AppTheme.inkBlack),
+                        ),
+                        const Spacer(),
+                        Text(
+                          label,
+                          style: const TextStyle(
+                            color: AppTheme.inkBlack,
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const Text(
+                          'per day',
+                          style: TextStyle(
+                            color: AppTheme.inkBlack,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Text(label,
-                style: TextStyle(
-                  color: isSelected ? const Color(0xFFF0F0FF) : const Color(0xFF8888A8),
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                )),
+          ),
+          const SizedBox(height: 14),
+          NeoPrimaryButton(label: 'Lock Goal', onPressed: onNext),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReadySlide extends StatelessWidget {
+  final VoidCallback onSignup;
+  final VoidCallback onLogin;
+
+  const _ReadySlide({required this.onSignup, required this.onLogin});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'YOU ARE READY',
+            style: TextStyle(
+              color: AppTheme.inkBlack,
+              fontSize: 36,
+              letterSpacing: -0.8,
+              fontWeight: FontWeight.w900,
             ),
-            if (isSelected)
-              const Icon(Icons.check_circle_rounded, color: Color(0xFF6C63FF), size: 20),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Start your first sign lesson and keep the streak alive.',
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
+          const SizedBox(height: 18),
+          Expanded(
+            child: NeoPanel(
+              color: AppTheme.softPeach,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const NeoSticker(
+                    label: 'BOOSTERS READY',
+                    color: AppTheme.signalYellow,
+                    icon: Icons.local_fire_department,
+                  ),
+                  const SizedBox(height: 16),
+                  const _ReadyMetric(icon: Icons.bolt, label: 'XP', value: '+25 first lesson'),
+                  const SizedBox(height: 10),
+                  const _ReadyMetric(icon: Icons.diamond, label: 'GEMS', value: '+5 first win'),
+                  const SizedBox(height: 10),
+                  const _ReadyMetric(icon: Icons.front_hand, label: 'SIGNS', value: 'A-Z and 1-9'),
+                  const Spacer(),
+                  const Text(
+                    'Nice move. Let us begin.',
+                    style: TextStyle(
+                      color: AppTheme.inkBlack,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          NeoPrimaryButton(label: 'Create Account', onPressed: onSignup),
+          const SizedBox(height: 10),
+          NeoSecondaryButton(label: 'I Already Have Account', onPressed: onLogin),
+        ],
+      ),
+    );
+  }
+}
+
+class _IconTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _IconTile({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: AppTheme.warmWhite,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.inkBlack, width: 2),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: AppTheme.inkBlack, size: 18),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppTheme.inkBlack,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ReadyMetric extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _ReadyMetric({required this.icon, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppTheme.warmWhite,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.inkBlack, width: 2),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: AppTheme.inkBlack, size: 18),
+          const SizedBox(width: 10),
+          Text(
+            '$label: ',
+            style: const TextStyle(
+              color: AppTheme.inkBlack,
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: AppTheme.inkBlack,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

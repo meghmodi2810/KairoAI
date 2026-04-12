@@ -104,10 +104,28 @@ class _ToastOverlayState extends State<_ToastOverlay>
   Widget build(BuildContext context) {
     final c = ac(context);
     final mediaQuery = MediaQuery.of(context);
-    
-    // Stripe toasts are usually simple and dark or matching type
-    final bg = c.isDark ? c.bgSurface3 : const Color(0xFF1A1F36);
-    final fg = Colors.white;
+
+    Color bg;
+    Color fg;
+    Color border;
+    switch (widget.type) {
+      case AdminToastType.success:
+        bg = c.successFill;
+        fg = c.successText;
+        border = c.success;
+      case AdminToastType.error:
+        bg = c.errorFill;
+        fg = c.errorText;
+        border = c.error;
+      case AdminToastType.warning:
+        bg = c.warningFill;
+        fg = c.warningText;
+        border = c.warning;
+      case AdminToastType.info:
+        bg = c.accentFill;
+        fg = c.isDark ? c.accentBright : c.accent;
+        border = c.isDark ? c.accentBright : c.accent;
+    }
 
     IconData icon;
     Color iconColor = fg;
@@ -144,16 +162,17 @@ class _ToastOverlayState extends State<_ToastOverlay>
             }
           },
           child: Container(
-            height: 48,
+            height: 52,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
               color: bg,
               borderRadius: BorderRadius.circular(8),
-              boxShadow: [
+              border: Border.all(color: border, width: 2.5),
+              boxShadow: const [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.2),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
+                  color: Color(0xFF111111),
+                  blurRadius: 0,
+                  offset: Offset(4, 4),
                 ),
               ],
             ),
@@ -166,9 +185,9 @@ class _ToastOverlayState extends State<_ToastOverlay>
                     widget.message,
                     style: TextStyle(
                       fontSize: 13,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w800,
                       color: fg,
-                      letterSpacing: -0.1,
+                      letterSpacing: 0.15,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -232,7 +251,9 @@ class AdminConfirmModal extends StatelessWidget {
       backgroundColor: c.bgSurface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(radiusModal),
+        side: BorderSide(color: c.border, width: 2.5),
       ),
+      elevation: 0,
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -297,12 +318,15 @@ class AdminAvatar extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: c.bgSurface3,
+        borderRadius: BorderRadius.circular(10),
+        color: c.accentFill,
         border: Border.all(
           color: isBanned ? c.error : c.border2,
-          width: isBanned ? 2 : 1,
+          width: isBanned ? 2.5 : 2,
         ),
+        boxShadow: const [
+          BoxShadow(color: Color(0xFF111111), offset: Offset(2, 2), blurRadius: 0),
+        ],
       ),
       child: Center(
         child: Text(
@@ -343,12 +367,12 @@ class _AdminDrawerState extends State<AdminDrawer>
   late AnimationController _ctrl;
 
   static const _navItems = [
-    (LucideIcons.home, 'Home'),
-    (LucideIcons.bookOpen, 'Content'),
+    (LucideIcons.layoutGrid, 'Dashboard'),
+    (LucideIcons.bookOpen, 'Lessons'),
     (LucideIcons.users, 'Learners'),
-    (LucideIcons.barChart2, 'Trends'),
-    (LucideIcons.activity, 'Alerts'),
-    (LucideIcons.settings, 'Platform'),
+    (LucideIcons.barChart2, 'Analytics'),
+    (LucideIcons.activity, 'Issues'),
+    (LucideIcons.settings, 'Settings'),
   ];
 
   @override
@@ -375,16 +399,18 @@ class _AdminDrawerState extends State<AdminDrawer>
     final safeTop = MediaQuery.of(context).padding.top;
 
     return Material(
-      color: c.bgSurface,
+      color: c.bgBase,
       child: SizedBox(
         width: drawerWidth,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Premium Identity Block
             Container(
-              color: c.bgBase,
+              color: c.bgSurface,
               padding: EdgeInsets.fromLTRB(14, safeTop + 24, 14, 20),
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: c.border, width: 2)),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -395,16 +421,16 @@ class _AdminDrawerState extends State<AdminDrawer>
                 ],
               ),
             ),
-            const Divider(),
 
             const SizedBox(height: 14),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              child: Text('OVERVIEW', style: adminLabel(c.textMuted)),
+              child: Text('NAVIGATION', style: adminLabel(c.textMuted)),
             ),
             ..._navItems.take(3).toList().asMap().entries.map((e) => _item(e, c)),
 
-            const Divider(indent: 14, endIndent: 14, height: 28),
+            const SizedBox(height: 8),
+            Divider(indent: 14, endIndent: 14, height: 24, color: c.border),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               child: Text('SYSTEM', style: adminLabel(c.textMuted)),
@@ -412,13 +438,17 @@ class _AdminDrawerState extends State<AdminDrawer>
             ..._navItems.skip(3).toList().asMap().entries.map((e) => _item(e, c, offset: 3)),
 
             const Spacer(),
-            const Divider(),
+            Divider(height: 1, color: c.border),
             GestureDetector(
               onTap: widget.onSignOut,
               behavior: HitTestBehavior.opaque,
               child: Container(
                 height: 52,
                 padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: c.errorFill,
+                  border: Border(top: BorderSide(color: c.error, width: 2)),
+                ),
                 child: Row(
                   children: [
                     Icon(LucideIcons.logOut, size: 16, color: c.error),
@@ -456,12 +486,21 @@ class _AdminDrawerState extends State<AdminDrawer>
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        height: 40,
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
-        padding: const EdgeInsets.symmetric(horizontal: 8),
+        height: 42,
+        margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
-          color: isSelected ? c.accentFill : Colors.transparent,
-          borderRadius: BorderRadius.circular(6),
+          color: isSelected ? c.accentFill : c.bgSurface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? (c.isDark ? c.accentBright : c.accent) : c.border,
+            width: 2,
+          ),
+          boxShadow: isSelected
+              ? const [
+                  BoxShadow(color: Color(0xFF111111), offset: Offset(2, 2), blurRadius: 0),
+                ]
+              : null,
         ),
         child: Row(
           children: [
@@ -497,11 +536,11 @@ class AdminNavBar extends StatelessWidget {
   });
 
   static const _tabs = [
-    (LucideIcons.layoutGrid, 'Home'),
-    (LucideIcons.bookOpen, 'Content'),
+    (LucideIcons.layoutGrid, 'Dashboard'),
+    (LucideIcons.bookOpen, 'Lessons'),
     (LucideIcons.users, 'Learners'),
-    (LucideIcons.barChart2, 'Trends'),
-    (LucideIcons.activity, 'Alerts'),
+    (LucideIcons.barChart2, 'Analytics'),
+    (LucideIcons.activity, 'Issues'),
   ];
 
   @override
@@ -509,10 +548,13 @@ class AdminNavBar extends StatelessWidget {
     final c = ac(context);
     final bottomPad = MediaQuery.of(context).padding.bottom;
     return Container(
-      height: 52 + bottomPad,
+      height: 58 + bottomPad,
       decoration: BoxDecoration(
         color: c.bgSurface,
-        border: Border(top: BorderSide(color: c.border, width: 0.5)),
+        border: Border(top: BorderSide(color: c.border, width: 2)),
+        boxShadow: const [
+          BoxShadow(color: Color(0xFF111111), offset: Offset(0, -2), blurRadius: 0),
+        ],
       ),
       child: Padding(
         padding: EdgeInsets.fromLTRB(8, 0, 8, bottomPad),
@@ -527,17 +569,26 @@ class AdminNavBar extends StatelessWidget {
                 behavior: HitTestBehavior.opaque,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                  margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 9),
                   decoration: BoxDecoration(
-                    color: isSelected ? c.accentFill : Colors.transparent,
-                    borderRadius: BorderRadius.circular(pillRadius),
+                    color: isSelected ? c.accentFill : c.bgSurface2,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isSelected ? (c.isDark ? c.accentBright : c.accent) : c.border,
+                      width: 2,
+                    ),
+                    boxShadow: isSelected
+                        ? const [
+                            BoxShadow(color: Color(0xFF111111), offset: Offset(2, 2), blurRadius: 0),
+                          ]
+                        : null,
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
                         icon,
-                        size: 18,
+                        size: 16,
                         color: isSelected
                             ? (c.isDark ? c.accentBright : c.accent)
                             : c.textMuted,
@@ -546,7 +597,7 @@ class AdminNavBar extends StatelessWidget {
                       Text(
                         label,
                         style: TextStyle(
-                          fontSize: 9, 
+                          fontSize: 9,
                           fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                           color: isSelected ? (c.isDark ? c.accentBright : c.accent) : c.textMuted,
                         ),

@@ -17,6 +17,8 @@ class UserModel {
   // Settings
   final String? learningGoal;
   final int dailyGoalMinutes;
+  final int todayLessonPracticeMinutes;
+  final DateTime? todayLessonPracticeDate;
   
   // Progress summary
   final int totalLessonsCompleted;
@@ -39,6 +41,8 @@ class UserModel {
     this.lastStreakDate,
     this.learningGoal,
     this.dailyGoalMinutes = 10,
+    this.todayLessonPracticeMinutes = 0,
+    this.todayLessonPracticeDate,
     this.totalLessonsCompleted = 0,
     this.totalSignsLearned = 0,
     this.totalPracticeMinutes = 0,
@@ -62,6 +66,8 @@ class UserModel {
       lastStreakDate: (data['lastStreakDate'] as Timestamp?)?.toDate(),
       learningGoal: data['learningGoal'],
       dailyGoalMinutes: data['dailyGoalMinutes'] ?? 10,
+      todayLessonPracticeMinutes: data['todayLessonPracticeMinutes'] ?? 0,
+      todayLessonPracticeDate: (data['todayLessonPracticeDate'] as Timestamp?)?.toDate(),
       totalLessonsCompleted: data['totalLessonsCompleted'] ?? 0,
       totalSignsLearned: data['totalSignsLearned'] ?? 0,
       totalPracticeMinutes: data['totalPracticeMinutes'] ?? 0,
@@ -84,6 +90,10 @@ class UserModel {
       'lastStreakDate': lastStreakDate != null ? Timestamp.fromDate(lastStreakDate!) : null,
       'learningGoal': learningGoal,
       'dailyGoalMinutes': dailyGoalMinutes,
+      'todayLessonPracticeMinutes': todayLessonPracticeMinutes,
+      'todayLessonPracticeDate': todayLessonPracticeDate != null
+          ? Timestamp.fromDate(todayLessonPracticeDate!)
+          : null,
       'totalLessonsCompleted': totalLessonsCompleted,
       'totalSignsLearned': totalSignsLearned,
       'totalPracticeMinutes': totalPracticeMinutes,
@@ -106,6 +116,8 @@ class UserModel {
     DateTime? lastStreakDate,
     String? learningGoal,
     int? dailyGoalMinutes,
+    int? todayLessonPracticeMinutes,
+    DateTime? todayLessonPracticeDate,
     int? totalLessonsCompleted,
     int? totalSignsLearned,
     int? totalPracticeMinutes,
@@ -126,6 +138,10 @@ class UserModel {
       lastStreakDate: lastStreakDate ?? this.lastStreakDate,
       learningGoal: learningGoal ?? this.learningGoal,
       dailyGoalMinutes: dailyGoalMinutes ?? this.dailyGoalMinutes,
+      todayLessonPracticeMinutes:
+          todayLessonPracticeMinutes ?? this.todayLessonPracticeMinutes,
+      todayLessonPracticeDate:
+          todayLessonPracticeDate ?? this.todayLessonPracticeDate,
       totalLessonsCompleted: totalLessonsCompleted ?? this.totalLessonsCompleted,
       totalSignsLearned: totalSignsLearned ?? this.totalSignsLearned,
       totalPracticeMinutes: totalPracticeMinutes ?? this.totalPracticeMinutes,
