@@ -9,35 +9,30 @@ class LessonCompletionSummaryPage extends StatelessWidget {
   final LessonAssessmentSession session;
   final int practiceSeconds;
 
-  const LessonCompletionSummaryPage({
+  LessonCompletionSummaryPage({
     super.key,
     required this.lesson,
     required this.session,
     required this.practiceSeconds,
-  });
+  }) : assert(
+         session.canCompleteLesson,
+         'LessonCompletionSummaryPage requires a completable session.',
+       );
 
   @override
   Widget build(BuildContext context) {
     final practiceMinutes = (practiceSeconds / 60).ceil();
-    final completionEligible = session.canCompleteLesson;
     final allRequiredPassed = session.allRequiredAssessmentsPassed;
 
-    final subtitle = completionEligible
-      ? (allRequiredPassed
-          ? 'Guided practice complete. All required assessments passed.'
-          : 'Guided practice complete. Required assessments attempted. You can still finish this lesson.')
-      : 'Lesson has required steps pending. Resume from the first incomplete assessment.';
-
-    final finishLabel = completionEligible
-      ? 'Finish Lesson'
-      : 'Resume Required Assessment';
+    final subtitle = allRequiredPassed
+        ? 'Guided practice complete. All required assessments passed.'
+        : 'Guided practice complete. Required assessments attempted. You can still finish this lesson.';
 
     return Scaffold(
       backgroundColor: AppTheme.paperCream,
       appBar: AppBar(
         backgroundColor: AppTheme.paperCream,
         elevation: 0,
-        automaticallyImplyLeading: false,
         title: const Text(
           'Lesson Summary',
           style: TextStyle(
@@ -137,26 +132,13 @@ class LessonCompletionSummaryPage extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              Row(
-                children: [
-                  Expanded(
-                    child: NeoSecondaryButton(
-                      label: 'Later',
-                      icon: Icons.schedule,
-                      onPressed: () => Navigator.of(context).pop(false),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: NeoPrimaryButton(
-                      label: finishLabel,
-                      icon: Icons.check_circle,
-                      onPressed: completionEligible
-                          ? () => Navigator.of(context).pop(true)
-                          : () => Navigator.of(context).pop(false),
-                    ),
-                  ),
-                ],
+              SizedBox(
+                width: double.infinity,
+                child: NeoPrimaryButton(
+                  label: 'Finish Lesson',
+                  icon: Icons.check_circle,
+                  onPressed: () => Navigator.of(context).pop(true),
+                ),
               ),
             ],
           ),

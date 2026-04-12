@@ -5,6 +5,7 @@ import '../services/database_service.dart';
 import '../services/sign_image_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/neo_brutal_widgets.dart';
+import 'sign_learning_flow_logic.dart';
 import 'assessments/lesson_completion_summary_page.dart';
 import 'assessments/matching_assessment_page.dart';
 import 'assessments/mcq_recognition_assessment_page.dart';
@@ -45,8 +46,7 @@ class _SignLearningPageState extends State<SignLearningPage> {
     'recall',
     'mcq',
   ];
-  static const McqQuestionScope _mcqQuestionScope =
-      McqQuestionScope.allSigns;
+  static const McqQuestionScope _mcqQuestionScope = McqQuestionScope.allSigns;
 
   final DatabaseService _db = DatabaseService();
   final SignImageService _imageService = SignImageService();
@@ -62,14 +62,46 @@ class _SignLearningPageState extends State<SignLearningPage> {
   final Set<String> _skippedSignIds = <String>{};
   final List<String> _skippedAssessmentTypes = <String>[];
   String? _assessmentResumeType;
-  bool _assessmentSummaryReady = false;
   LessonAssessmentSession? _assessmentSession;
 
   SignModel get _current => _signs[_index];
-  bool get _guidedPracticeDone =>
+  bool get _guidedSequenceFinished =>
       _signs.isNotEmpty &&
-      _practicedSignIds.length == _signs.length &&
-      _skippedSignIds.isEmpty;
+      (_practicedSignIds.length + _skippedSignIds.length) == _signs.length;
+  bool get _guidedPracticeDone =>
+      _signs.isNotEmpty && _guidedSequenceFinished && _skippedSignIds.isEmpty;
+
+  int? get _firstPendingGuidedSignIndex {
+    if (_signs.isEmpty || _skippedSignIds.isEmpty) return null;
+    final pendingIndex = _signs.indexWhere(
+      (sign) => _skippedSignIds.contains(sign.id),
+    );
+    return pendingIndex == -1 ? null : pendingIndex;
+  }
+
+  int get _pendingGuidedCount =>
+      _signs.where((sign) => _skippedSignIds.contains(sign.id)).length;
+
+  int _pendingAssessmentCountForSession(LessonAssessmentSession session) {
+    var pendingCount = 0;
+    for (final assessmentType in session.enabledAssessments) {
+      if (!_isAssessmentSatisfiedForCompletion(session, assessmentType)) {
+        pendingCount += 1;
+      }
+    }
+    return pendingCount;
+  }
+
+  String? _firstIncompleteAssessmentTypeForSession(
+    LessonAssessmentSession session,
+  ) {
+    if (_assessmentResumeType != null &&
+        session.enabledAssessments.contains(_assessmentResumeType) &&
+        !_isAssessmentSatisfiedForCompletion(session, _assessmentResumeType!)) {
+      return _assessmentResumeType;
+    }
+    return session.firstIncompleteAssessmentType;
+  }
 
   Widget _buildGuidedSignMedia(String resolvedRef) {
     return ClipRRect(
@@ -77,8 +109,7 @@ class _SignLearningPageState extends State<SignLearningPage> {
       child: Image.asset(
         resolvedRef,
         fit: BoxFit.contain,
-        errorBuilder: (context, error, stackTrace) =>
-            _buildGuidedPlaceholder(),
+        errorBuilder: (context, error, stackTrace) => _buildGuidedPlaceholder(),
       ),
     );
   }
@@ -176,16 +207,14 @@ class _SignLearningPageState extends State<SignLearningPage> {
   }
 
   Future<void> _persistAssessmentSession(
-    LessonAssessmentSession session, {
-    bool? summaryReady,
-  }) async {
+    LessonAssessmentSession session,
+  ) async {
     session.guidedPracticePassed = _guidedPracticeDone;
 
     final skippedTypes = _orderedEnabledAssessmentTypes(
       session.skippedAssessmentTypes,
     );
-    final resumeType = session.firstIncompleteAssessmentType;
-    final effectiveSummaryReady = summaryReady ?? _assessmentSummaryReady;
+    final resumeType = _firstIncompleteAssessmentTypeForSession(session);
 
     if (mounted) {
       setState(() {
@@ -194,7 +223,6 @@ class _SignLearningPageState extends State<SignLearningPage> {
           ..clear()
           ..addAll(skippedTypes);
         _assessmentResumeType = resumeType;
-        _assessmentSummaryReady = effectiveSummaryReady;
       });
     }
 
@@ -205,23 +233,23 @@ class _SignLearningPageState extends State<SignLearningPage> {
         resumeAssessmentType: resumeType,
         assessmentResults: _serializeAssessmentResults(session),
         guidedPracticeCompleted: _guidedPracticeDone,
-        assessmentSummaryReady: effectiveSummaryReady,
+        assessmentSummaryReady: false,
       );
     } catch (_) {}
   }
 
-  Future<void> _saveAssessmentSkipAndExit(
+  Future<void> _saveAssessmentSkipAndContinue(
     String type,
     LessonAssessmentSession session,
   ) async {
-    await _persistAssessmentSession(session, summaryReady: false);
+    await _persistAssessmentSession(session);
     if (!mounted) return;
 
     final title = _assessmentTitle(type);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Skipped $title assessment saved. You can resume from it anytime.',
+          'Skipped $title assessment and marked pending. Moving to the next step.',
         ),
       ),
     );
@@ -239,7 +267,7 @@ class _SignLearningPageState extends State<SignLearningPage> {
             ? null
             : _serializeAssessmentResults(_assessmentSession!),
         guidedPracticeCompleted: _guidedPracticeDone,
-        assessmentSummaryReady: _assessmentSummaryReady,
+        assessmentSummaryReady: false,
       );
     } catch (_) {}
   }
@@ -287,7 +315,6 @@ class _SignLearningPageState extends State<SignLearningPage> {
       _skippedSignIds.clear();
       _skippedAssessmentTypes.clear();
       _assessmentResumeType = null;
-      _assessmentSummaryReady = false;
       _assessmentSession = null;
     });
 
@@ -344,29 +371,23 @@ class _SignLearningPageState extends State<SignLearningPage> {
       );
       final restoredAssessmentResume =
           savedAssessmentResume != null &&
-              restoredSession.enabledAssessments.contains(savedAssessmentResume)
+              restoredSession.enabledAssessments.contains(
+                savedAssessmentResume,
+              ) &&
+              !_isAssessmentSatisfiedForCompletion(
+                restoredSession,
+                savedAssessmentResume,
+              )
           ? savedAssessmentResume
           : restoredSession.firstIncompleteAssessmentType;
-        final restoredSummaryReady =
-          progress?.assessmentSummaryReady == true &&
-          restoredSession.canCompleteLesson;
-
       final savedIndex = progress?.guidedCurrentIndex;
-      final firstUnpracticedIndex = signs.indexWhere(
-        (sign) => !restoredPracticed.contains(sign.id),
+      final resumeIndex = computeGuidedResumeIndex(
+        signCount: signs.length,
+        savedIndex: savedIndex,
+        practicedSignIds: restoredPracticed,
+        skippedSignIds: restoredSkipped,
+        orderedSignIds: signs.map((sign) => sign.id).toList(growable: false),
       );
-      final firstSkippedIndex = signs.indexWhere(
-        (sign) => restoredSkipped.contains(sign.id),
-      );
-      final resumeIndex = signs.isEmpty
-          ? 0
-          : firstSkippedIndex != -1
-          ? firstSkippedIndex
-          : (savedIndex != null && savedIndex >= 0 && savedIndex < signs.length)
-          ? savedIndex
-          : firstUnpracticedIndex == -1
-          ? signs.length - 1
-          : firstUnpracticedIndex;
 
       if (!mounted) return;
       setState(() {
@@ -382,38 +403,22 @@ class _SignLearningPageState extends State<SignLearningPage> {
           ..clear()
           ..addAll(restoredSkippedAssessments);
         _assessmentResumeType = restoredAssessmentResume;
-        _assessmentSummaryReady = restoredSummaryReady;
         _assessmentSession = restoredSession;
         _totalPracticeSeconds = progress?.timeSpentSeconds ?? 0;
         _loading = false;
       });
 
       if (restoredSkipped.isNotEmpty) {
-        final skippedWord = signs[resumeIndex].word.toUpperCase();
+        final pendingCount = restoredSkipped.length;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               backgroundColor: AppTheme.signalYellow,
               content: Text(
-                'You skipped $skippedWord earlier. Start from here.',
+                '$pendingCount guided sign(s) are pending. Lesson completion stays locked until pending steps are done.',
               ),
               duration: const Duration(milliseconds: 1400),
-            ),
-          );
-        });
-      } else if (_guidedPracticeDone &&
-          restoredSummaryReady &&
-          restoredSession.canCompleteLesson) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              backgroundColor: AppTheme.signalYellow,
-              content: Text(
-                'Assessment results are ready. Continue to lesson summary.',
-              ),
-              duration: Duration(milliseconds: 1500),
             ),
           );
         });
@@ -425,7 +430,7 @@ class _SignLearningPageState extends State<SignLearningPage> {
             SnackBar(
               backgroundColor: AppTheme.signalYellow,
               content: Text(
-                'You skipped $resumeType assessment earlier. Resume from there.',
+                '$resumeType assessment is pending. Lesson completion remains blocked until pending steps are finished.',
               ),
               duration: const Duration(milliseconds: 1500),
             ),
@@ -546,10 +551,13 @@ class _SignLearningPageState extends State<SignLearningPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Skipped sign saved. Complete pending signs before assessments.',
+              'Skipped and marked pending. Lesson completion remains locked.',
             ),
           ),
         );
+        if (_guidedSequenceFinished) {
+          await _runAssessmentFlow();
+        }
         return;
       }
 
@@ -567,7 +575,7 @@ class _SignLearningPageState extends State<SignLearningPage> {
         SnackBar(
           backgroundColor: AppTheme.signalYellow,
           content: Text(
-            'Skipped $skippedWord. Next sign: $nextWord (completion remains locked).',
+            'Skipped $skippedWord and marked pending. Next sign: $nextWord.',
           ),
           duration: const Duration(milliseconds: 950),
         ),
@@ -651,8 +659,7 @@ class _SignLearningPageState extends State<SignLearningPage> {
             lessonImageRef: sign.imageUrl,
             lessonFallbackRef: sign.gifUrl,
             fallbackLabel: sign.id,
-          ))
-              ?.trim() ??
+          ))?.trim() ??
           '';
 
       if (resolvedRef.isNotEmpty) {
@@ -741,9 +748,9 @@ class _SignLearningPageState extends State<SignLearningPage> {
     }
 
     try {
-      if (!_guidedPracticeDone) {
+      if (!_guidedSequenceFinished) {
         await _showBlockedCompletionDialog(
-          'Lesson not completed. Finish guided practice for all signs before assessments.',
+          'Assessments unlock after each guided sign has been practiced or skipped.',
         );
         return;
       }
@@ -756,48 +763,6 @@ class _SignLearningPageState extends State<SignLearningPage> {
       }
       session.guidedPracticePassed = _guidedPracticeDone;
       _assessmentSession = session;
-
-      if (_assessmentSummaryReady && session.canCompleteLesson) {
-        final shouldComplete = await Navigator.push<bool>(
-          context,
-          MaterialPageRoute(
-            builder: (_) => LessonCompletionSummaryPage(
-              lesson: widget.lesson,
-              session: session,
-              practiceSeconds: _totalPracticeSeconds,
-            ),
-          ),
-        );
-
-        if (!mounted) return;
-
-        if (shouldComplete == true) {
-          applyAssessmentFlowTime();
-          final accuracy = _calculateLessonAccuracy(session);
-          await _persistAssessmentSession(session, summaryReady: false);
-          await _completeLesson(
-            timeSpentSeconds: _totalPracticeSeconds,
-            accuracy: accuracy,
-            session: session,
-          );
-          if (!mounted) return;
-          setState(() {
-            _assessmentSummaryReady = false;
-            _assessmentResumeType = null;
-            _skippedAssessmentTypes.clear();
-          });
-          _showCompletionDialog();
-        } else {
-          await _persistAssessmentSession(session, summaryReady: true);
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Summary checkpoint saved. Resume anytime.'),
-            ),
-          );
-        }
-        return;
-      }
 
       final enabledAssessments = session.enabledAssessments;
 
@@ -824,7 +789,7 @@ class _SignLearningPageState extends State<SignLearningPage> {
                 completedAt: DateTime.now(),
                 errorMessage: null,
               );
-              await _persistAssessmentSession(session, summaryReady: false);
+              await _persistAssessmentSession(session);
               continue;
             }
 
@@ -854,10 +819,9 @@ class _SignLearningPageState extends State<SignLearningPage> {
               attemptCount: previousAttempts + runAttempts,
             );
 
-            if (session.matchingResult.status ==
-                AssessmentStatus.skipped) {
-              await _saveAssessmentSkipAndExit('matching', session);
-              return;
+            if (session.matchingResult.status == AssessmentStatus.skipped) {
+              await _saveAssessmentSkipAndContinue('matching', session);
+              continue;
             }
 
             if (session.matchingResult.status == AssessmentStatus.failed) {
@@ -866,11 +830,11 @@ class _SignLearningPageState extends State<SignLearningPage> {
                 completedAt: DateTime.now(),
                 errorMessage: null,
               );
-              await _persistAssessmentSession(session, summaryReady: false);
+              await _persistAssessmentSession(session);
               continue;
             }
 
-            await _persistAssessmentSession(session, summaryReady: false);
+            await _persistAssessmentSession(session);
 
             continue;
           }
@@ -898,21 +862,20 @@ class _SignLearningPageState extends State<SignLearningPage> {
               attemptCount: previousAttempts + runAttempts,
             );
 
-            if (session.recallResult.status ==
-                AssessmentStatus.skipped) {
-              await _saveAssessmentSkipAndExit('recall', session);
-              return;
+            if (session.recallResult.status == AssessmentStatus.skipped) {
+              await _saveAssessmentSkipAndContinue('recall', session);
+              continue;
             }
 
             if (session.recallResult.status != AssessmentStatus.passed) {
-              await _persistAssessmentSession(session, summaryReady: false);
+              await _persistAssessmentSession(session);
               await _showBlockedCompletionDialog(
                 'Recall must be completed before you can finish this lesson.',
               );
               return;
             }
 
-            await _persistAssessmentSession(session, summaryReady: false);
+            await _persistAssessmentSession(session);
             continue;
           }
 
@@ -945,39 +908,36 @@ class _SignLearningPageState extends State<SignLearningPage> {
             );
 
             if (session.mcqResult.status == AssessmentStatus.skipped) {
-              await _saveAssessmentSkipAndExit('mcq', session);
-              return;
+              await _saveAssessmentSkipAndContinue('mcq', session);
+              continue;
             }
 
             if (session.mcqResult.status == AssessmentStatus.failed) {
-              await _persistAssessmentSession(session, summaryReady: false);
+              await _persistAssessmentSession(session);
               await _showBlockedCompletionDialog(
                 'Recognition assessment could not run due to missing content. Please update lesson media and try again.',
               );
               return;
             }
 
-            await _persistAssessmentSession(session, summaryReady: false);
+            await _persistAssessmentSession(session);
           }
         }
       }
 
-      if (_skippedSignIds.isNotEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'You skipped guided signs. Lesson saved as incomplete. Next time you will resume from skipped signs.',
-            ),
-          ),
-        );
-        return;
-      }
-
-      await _persistAssessmentSession(session, summaryReady: false);
+      await _persistAssessmentSession(session);
 
       if (!session.canCompleteLesson) {
-        await _showBlockedCompletionDialog(
-          'Lesson not completed. Resume from the first required skipped assessment.',
+        final pendingGuidedCount = _pendingGuidedCount;
+        final pendingAssessmentCount = _pendingAssessmentCountForSession(
+          session,
+        );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Lesson incomplete: $pendingGuidedCount guided and $pendingAssessmentCount assessment step(s) pending.',
+            ),
+          ),
         );
         return;
       }
@@ -998,7 +958,7 @@ class _SignLearningPageState extends State<SignLearningPage> {
       if (shouldComplete == true) {
         applyAssessmentFlowTime();
         final accuracy = _calculateLessonAccuracy(session);
-        await _persistAssessmentSession(session, summaryReady: false);
+        await _persistAssessmentSession(session);
         await _completeLesson(
           timeSpentSeconds: _totalPracticeSeconds,
           accuracy: accuracy,
@@ -1006,21 +966,10 @@ class _SignLearningPageState extends State<SignLearningPage> {
         );
         if (!mounted) return;
         setState(() {
-          _assessmentSummaryReady = false;
           _assessmentResumeType = null;
           _skippedAssessmentTypes.clear();
         });
         _showCompletionDialog();
-      } else {
-        await _persistAssessmentSession(session, summaryReady: true);
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Assessment progress saved. Next time you will return to lesson summary.',
-            ),
-          ),
-        );
       }
     } finally {
       applyAssessmentFlowTime();
@@ -1090,6 +1039,40 @@ class _SignLearningPageState extends State<SignLearningPage> {
     );
   }
 
+  void _resumePendingGuidedSign() {
+    final pendingIndex = _firstPendingGuidedSignIndex;
+    if (pendingIndex == null) return;
+
+    setState(() {
+      _index = pendingIndex;
+      _showTips = false;
+    });
+  }
+
+  ({String label, VoidCallback onPressed}) _primaryCtaConfig() {
+    final session = _assessmentSession ?? _buildAssessmentSession();
+    session.guidedPracticePassed = _guidedPracticeDone;
+
+    final cta = decidePrimaryLessonCta(
+      currentSignNeedsWork: !_practicedSignIds.contains(_current.id),
+      guidedSequenceFinished: _guidedSequenceFinished,
+      pendingGuidedCount: _pendingGuidedCount,
+      pendingAssessmentCount: _pendingAssessmentCountForSession(session),
+      canCompleteLesson: session.canCompleteLesson,
+    );
+
+    switch (cta.action) {
+      case PrimaryLessonAction.practiceCurrentSign:
+        return (label: cta.label, onPressed: _practiceCurrentSign);
+      case PrimaryLessonAction.resumePendingGuided:
+        return (label: cta.label, onPressed: _resumePendingGuidedSign);
+      case PrimaryLessonAction.continueAssessments:
+        return (label: cta.label, onPressed: _runAssessmentFlow);
+      case PrimaryLessonAction.showCompletionSummary:
+        return (label: cta.label, onPressed: _runAssessmentFlow);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -1112,8 +1095,8 @@ class _SignLearningPageState extends State<SignLearningPage> {
       );
     }
 
-    final isLast = _index == _signs.length - 1;
     final progress = (_index + 1) / _signs.length;
+    final primaryCta = _primaryCtaConfig();
 
     return Scaffold(
       backgroundColor: AppTheme.paperCream,
@@ -1385,14 +1368,10 @@ class _SignLearningPageState extends State<SignLearningPage> {
                   SizedBox(
                     width: double.infinity,
                     child: NeoPrimaryButton(
-                      label: _guidedPracticeDone
-                          ? 'Continue Assessments'
-                          : isLast
-                        ? 'Finish Guided Practice'
-                          : 'Practice This Sign',
-                      onPressed: _guidedPracticeDone
-                          ? _runAssessmentFlow
-                          : _practiceCurrentSign,
+                      label: primaryCta.label,
+                      onPressed: _assessmentFlowStarted
+                          ? null
+                          : primaryCta.onPressed,
                       icon: Icons.camera_alt,
                     ),
                   ),
