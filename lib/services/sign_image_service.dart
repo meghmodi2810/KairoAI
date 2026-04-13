@@ -1,81 +1,142 @@
-import 'dart:convert';
-import 'dart:math';
-import 'dart:typed_data';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/services.dart';
 
-/// Service to fetch ISL sign images from Firestore (stored as Base64).
-/// The 'sign_images' collection has one doc per sign (A-Z, 1-9),
-/// each with an 'images' array of Base64-encoded JPEGs.
+/// Service to resolve local bundled sign assets from normalized labels.
 class SignImageService {
   static final SignImageService _instance = SignImageService._internal();
   factory SignImageService() => _instance;
   SignImageService._internal();
 
-  final Random _random = Random();
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
-  // In-memory cache: sign key -> list of decoded image bytes
-  final Map<String, List<Uint8List>> _cache = {};
+  final Map<String, String?> _bundledImageRefCache = {};
 
   static const List<String> availableSigns = [
     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',
     'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
     'U', 'V', 'W', 'X', 'Y', 'Z',
-    '1', '2', '3', '4', '5', '6', '7', '8', '9',
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
   ];
+
+  static const Map<String, String> _numberWordToDigit = {
+    'ZERO': '0',
+    'ONE': '1',
+    'TWO': '2',
+    'THREE': '3',
+    'FOUR': '4',
+    'FIVE': '5',
+    'SIX': '6',
+    'SEVEN': '7',
+    'EIGHT': '8',
+    'NINE': '9',
+  };
 
   /// Maps a word to its sign folder key.
   String? _mapWordToFolder(String word) {
     if (word.isEmpty) return null;
+
     final upper = word.toUpperCase().trim();
-    if (upper.length == 1 && availableSigns.contains(upper)) return upper;
+
+    if (availableSigns.contains(upper)) return upper;
+    if (_numberWordToDigit.containsKey(upper)) return _numberWordToDigit[upper];
+
+    final alnumOnly = upper.replaceAll(RegExp(r'[^A-Z0-9]'), '');
+    if (availableSigns.contains(alnumOnly)) return alnumOnly;
+    if (_numberWordToDigit.containsKey(alnumOnly)) {
+      return _numberWordToDigit[alnumOnly];
+    }
+
+    // Handle compact values like "SIGN2" or "LEVEL_3" by preferring
+    // an embedded digit when one exists.
+    final digitMatch = RegExp(r'[0-9]').firstMatch(upper);
+    if (digitMatch != null) {
+      final digit = digitMatch.group(0)!;
+      if (availableSigns.contains(digit)) return digit;
+    }
+
+    final tokens = upper
+        .split(RegExp(r'[^A-Z0-9]+'))
+        .where((token) => token.isNotEmpty)
+        .toList(growable: false);
+
+    for (final token in tokens) {
+      if (availableSigns.contains(token)) return token;
+      if (_numberWordToDigit.containsKey(token)) {
+        return _numberWordToDigit[token];
+      }
+    }
+
     final firstChar = upper[0];
     if (availableSigns.contains(firstChar)) return firstChar;
+
     return null;
   }
 
-  /// Fetches images for a sign from Firestore, with caching.
-  /// Returns a list of decoded image bytes.
-  Future<List<Uint8List>> _getImages(String signKey) async {
-    if (_cache.containsKey(signKey)) return _cache[signKey]!;
+  bool _looksLikeAssetPath(String value) {
+    return value.startsWith('assets/');
+  }
 
+  String? _normalizeLocalAssetRef(String? rawValue) {
+    final value = (rawValue ?? '').trim();
+    if (value.isEmpty) return null;
+    if (_looksLikeAssetPath(value)) {
+      return value;
+    }
+    return null;
+  }
+
+  Future<bool> _assetExists(String assetPath) async {
     try {
-      final doc = await _firestore.collection('sign_images').doc(signKey).get();
-      if (!doc.exists) return [];
-
-      final data = doc.data()!;
-      final List<dynamic> base64List = data['images'] ?? [];
-      final images = base64List
-          .map((b64) => base64Decode(b64 as String))
-          .toList();
-
-      _cache[signKey] = images;
-      return images;
-    } catch (e) {
-      return [];
+      await rootBundle.load(assetPath);
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 
-  /// Returns a random image (as bytes) for the given sign word.
-  Future<Uint8List?> getRandomImage(String word) async {
+  /// Resolve bundled local asset path for a sign label using the canonical
+  /// contract: assets/signs/<LABEL>/image.png.
+  Future<String?> getBundledImageRef(String word) async {
     final folder = _mapWordToFolder(word);
     if (folder == null) return null;
 
-    final images = await _getImages(folder);
-    if (images.isEmpty) return null;
+    if (_bundledImageRefCache.containsKey(folder)) {
+      return _bundledImageRefCache[folder];
+    }
 
-    return images[_random.nextInt(images.length)];
+    final candidate = 'assets/signs/$folder/image.png';
+    if (await _assetExists(candidate)) {
+      _bundledImageRefCache[folder] = candidate;
+      return candidate;
+    }
+
+    _bundledImageRefCache[folder] = null;
+    return null;
   }
 
-  /// Returns a specific image by index (for previews).
-  Future<Uint8List?> getImageAtIndex(String word, {int index = 0}) async {
-    final folder = _mapWordToFolder(word);
-    if (folder == null) return null;
+  /// Resolve image ref for a sign label from local bundled assets only.
+  /// Returns the exact local asset path when it exists, otherwise null.
+  Future<String?> resolveImageRefForWord(
+    String word, {
+    String? lessonImageRef,
+    String? lessonFallbackRef,
+    String? fallbackLabel,
+  }) async {
+    final lessonPrimary = _normalizeLocalAssetRef(lessonImageRef);
+    final lessonFallback = _normalizeLocalAssetRef(lessonFallbackRef);
 
-    final images = await _getImages(folder);
-    if (images.isEmpty || index >= images.length) return null;
+    if (lessonPrimary != null && await _assetExists(lessonPrimary)) {
+      return lessonPrimary;
+    }
+    if (lessonFallback != null && await _assetExists(lessonFallback)) {
+      return lessonFallback;
+    }
 
-    return images[index];
+    final bundled = await getBundledImageRef(word);
+    if (bundled != null) return bundled;
+
+    // Safe same-item fallback: if caller passes a label-like id, use it.
+    final bundledFallback = await getBundledImageRef(fallbackLabel ?? '');
+    if (bundledFallback != null) return bundledFallback;
+
+    return null;
   }
 
   /// Whether this sign has images available.
@@ -99,13 +160,15 @@ class SignImageService {
     return result;
   }
 
-  /// Pre-fetch all sign images into cache (call on app start for speed).
+  /// Pre-fetch all bundled image refs into cache.
   Future<void> preloadAll() async {
     for (final sign in availableSigns) {
-      await _getImages(sign);
+      await getBundledImageRef(sign);
     }
   }
 
   /// Clear the cache.
-  void clearCache() => _cache.clear();
+  void clearCache() {
+    _bundledImageRefCache.clear();
+  }
 }

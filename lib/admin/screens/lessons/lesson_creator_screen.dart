@@ -39,10 +39,10 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
   String _type = 'alphabet'; // 'alphabet', 'numeric', 'both'
   bool _isActive = false;
   bool _isSaving = false;
-  
+
   // List of signs picked for THIS lesson
   List<AdminSignItem> _selectedSigns = [];
-  
+
   // Reference of ALL signs from Firestore to get icons/gifs
   List<AdminSignModel> _allSigns = [];
   bool _loadingSupport = true;
@@ -102,10 +102,12 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
 
       if (!mounted) return;
       setState(() {
-        _categories = cats.docs.map((d) => CategoryModel.fromFirestore(d)).toList();
+        _categories = cats.docs
+            .map((d) => CategoryModel.fromFirestore(d))
+            .toList();
         _allSigns = allSigns;
         _loadingSupport = false;
-        
+
         if (_selectedCategoryId.isEmpty && _categories.isNotEmpty) {
           _selectedCategoryId = _categories.first.id;
           _updateNextOrder(_selectedCategoryId);
@@ -128,12 +130,12 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
           .orderBy('order', descending: true)
           .limit(1)
           .get();
-      
+
       int next = 1;
       if (snapshot.docs.isNotEmpty) {
         next = (snapshot.docs.first.data()['order'] as int? ?? 0) + 1;
       }
-      
+
       if (mounted) {
         setState(() => _orderCtrl.text = '$next');
       }
@@ -150,8 +152,12 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
     }
     if (_selectedCategoryId.isEmpty) return false;
     if (_selectedSigns.isEmpty) {
-       AdminToast.show(context, 'Please select at least one sign.', type: AdminToastType.error);
-       return false;
+      AdminToast.show(
+        context,
+        'Please select at least one sign.',
+        type: AdminToastType.error,
+      );
+      return false;
     }
     return true;
   }
@@ -172,7 +178,9 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
       gemsReward: int.tryParse(_gemsCtrl.text) ?? 5,
       coinsReward: int.tryParse(_coinsCtrl.text) ?? 50,
       signs: _selectedSigns,
-      testTypes: _isEdit ? widget.existingLesson!.testTypes : ['mcq', 'recall', 'matching'],
+      testTypes: _isEdit
+          ? widget.existingLesson!.testTypes
+          : ['matching', 'recall', 'mcq'],
       createdBy: _isEdit ? widget.existingLesson!.createdBy : widget.admin.uid,
       createdAt: _isEdit ? widget.existingLesson!.createdAt : DateTime.now(),
       updatedAt: DateTime.now(),
@@ -180,7 +188,11 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
 
     bool ok;
     if (_isEdit) {
-      ok = await _db.updateLesson(_selectedCategoryId, lesson.id, lesson.toFirestore());
+      ok = await _db.updateLesson(
+        _selectedCategoryId,
+        lesson.id,
+        lesson.toFirestore(),
+      );
     } else {
       final id = await _db.createLesson(lesson);
       ok = id != null;
@@ -190,19 +202,34 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
     setState(() => _isSaving = false);
 
     if (ok) {
-      AdminToast.show(context, _isEdit ? 'Lesson updated.' : 'Lesson created.', type: AdminToastType.success);
+      AdminToast.show(
+        context,
+        _isEdit ? 'Lesson updated.' : 'Lesson created.',
+        type: AdminToastType.success,
+      );
       Navigator.of(context).pop();
     } else {
-      AdminToast.show(context, 'Failed to save. Try again.', type: AdminToastType.error);
+      AdminToast.show(
+        context,
+        'Failed to save. Try again.',
+        type: AdminToastType.error,
+      );
     }
   }
 
   void _toggleSign(String char) {
     setState(() {
-      final normalizedChar = (char.toUpperCase() == '0' || char.toUpperCase() == 'O') ? 'O' : char.toUpperCase();
-      
+      final normalizedChar =
+          (char.toUpperCase() == '0' || char.toUpperCase() == 'O')
+          ? 'O'
+          : char.toUpperCase();
+
       final exists = _selectedSigns.indexWhere((s) {
-        final existingNorm = (s.character.toUpperCase() == '0' || s.character.toUpperCase() == 'O') ? 'O' : s.character.toUpperCase();
+        final existingNorm =
+            (s.character.toUpperCase() == '0' ||
+                s.character.toUpperCase() == 'O')
+            ? 'O'
+            : s.character.toUpperCase();
         return existingNorm == normalizedChar;
       });
 
@@ -211,16 +238,21 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
       } else {
         // Find matching data from master collection
         final signData = _allSigns.where((s) {
-          final sWordNorm = (s.word.toUpperCase() == '0' || s.word.toUpperCase() == 'O') ? 'O' : s.word.toUpperCase();
+          final sWordNorm =
+              (s.word.toUpperCase() == '0' || s.word.toUpperCase() == 'O')
+              ? 'O'
+              : s.word.toUpperCase();
           return sWordNorm == normalizedChar;
         }).firstOrNull;
 
-        _selectedSigns.add(AdminSignItem(
-          character: char.toUpperCase(),
-          order: _selectedSigns.length,
-          pictureUrl: signData?.imageUrl,
-          animationUrl: signData?.gifUrl,
-        ));
+        _selectedSigns.add(
+          AdminSignItem(
+            character: char.toUpperCase(),
+            order: _selectedSigns.length,
+            pictureUrl: signData?.imageUrl,
+            animationUrl: signData?.gifUrl,
+          ),
+        );
       }
     });
   }
@@ -231,7 +263,10 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
     if (_loadingSupport) {
       return Scaffold(
         backgroundColor: c.bgBase,
-        appBar: AdminTopBar(title: 'Lesson Creator', variant: AdminTopBarVariant.sub),
+        appBar: AdminTopBar(
+          title: 'Lesson Creator',
+          variant: AdminTopBarVariant.sub,
+        ),
         body: AdminSkeletonLoader.listRows(count: 15),
       );
     }
@@ -310,26 +345,32 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
                   const SizedBox(height: 10),
                   Row(
                     children: [
-                      Expanded(child: _TypeBox(
-                        label: 'Alphabets',
-                        icon: LucideIcons.type,
-                        isSelected: _type == 'alphabet',
-                        onTap: () => setState(() => _type = 'alphabet'),
-                      )),
+                      Expanded(
+                        child: _TypeBox(
+                          label: 'Alphabets',
+                          icon: LucideIcons.type,
+                          isSelected: _type == 'alphabet',
+                          onTap: () => setState(() => _type = 'alphabet'),
+                        ),
+                      ),
                       const SizedBox(width: 7),
-                      Expanded(child: _TypeBox(
-                        label: 'Numbers',
-                        icon: LucideIcons.hash,
-                        isSelected: _type == 'numeric',
-                        onTap: () => setState(() => _type = 'numeric'),
-                      )),
+                      Expanded(
+                        child: _TypeBox(
+                          label: 'Numbers',
+                          icon: LucideIcons.hash,
+                          isSelected: _type == 'numeric',
+                          onTap: () => setState(() => _type = 'numeric'),
+                        ),
+                      ),
                       const SizedBox(width: 7),
-                      Expanded(child: _TypeBox(
-                        label: 'Both',
-                        icon: LucideIcons.layers,
-                        isSelected: _type == 'both',
-                        onTap: () => setState(() => _type = 'both'),
-                      )),
+                      Expanded(
+                        child: _TypeBox(
+                          label: 'Both',
+                          icon: LucideIcons.layers,
+                          isSelected: _type == 'both',
+                          onTap: () => setState(() => _type = 'both'),
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -346,7 +387,10 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text('SELECT SIGNS', style: adminLabel(c.textMuted)),
-                    Text('${_selectedSigns.length} selected', style: adminLabel(c.accent)),
+                    Text(
+                      '${_selectedSigns.length} selected',
+                      style: adminLabel(c.accent),
+                    ),
                   ],
                 ),
               ),
@@ -363,26 +407,59 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
                 children: [
                   Row(
                     children: [
-                      Expanded(child: AdminInput(label: 'XP', hint: '25', controller: _xpCtrl, keyboardType: TextInputType.number)),
+                      Expanded(
+                        child: AdminInput(
+                          label: 'XP',
+                          hint: '25',
+                          controller: _xpCtrl,
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
                       const SizedBox(width: 10),
-                      Expanded(child: AdminInput(label: 'GEMS', hint: '5', controller: _gemsCtrl, keyboardType: TextInputType.number)),
+                      Expanded(
+                        child: AdminInput(
+                          label: 'GEMS',
+                          hint: '5',
+                          controller: _gemsCtrl,
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
                       const SizedBox(width: 10),
-                      Expanded(child: AdminInput(label: 'COINS', hint: '50', controller: _coinsCtrl, keyboardType: TextInputType.number)),
+                      Expanded(
+                        child: AdminInput(
+                          label: 'COINS',
+                          hint: '50',
+                          controller: _coinsCtrl,
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 14),
                   AdminRow(
                     title: Text('Lesson Order', style: adminH3(c.textPrimary)),
-                    subtitle: Text('Position in category list (max + 1)', style: adminMeta(c.textSecondary)),
-                    trailing: Text('#${_orderCtrl.text}', style: adminH2(c.accent)),
+                    subtitle: Text(
+                      'Position in category list (max + 1)',
+                      style: adminMeta(c.textSecondary),
+                    ),
+                    trailing: Text(
+                      '#${_orderCtrl.text}',
+                      style: adminH2(c.accent),
+                    ),
                   ),
                   AdminRow(
-                    title: Text('Publish Lesson', style: adminH3(c.textPrimary)),
-                    subtitle: Text('Visible to learners', style: adminMeta(c.textSecondary)),
+                    title: Text(
+                      'Publish Lesson',
+                      style: adminH3(c.textPrimary),
+                    ),
+                    subtitle: Text(
+                      'Visible to learners',
+                      style: adminMeta(c.textSecondary),
+                    ),
                     trailing: Switch.adaptive(
-                      value: _isActive, 
+                      value: _isActive,
                       activeTrackColor: c.accent,
-                      onChanged: (v) => setState(() => _isActive = v)
+                      onChanged: (v) => setState(() => _isActive = v),
                     ),
                     isLast: true,
                   ),
@@ -397,10 +474,24 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
               color: c.bgSurface,
               child: Column(
                 children: [
-                  _ReadinessItem(label: 'Title entered', isDone: _titleCtrl.text.isNotEmpty),
-                  _ReadinessItem(label: 'Signs selected (${_selectedSigns.length})', isDone: _selectedSigns.isNotEmpty),
-                  _ReadinessItem(label: 'Rewards configured', isDone: _xpCtrl.text.isNotEmpty && _gemsCtrl.text.isNotEmpty),
-                  _ReadinessItem(label: 'Category assigned', isDone: _selectedCategoryId.isNotEmpty, isLast: true),
+                  _ReadinessItem(
+                    label: 'Title entered',
+                    isDone: _titleCtrl.text.isNotEmpty,
+                  ),
+                  _ReadinessItem(
+                    label: 'Signs selected (${_selectedSigns.length})',
+                    isDone: _selectedSigns.isNotEmpty,
+                  ),
+                  _ReadinessItem(
+                    label: 'Rewards configured',
+                    isDone:
+                        _xpCtrl.text.isNotEmpty && _gemsCtrl.text.isNotEmpty,
+                  ),
+                  _ReadinessItem(
+                    label: 'Category assigned',
+                    isDone: _selectedCategoryId.isNotEmpty,
+                    isLast: true,
+                  ),
                 ],
               ),
             ),
@@ -425,14 +516,16 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
   Widget _buildSignGrid(AdminColors c) {
     List<String> pool = [];
     if (_type == 'alphabet' || _type == 'both') {
-      pool.addAll('ABCDEFGHIJKLMNPQRSTUVWXYZ'.split('')); // Exclude O to handle 0/O as one
+      pool.addAll(
+        'ABCDEFGHIJKLMNPQRSTUVWXYZ'.split(''),
+      ); // Exclude O to handle 0/O as one
       pool.add('O / 0');
     }
     if (_type == 'numeric') {
       pool.addAll('123456789'.split(''));
       pool.add('O / 0');
     } else if (_type == 'both') {
-       pool.addAll('123456789'.split(''));
+      pool.addAll('123456789'.split(''));
     }
 
     return Container(
@@ -454,10 +547,14 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
           final searchChar = isO0 ? 'O' : char;
 
           final isSelected = _selectedSigns.any((s) {
-             final sNorm = (s.character.toUpperCase() == '0' || s.character.toUpperCase() == 'O') ? 'O' : s.character.toUpperCase();
-             return sNorm == searchChar;
+            final sNorm =
+                (s.character.toUpperCase() == '0' ||
+                    s.character.toUpperCase() == 'O')
+                ? 'O'
+                : s.character.toUpperCase();
+            return sNorm == searchChar;
           });
-          
+
           return GestureDetector(
             onTap: () => _toggleSign(searchChar),
             child: AnimatedContainer(
@@ -476,17 +573,24 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
                     child: Text(
                       char,
                       textAlign: TextAlign.center,
-                      style: signLetter(isSelected ? c.accent : c.textPrimary).copyWith(fontSize: isO0 ? 11 : 14),
+                      style: signLetter(
+                        isSelected ? c.accent : c.textPrimary,
+                      ).copyWith(fontSize: isO0 ? 11 : 14),
                     ),
                   ),
                   if (isSelected)
                     Positioned(
                       bottom: 6,
-                      left: 0, right: 0,
+                      left: 0,
+                      right: 0,
                       child: Center(
                         child: Container(
-                          width: 4, height: 4,
-                          decoration: BoxDecoration(shape: BoxShape.circle, color: c.accent),
+                          width: 4,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: c.accent,
+                          ),
                         ),
                       ),
                     ),
@@ -536,7 +640,9 @@ class _TypeBox extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               label,
-              style: adminLabel(isSelected ? c.accent : c.textMuted).copyWith(fontSize: 9),
+              style: adminLabel(
+                isSelected ? c.accent : c.textMuted,
+              ).copyWith(fontSize: 9),
             ),
           ],
         ),
@@ -562,30 +668,46 @@ class _ReadinessItem extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        border: isLast ? null : Border(bottom: BorderSide(color: c.bgBase, width: 2)),
+        border: isLast
+            ? null
+            : Border(bottom: BorderSide(color: c.bgBase, width: 2)),
       ),
       child: Row(
         children: [
           Container(
-            width: 18, height: 18,
+            width: 18,
+            height: 18,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: isDone ? c.successFill : (c.isDark ? c.bgSurface3 : c.bgSurface2),
+              color: isDone
+                  ? c.successFill
+                  : (c.isDark ? c.bgSurface3 : c.bgSurface2),
             ),
             child: Center(
-              child: isDone 
-                ? Icon(LucideIcons.check, size: 10, color: c.successText)
-                : Container(width: 8, height: 8, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: c.textMuted.withValues(alpha: 0.3), width: 1))),
+              child: isDone
+                  ? Icon(LucideIcons.check, size: 10, color: c.successText)
+                  : Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: c.textMuted.withValues(alpha: 0.3),
+                          width: 1,
+                        ),
+                      ),
+                    ),
             ),
           ),
           const SizedBox(width: 10),
           Text(
             label,
-            style: adminBody(isDone ? c.textPrimary : c.textMuted).copyWith(fontWeight: isDone ? FontWeight.w600 : FontWeight.w400),
+            style: adminBody(
+              isDone ? c.textPrimary : c.textMuted,
+            ).copyWith(fontWeight: isDone ? FontWeight.w600 : FontWeight.w400),
           ),
         ],
       ),
     );
   }
 }
-

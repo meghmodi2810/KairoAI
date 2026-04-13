@@ -47,8 +47,12 @@ class AdminModel {
       'isActive': isActive,
       'role': role,
       'permissions': permissions,
-      'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : FieldValue.serverTimestamp(),
-      'lastLoginAt': lastLoginAt != null ? Timestamp.fromDate(lastLoginAt!) : FieldValue.serverTimestamp(),
+      'createdAt': createdAt != null
+          ? Timestamp.fromDate(createdAt!)
+          : FieldValue.serverTimestamp(),
+      'lastLoginAt': lastLoginAt != null
+          ? Timestamp.fromDate(lastLoginAt!)
+          : FieldValue.serverTimestamp(),
     };
   }
 
@@ -124,6 +128,33 @@ class AdminLessonModel {
   /// Alias for backwards compatibility
   String get name => title;
 
+  static List<String> _normalizeTestTypes(dynamic rawValue) {
+    final rawList = (rawValue as List<dynamic>? ?? const <dynamic>[])
+        .map((e) => e.toString().trim().toLowerCase())
+        .toList(growable: false);
+
+    final normalized = <String>{};
+    for (final type in rawList) {
+      if (type == 'match' || type == 'matching') {
+        normalized.add('matching');
+      } else if (type == 'recall' || type == 'mcq') {
+        normalized.add(type);
+      }
+    }
+
+    if (normalized.isEmpty) {
+      return const <String>['matching', 'recall', 'mcq'];
+    }
+
+    final ordered = <String>[];
+    for (final type in const <String>['matching', 'recall', 'mcq']) {
+      if (normalized.contains(type)) {
+        ordered.add(type);
+      }
+    }
+    return ordered;
+  }
+
   factory AdminLessonModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     return AdminLessonModel(
@@ -138,11 +169,12 @@ class AdminLessonModel {
       gemsReward: data['gemsReward'] ?? 5,
       coinsReward: data['coinsReward'] ?? 50,
       xpReward: data['xpReward'] ?? 25,
-      signs: (data['signs'] as List<dynamic>?)
+      signs:
+          (data['signs'] as List<dynamic>?)
               ?.map((s) => AdminSignItem.fromMap(s as Map<String, dynamic>))
               .toList() ??
           [],
-      testTypes: List<String>.from(data['testTypes'] ?? ['mcq']),
+      testTypes: _normalizeTestTypes(data['testTypes']),
       order: data['order'] ?? 0,
       isActive: data['isActive'] ?? true,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
@@ -164,7 +196,7 @@ class AdminLessonModel {
       'coinsReward': coinsReward,
       'xpReward': xpReward,
       'signs': signs.map((s) => s.toMap()).toList(),
-      'testTypes': testTypes,
+      'testTypes': _normalizeTestTypes(testTypes),
       'order': order,
       'isActive': isActive,
       'createdAt': Timestamp.fromDate(createdAt),
@@ -289,12 +321,14 @@ class MCQQuestion {
       'correctWord': correctSign.word,
       'questionText': questionText,
       'options': options
-          .map((s) => {
-                'signId': s.id,
-                'word': s.word,
-                'imageUrl': s.imageUrl,
-                'gifUrl': s.gifUrl,
-              })
+          .map(
+            (s) => {
+              'signId': s.id,
+              'word': s.word,
+              'imageUrl': s.imageUrl,
+              'gifUrl': s.gifUrl,
+            },
+          )
           .toList(),
     };
   }
@@ -373,7 +407,8 @@ class WordModel {
       id: doc.id,
       wordGroupId: data['wordGroupId'] ?? '',
       text: data['text'] ?? '',
-      characters: (data['characters'] as List<dynamic>?)
+      characters:
+          (data['characters'] as List<dynamic>?)
               ?.map((c) => WordCharacter.fromMap(c as Map<String, dynamic>))
               .toList() ??
           [],
@@ -397,10 +432,7 @@ class WordCharacter {
   final String char;
   final String? signReference;
 
-  WordCharacter({
-    required this.char,
-    this.signReference,
-  });
+  WordCharacter({required this.char, this.signReference});
 
   factory WordCharacter.fromMap(Map<String, dynamic> map) {
     return WordCharacter(
@@ -410,10 +442,7 @@ class WordCharacter {
   }
 
   Map<String, dynamic> toMap() {
-    return {
-      'char': char,
-      'signReference': signReference,
-    };
+    return {'char': char, 'signReference': signReference};
   }
 }
 
@@ -457,7 +486,8 @@ class IssueModel {
     final data = doc.data() as Map<String, dynamic>;
     return IssueModel(
       id: doc.id,
-      reportedBy: data['reportedBy'] ?? data['learnerId'] ?? data['learnerEmail'] ?? '',
+      reportedBy:
+          data['reportedBy'] ?? data['learnerId'] ?? data['learnerEmail'] ?? '',
       title: data['title'] ?? '',
       description: data['description'] ?? '',
       type: data['type'] ?? data['category'] ?? 'other',
@@ -468,7 +498,8 @@ class IssueModel {
       attachments: List<String>.from(data['attachments'] ?? []),
       deviceInfo: data['deviceInfo'] as Map<String, dynamic>?,
       appVersion: data['appVersion'],
-      adminNotes: (data['adminNotes'] as List<dynamic>?)
+      adminNotes:
+          (data['adminNotes'] as List<dynamic>?)
               ?.map((n) => AdminNote.fromMap(n as Map<String, dynamic>))
               .toList() ??
           [],
@@ -518,9 +549,10 @@ class AdminNote {
       adminId: map['adminId'] ?? '',
       adminName: map['adminName'] ?? '',
       content: map['content'] ?? map['note'] ?? '',
-      createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? 
-                 (map['timestamp'] as Timestamp?)?.toDate() ?? 
-                 DateTime.now(),
+      createdAt:
+          (map['createdAt'] as Timestamp?)?.toDate() ??
+          (map['timestamp'] as Timestamp?)?.toDate() ??
+          DateTime.now(),
     );
   }
 
@@ -554,9 +586,12 @@ class MaintenanceModeModel {
     final data = doc.data() as Map<String, dynamic>;
     return MaintenanceModeModel(
       isEnabled: data['isEnabled'] ?? false,
-      message: data['message'] ?? 'The app is under maintenance. Please try again later.',
-      estimatedEndTime: (data['estimatedEndTime'] as Timestamp?)?.toDate() ?? 
-                        (data['scheduledEnd'] as Timestamp?)?.toDate(),
+      message:
+          data['message'] ??
+          'The app is under maintenance. Please try again later.',
+      estimatedEndTime:
+          (data['estimatedEndTime'] as Timestamp?)?.toDate() ??
+          (data['scheduledEnd'] as Timestamp?)?.toDate(),
       enabledBy: data['enabledBy'],
       enabledAt: (data['enabledAt'] as Timestamp?)?.toDate(),
     );
@@ -566,7 +601,9 @@ class MaintenanceModeModel {
     return {
       'isEnabled': isEnabled,
       'message': message,
-      'estimatedEndTime': estimatedEndTime != null ? Timestamp.fromDate(estimatedEndTime!) : null,
+      'estimatedEndTime': estimatedEndTime != null
+          ? Timestamp.fromDate(estimatedEndTime!)
+          : null,
       'enabledBy': enabledBy,
       'enabledAt': enabledAt != null ? Timestamp.fromDate(enabledAt!) : null,
     };
@@ -602,7 +639,7 @@ class AuditLogModel {
   factory AuditLogModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     final changes = data['changes'] as Map<String, dynamic>?;
-    
+
     // Generate a readable details string from changes
     String details = data['details'] ?? '';
     if (details.isEmpty && changes != null) {
@@ -611,12 +648,13 @@ class AuditLogModel {
           .map((e) => '${e.key}: ${e.value}')
           .join(', ');
     }
-    
+
     return AuditLogModel(
       id: doc.id,
       adminId: data['adminId'] ?? '',
       adminEmail: data['adminEmail'] ?? '',
-      adminName: data['adminName'] ?? data['adminEmail']?.split('@').first ?? '',
+      adminName:
+          data['adminName'] ?? data['adminEmail']?.split('@').first ?? '',
       action: data['action'] ?? '',
       entityType: data['entityType'] ?? '',
       entityId: data['entityId'],

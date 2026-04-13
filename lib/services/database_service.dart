@@ -10,10 +10,14 @@ class DatabaseService {
 
   // ==================== USER OPERATIONS ====================
 
-  Future<void> createUserDocument(User user, {String? learningGoal, int? dailyGoalMinutes}) async {
+  Future<void> createUserDocument(
+    User user, {
+    String? learningGoal,
+    int? dailyGoalMinutes,
+  }) async {
     final userDoc = _db.collection('users').doc(user.uid);
     final docSnapshot = await userDoc.get();
-    
+
     if (!docSnapshot.exists) {
       final newUser = UserModel(
         uid: user.uid,
@@ -29,9 +33,7 @@ class DatabaseService {
       );
       await userDoc.set(newUser.toFirestore());
     } else {
-      await userDoc.update({
-        'lastLoginAt': Timestamp.now(),
-      });
+      await userDoc.update({'lastLoginAt': Timestamp.now()});
     }
   }
 
@@ -63,9 +65,9 @@ class DatabaseService {
     int? practiceMinutes,
   }) async {
     if (currentUserId == null) return;
-    
+
     final updates = <String, dynamic>{};
-    
+
     if (gemsToAdd != null) {
       updates['gems'] = FieldValue.increment(gemsToAdd);
     }
@@ -84,7 +86,7 @@ class DatabaseService {
     if (practiceMinutes != null) {
       updates['totalPracticeMinutes'] = FieldValue.increment(practiceMinutes);
     }
-    
+
     if (updates.isNotEmpty) {
       await _db.collection('users').doc(currentUserId).update(updates);
     }
@@ -92,15 +94,15 @@ class DatabaseService {
 
   Future<void> updateStreak() async {
     if (currentUserId == null) return;
-    
+
     final userDoc = await _db.collection('users').doc(currentUserId).get();
     if (!userDoc.exists) return;
-    
+
     final userData = userDoc.data()!;
     final lastStreakDate = (userData['lastStreakDate'] as Timestamp?)?.toDate();
     final today = DateTime.now();
     final todayDate = DateTime(today.year, today.month, today.day);
-    
+
     if (lastStreakDate == null) {
       // First time - start streak
       await _db.collection('users').doc(currentUserId).update({
@@ -108,9 +110,13 @@ class DatabaseService {
         'lastStreakDate': Timestamp.fromDate(todayDate),
       });
     } else {
-      final lastDate = DateTime(lastStreakDate.year, lastStreakDate.month, lastStreakDate.day);
+      final lastDate = DateTime(
+        lastStreakDate.year,
+        lastStreakDate.month,
+        lastStreakDate.day,
+      );
       final difference = todayDate.difference(lastDate).inDays;
-      
+
       if (difference == 0) {
         // Already practiced today
         return;
@@ -137,12 +143,18 @@ class DatabaseService {
         .collection('categories')
         .orderBy('order')
         .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => CategoryModel.fromFirestore(doc)).toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => CategoryModel.fromFirestore(doc))
+              .toList(),
+        );
   }
 
   Future<List<CategoryModel>> getCategories() async {
     final snapshot = await _db.collection('categories').orderBy('order').get();
-    return snapshot.docs.map((doc) => CategoryModel.fromFirestore(doc)).toList();
+    return snapshot.docs
+        .map((doc) => CategoryModel.fromFirestore(doc))
+        .toList();
   }
 
   // ==================== LESSON OPERATIONS ====================
@@ -154,7 +166,11 @@ class DatabaseService {
         .collection('lessons')
         .orderBy('order')
         .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => LessonModel.fromFirestore(doc)).toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => LessonModel.fromFirestore(doc))
+              .toList(),
+        );
   }
 
   Future<List<LessonModel>> getLessons(String categoryId) async {
@@ -191,7 +207,10 @@ class DatabaseService {
         .collection('signs')
         .orderBy('order')
         .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => SignModel.fromFirestore(doc)).toList());
+        .map(
+          (snapshot) =>
+              snapshot.docs.map((doc) => SignModel.fromFirestore(doc)).toList(),
+        );
   }
 
   Future<List<SignModel>> getSigns(String categoryId, String lessonId) async {
@@ -206,6 +225,63 @@ class DatabaseService {
     return snapshot.docs.map((doc) => SignModel.fromFirestore(doc)).toList();
   }
 
+  Future<List<String>> getGlobalSignLabels() async {
+    final snapshot = await _db.collection('signs').get();
+    final labels = <String>{};
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      final label = _normalizeSignLabel(data, fallbackId: doc.id);
+      if (label.isNotEmpty) {
+        labels.add(label);
+      }
+    }
+
+    final ordered = labels.toList()..sort();
+    return ordered;
+  }
+
+  Future<Map<String, String>> getGlobalSignImageUrls() async {
+    final snapshot = await _db.collection('signs').get();
+    final imageByLabel = <String, String>{};
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      final label = _normalizeSignLabel(data, fallbackId: doc.id);
+      if (label.isEmpty) continue;
+
+      final imageUrl = (data['imageUrl'] ?? data['pictureUrl'] ?? '')
+          .toString()
+          .trim();
+      final assetPathImage = (data['assetPathImage'] ?? '').toString().trim();
+      final gifUrl = (data['gifUrl'] ?? '').toString().trim();
+
+      final resolvedRef = imageUrl.isNotEmpty
+          ? imageUrl
+          : assetPathImage.isNotEmpty
+          ? assetPathImage
+          : gifUrl;
+
+      if (resolvedRef.isNotEmpty) {
+        imageByLabel[label] = resolvedRef;
+      }
+    }
+
+    return imageByLabel;
+  }
+
+  String _normalizeSignLabel(
+    Map<String, dynamic> data, {
+    String? fallbackId,
+  }) {
+    final raw =
+        (data['word'] ?? data['character'] ?? data['label'] ?? fallbackId ?? '')
+            .toString()
+            .trim();
+    if (raw.isEmpty) return '';
+    return raw.toUpperCase();
+  }
+
   // ==================== PROGRESS OPERATIONS ====================
 
   Stream<List<LessonProgress>> progressStream() {
@@ -215,7 +291,11 @@ class DatabaseService {
         .doc(currentUserId)
         .collection('progress')
         .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => LessonProgress.fromFirestore(doc)).toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => LessonProgress.fromFirestore(doc))
+              .toList(),
+        );
   }
 
   Future<LessonProgress?> getLessonProgress(String lessonId) async {
@@ -234,13 +314,13 @@ class DatabaseService {
 
   Future<void> startLesson(String lessonId, String categoryId) async {
     if (currentUserId == null) return;
-    
+
     final progressDoc = _db
         .collection('users')
         .doc(currentUserId)
         .collection('progress')
         .doc(lessonId);
-    
+
     final existing = await progressDoc.get();
     if (!existing.exists) {
       final progress = LessonProgress(
@@ -249,6 +329,7 @@ class DatabaseService {
         status: 'in_progress',
         startedAt: DateTime.now(),
         attemptsCount: 1,
+        guidedCurrentIndex: 0,
       );
       await progressDoc.set(progress.toFirestore());
     } else {
@@ -259,17 +340,134 @@ class DatabaseService {
     }
   }
 
-  Future<void> completeSign(String lessonId, String signId) async {
+  Future<void> completeSign(
+    String lessonId,
+    String signId, {
+    int? nextIndex,
+  }) async {
     if (currentUserId == null) return;
-    
+
+    final updates = <String, dynamic>{
+      'signsCompleted': FieldValue.arrayUnion([signId]),
+      'signsSkipped': FieldValue.arrayRemove([signId]),
+    };
+
+    if (nextIndex != null) {
+      updates['guidedCurrentIndex'] = nextIndex;
+    }
+
     await _db
         .collection('users')
         .doc(currentUserId)
         .collection('progress')
         .doc(lessonId)
-        .update({
-      'signsCompleted': FieldValue.arrayUnion([signId]),
-    });
+        .set(updates, SetOptions(merge: true));
+  }
+
+  Future<void> markSignSkipped({
+    required String lessonId,
+    required String signId,
+    required int nextIndex,
+  }) async {
+    if (currentUserId == null) return;
+
+    await _db
+        .collection('users')
+        .doc(currentUserId)
+        .collection('progress')
+        .doc(lessonId)
+        .set({
+          'signsSkipped': FieldValue.arrayUnion([signId]),
+          'guidedCurrentIndex': nextIndex,
+        }, SetOptions(merge: true));
+  }
+
+  Future<void> setGuidedCurrentIndex(String lessonId, int currentIndex) async {
+    if (currentUserId == null) return;
+
+    await _db
+        .collection('users')
+        .doc(currentUserId)
+        .collection('progress')
+        .doc(lessonId)
+        .set({'guidedCurrentIndex': currentIndex}, SetOptions(merge: true));
+  }
+
+  Future<void> saveAssessmentCheckpoint({
+    required String lessonId,
+    required List<String> skippedAssessmentTypes,
+    String? resumeAssessmentType,
+    Map<String, dynamic>? assessmentResults,
+    bool? guidedPracticeCompleted,
+    bool? assessmentSummaryReady,
+  }) async {
+    if (currentUserId == null) return;
+
+    final payload = <String, dynamic>{
+      'assessmentsSkipped': skippedAssessmentTypes,
+      'assessmentResumeFrom': resumeAssessmentType,
+    };
+
+    if (assessmentResults != null) {
+      payload['assessmentResults'] = assessmentResults;
+    }
+
+    if (guidedPracticeCompleted != null) {
+      payload['guidedPracticeCompleted'] = guidedPracticeCompleted;
+    }
+
+    if (assessmentSummaryReady != null) {
+      payload['assessmentSummaryReady'] = assessmentSummaryReady;
+    }
+
+    await _db
+        .collection('users')
+        .doc(currentUserId)
+        .collection('progress')
+        .doc(lessonId)
+        .set(payload, SetOptions(merge: true));
+  }
+
+  Future<void> restartLessonProgress({
+    required String lessonId,
+    required String categoryId,
+  }) async {
+    if (currentUserId == null) return;
+
+    final progressRef = _db
+        .collection('users')
+        .doc(currentUserId)
+        .collection('progress')
+        .doc(lessonId);
+
+    final snapshot = await progressRef.get();
+    final data = snapshot.data();
+    final attemptsCount = (data?['attemptsCount'] as num?)?.toInt() ?? 0;
+    final wasCompleted = data?['status'] == 'completed';
+    final preservedCompletedAt = data?['completedAt'];
+    final now = Timestamp.now();
+
+    await progressRef.set({
+      'categoryId': categoryId,
+      'status': wasCompleted ? 'completed' : 'in_progress',
+      'startedAt': now,
+      'lastAttemptAt': now,
+      'completedAt': wasCompleted ? preservedCompletedAt : null,
+      'attemptsCount': attemptsCount + 1,
+      'accuracy': null,
+      'timeSpentSeconds': 0,
+      'gemsEarned': 0,
+      'coinsEarned': 0,
+      'xpEarned': 0,
+      'signsCompleted': <String>[],
+      'signsSkipped': <String>[],
+      'guidedPracticeCompleted': false,
+      'guidedCurrentIndex': 0,
+      'assessmentsSkipped': <String>[],
+      'assessmentResumeFrom': null,
+      'assessmentSummaryReady': false,
+      'assessmentResults': <String, dynamic>{},
+    }, SetOptions(merge: true));
   }
 
   Future<void> completeLesson({
@@ -281,6 +479,7 @@ class DatabaseService {
     required int coinsEarned,
     required int xpEarned,
     required int signsCount,
+    Map<String, dynamic>? assessmentResults,
   }) async {
     if (currentUserId == null) return;
 
@@ -296,24 +495,36 @@ class DatabaseService {
       final firstCompletedAt = existingData?['completedAt'] as Timestamp?;
 
       final safeXpEarned = xpEarned < 0 ? 0 : xpEarned;
-      final safeGemsEarned = wasAlreadyCompleted ? 0 : (gemsEarned < 0 ? 0 : gemsEarned);
-      final safeCoinsEarned = wasAlreadyCompleted ? 0 : (coinsEarned < 0 ? 0 : coinsEarned);
+      final safeGemsEarned = wasAlreadyCompleted
+          ? 0
+          : (gemsEarned < 0 ? 0 : gemsEarned);
+      final safeCoinsEarned = wasAlreadyCompleted
+          ? 0
+          : (coinsEarned < 0 ? 0 : coinsEarned);
 
-      tx.set(
-        progressRef,
-        {
-          'categoryId': categoryId,
-          'status': 'completed',
-          'completedAt': firstCompletedAt ?? now,
-          'lastAttemptAt': now,
-          'accuracy': accuracy,
-          'timeSpentSeconds': timeSpentSeconds,
-          'gemsEarned': safeGemsEarned,
-          'coinsEarned': safeCoinsEarned,
-          'xpEarned': safeXpEarned,
-        },
-        SetOptions(merge: true),
-      );
+      tx.set(progressRef, {
+        'categoryId': categoryId,
+        'status': 'completed',
+        'completedAt': firstCompletedAt ?? now,
+        'lastAttemptAt': now,
+        'accuracy': accuracy,
+        'timeSpentSeconds': timeSpentSeconds,
+        'gemsEarned': safeGemsEarned,
+        'coinsEarned': safeCoinsEarned,
+        'xpEarned': safeXpEarned,
+        'signsSkipped': <String>[],
+        'guidedPracticeCompleted': true,
+        'guidedCurrentIndex': signsCount > 0 ? signsCount - 1 : 0,
+        'assessmentsSkipped': <String>[],
+        'assessmentResumeFrom': null,
+        'assessmentSummaryReady': false,
+        'assessmentResults': assessmentResults ??
+            (existingData?['assessmentResults'] is Map
+                ? Map<String, dynamic>.from(
+                    existingData!['assessmentResults'] as Map,
+                  )
+                : <String, dynamic>{}),
+      }, SetOptions(merge: true));
 
       final updates = <String, dynamic>{
         'xp': FieldValue.increment(safeXpEarned),
@@ -332,7 +543,7 @@ class DatabaseService {
 
     // Track lesson-only time for the daily goal widget.
     await _updateTodayLessonPracticeMinutes(timeSpentSeconds);
-    
+
     // Update streak
     await updateStreak();
   }
@@ -352,11 +563,15 @@ class DatabaseService {
       if (!snap.exists) return;
 
       final data = snap.data() ?? <String, dynamic>{};
-      final previousDate = (data['todayLessonPracticeDate'] as Timestamp?)?.toDate();
+      final previousDate = (data['todayLessonPracticeDate'] as Timestamp?)
+          ?.toDate();
       final existingMinutes = (data['todayLessonPracticeMinutes'] ?? 0) as int;
 
-      final sameDay = previousDate != null && _isSameCalendarDay(previousDate, today);
-      final updatedMinutes = sameDay ? existingMinutes + minutesToAdd : minutesToAdd;
+      final sameDay =
+          previousDate != null && _isSameCalendarDay(previousDate, today);
+      final updatedMinutes = sameDay
+          ? existingMinutes + minutesToAdd
+          : minutesToAdd;
 
       tx.update(userRef, {
         'todayLessonPracticeMinutes': updatedMinutes,
@@ -373,19 +588,20 @@ class DatabaseService {
 
   Future<DailyInsight?> getTodayInsight() async {
     final today = DateTime.now();
-    final dateStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
-    
+    final dateStr =
+        '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+
     final snapshot = await _db
         .collection('daily_insights')
         .where('date', isEqualTo: dateStr)
         .where('isActive', isEqualTo: true)
         .limit(1)
         .get();
-    
+
     if (snapshot.docs.isNotEmpty) {
       return DailyInsight.fromFirestore(snapshot.docs.first);
     }
-    
+
     // Fallback to most recent insight
     final fallbackSnapshot = await _db
         .collection('daily_insights')
@@ -393,12 +609,11 @@ class DatabaseService {
         .orderBy('date', descending: true)
         .limit(1)
         .get();
-    
+
     if (fallbackSnapshot.docs.isNotEmpty) {
       return DailyInsight.fromFirestore(fallbackSnapshot.docs.first);
     }
-    
+
     return null;
   }
 }
-

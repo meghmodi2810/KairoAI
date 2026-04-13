@@ -100,7 +100,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(18),
                     child: Image.asset(
-                      'assets/logo/logo.jpeg',
+                      'assets/logo/main_logo.png',
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) {
                         return const ColoredBox(
@@ -144,6 +144,16 @@ class _AuthWrapperState extends State<AuthWrapper> {
                   ),
                 ),
                 const SizedBox(height: 26),
+                SizedBox(
+                  height: 56,
+                  child: Image.asset(
+                    'assets/logo/auth_wrapper.png',
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const SizedBox.shrink(),
+                  ),
+                ),
+                const SizedBox(height: 20),
                 SizedBox(
                   width: 170,
                   child: Row(

@@ -87,6 +87,13 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ==================== SIGN IMAGES COLLECTION (LEGACY BASE64) ====================
+    match /sign_images/{signImageId} {
+      // Learners need read access for legacy fallback image retrieval.
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
     // ==================== WORD GROUPS COLLECTION ====================
     match /word_groups/{groupId} {
       // All authenticated users can read; only admins can write

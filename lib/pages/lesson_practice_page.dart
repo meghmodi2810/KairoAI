@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/app_models.dart';
+import '../services/sign_image_service.dart';
 import '../services/sign_detection_service.dart';
 import '../theme/app_theme.dart';
 
@@ -26,6 +27,7 @@ class LessonPracticePage extends StatefulWidget {
 class _LessonPracticePageState extends State<LessonPracticePage>
     with WidgetsBindingObserver {
   final SignDetectionService _detection = SignDetectionService();
+  final SignImageService _imageService = SignImageService();
 
   StreamSubscription<DetectionResult>? _sub;
   DetectionResult? _result;
@@ -109,8 +111,9 @@ class _LessonPracticePageState extends State<LessonPracticePage>
 
   Future<void> _stopCamera() async {
     if (_cameraSegmentStart != null) {
-      _activePracticeSeconds +=
-          DateTime.now().difference(_cameraSegmentStart!).inSeconds;
+      _activePracticeSeconds += DateTime.now()
+          .difference(_cameraSegmentStart!)
+          .inSeconds;
       _cameraSegmentStart = null;
     }
 
@@ -131,7 +134,9 @@ class _LessonPracticePageState extends State<LessonPracticePage>
     final target = _current.word.toUpperCase().trim();
     final detected = result.detectedSign.toUpperCase().trim();
 
-    if (result.handDetected && detected == target && result.confidence >= 0.65) {
+    if (result.handDetected &&
+        detected == target &&
+        result.confidence >= 0.65) {
       _matchCount++;
       if (_matchCount >= 3) {
         _confirmMatch();
@@ -201,10 +206,37 @@ class _LessonPracticePageState extends State<LessonPracticePage>
     return AppTheme.punchRed;
   }
 
+  Widget _buildReferenceMedia(String ref) {
+    return Image.asset(
+      ref,
+      fit: BoxFit.contain,
+      errorBuilder: (context, error, stackTrace) => _buildReferenceFallback(),
+    );
+  }
+
+  Widget _buildReferenceFallback() {
+    return Center(
+      child: Text(
+        _current.word.toUpperCase(),
+        style: const TextStyle(
+          color: AppTheme.cobaltBlue,
+          fontWeight: FontWeight.w900,
+          fontSize: 24,
+        ),
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final confidence = _result?.confidence ?? 0;
     final confidenceColor = _confidenceColor(confidence);
+    final prediction = (_result?.handDetected ?? false)
+        ? ((_result?.detectedSign.trim().isNotEmpty ?? false)
+              ? _result!.detectedSign.toUpperCase().trim()
+              : '--')
+        : '--';
     final displaySignNumber = widget.lessonSignNumber ?? (_index + 1);
     final displaySignTotal = widget.lessonSignTotal ?? widget.signs.length;
 
@@ -279,15 +311,25 @@ class _LessonPracticePageState extends State<LessonPracticePage>
                   const SizedBox(width: 10),
                   Expanded(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 7,
+                      ),
                       decoration: BoxDecoration(
                         color: AppTheme.warmWhite.withValues(alpha: 0.92),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.inkBlack, width: 2.5),
+                        border: Border.all(
+                          color: AppTheme.inkBlack,
+                          width: 2.5,
+                        ),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.gps_fixed, color: AppTheme.inkBlack, size: 16),
+                          const Icon(
+                            Icons.gps_fixed,
+                            color: AppTheme.inkBlack,
+                            size: 16,
+                          ),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
@@ -339,12 +381,16 @@ class _LessonPracticePageState extends State<LessonPracticePage>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: (_result?.handDetected ?? false) ? AppTheme.mintGreen : AppTheme.signalYellow,
+                color: (_result?.handDetected ?? false)
+                    ? AppTheme.mintGreen
+                    : AppTheme.signalYellow,
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: AppTheme.inkBlack, width: 2.5),
               ),
               child: Text(
-                (_result?.handDetected ?? false) ? 'HAND DETECTED' : 'SHOW HAND',
+                (_result?.handDetected ?? false)
+                    ? 'HAND DETECTED'
+                    : 'SHOW HAND',
                 style: const TextStyle(
                   color: AppTheme.inkBlack,
                   fontSize: 11,
@@ -353,16 +399,62 @@ class _LessonPracticePageState extends State<LessonPracticePage>
               ),
             ),
           ),
+          Positioned(
+            top: 90,
+            right: 14,
+            child: Container(
+              width: 114,
+              height: 114,
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: AppTheme.warmWhite,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.inkBlack, width: 3),
+              ),
+              child: FutureBuilder<String?>(
+                future: _imageService.resolveImageRefForWord(
+                  _current.word,
+                  lessonImageRef: _current.imageUrl,
+                  lessonFallbackRef: _current.gifUrl,
+                  fallbackLabel: _current.id,
+                ),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: CircularProgressIndicator(
+                        color: AppTheme.cobaltBlue,
+                        strokeWidth: 2,
+                      ),
+                    );
+                  }
+
+                  final ref = (snapshot.data ?? '').trim();
+                  if (ref.isNotEmpty) {
+                    return _buildReferenceMedia(ref);
+                  }
+
+                  return _buildReferenceFallback();
+                },
+              ),
+            ),
+          ),
           if (_matched)
             Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: AppTheme.mintGreen,
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: AppTheme.inkBlack, width: 3),
                   boxShadow: const [
-                    BoxShadow(color: AppTheme.inkBlack, blurRadius: 0, offset: Offset(6, 6)),
+                    BoxShadow(
+                      color: AppTheme.inkBlack,
+                      blurRadius: 0,
+                      offset: Offset(6, 6),
+                    ),
                   ],
                 ),
                 child: const Row(
@@ -386,131 +478,156 @@ class _LessonPracticePageState extends State<LessonPracticePage>
             alignment: Alignment.bottomCenter,
             child: Container(
               width: double.infinity,
-              padding: EdgeInsets.fromLTRB(12, 10, 12, MediaQuery.of(context).padding.bottom + 10),
+              padding: EdgeInsets.fromLTRB(
+                12,
+                10,
+                12,
+                MediaQuery.of(context).padding.bottom + 10,
+              ),
               decoration: BoxDecoration(
                 color: AppTheme.warmWhite,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(22),
+                ),
                 border: Border.all(color: AppTheme.inkBlack, width: 3),
               ),
               child: _loading
                   ? const SizedBox(
                       height: 68,
                       child: Center(
-                        child: CircularProgressIndicator(color: AppTheme.cobaltBlue),
+                        child: CircularProgressIndicator(
+                          color: AppTheme.cobaltBlue,
+                        ),
                       ),
                     )
                   : !_hasPermission
-                      ? Column(
-                          mainAxisSize: MainAxisSize.min,
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'Need camera access to practice.',
+                          style: TextStyle(
+                            color: AppTheme.inkBlack,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        ElevatedButton.icon(
+                          onPressed: _initCamera,
+                          icon: const Icon(Icons.camera_alt_rounded),
+                          label: const Text('Enable Camera'),
+                        ),
+                      ],
+                    )
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
                           children: [
-                            const Text(
-                              'Need camera access to practice.',
-                              style: TextStyle(
+                            Expanded(
+                              child: Text(
+                                _matchCount == 0
+                                    ? 'Hold steady'
+                                    : 'One more clean sign',
+                                style: const TextStyle(
+                                  color: AppTheme.inkBlack,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              '${(confidence * 100).toStringAsFixed(0)}%',
+                              style: const TextStyle(
                                 color: AppTheme.inkBlack,
                                 fontWeight: FontWeight.w900,
-                                fontSize: 16,
                               ),
-                            ),
-                            const SizedBox(height: 10),
-                            ElevatedButton.icon(
-                              onPressed: _initCamera,
-                              icon: const Icon(Icons.camera_alt_rounded),
-                              label: const Text('Enable Camera'),
                             ),
                           ],
-                        )
-                      : Column(
-                          mainAxisSize: MainAxisSize.min,
+                        ),
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: LinearProgressIndicator(
+                            value: confidence,
+                            minHeight: 10,
+                            backgroundColor: AppTheme.paperCream,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              confidenceColor,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Prediction: $prediction',
+                          style: const TextStyle(
+                            color: AppTheme.inkBlack,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
                           children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    _matchCount == 0
-                                        ? 'Hold steady'
-                                        : 'One more clean sign',
-                                    style: const TextStyle(
+                            ...List.generate(
+                              3,
+                              (i) => Expanded(
+                                child: Container(
+                                  margin: EdgeInsets.only(
+                                    right: i == 2 ? 0 : 6,
+                                  ),
+                                  height: 12,
+                                  decoration: BoxDecoration(
+                                    color: i < _matchCount
+                                        ? AppTheme.mintGreen
+                                        : AppTheme.paperCream,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
                                       color: AppTheme.inkBlack,
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w900,
+                                      width: 2,
                                     ),
                                   ),
-                                ),
-                                Text(
-                                  '${(confidence * 100).toStringAsFixed(0)}%',
-                                  style: const TextStyle(
-                                    color: AppTheme.inkBlack,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: LinearProgressIndicator(
-                                value: confidence,
-                                minHeight: 10,
-                                backgroundColor: AppTheme.paperCream,
-                                valueColor: AlwaysStoppedAnimation<Color>(confidenceColor),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                ...List.generate(
-                                  3,
-                                  (i) => Expanded(
-                                    child: Container(
-                                      margin: EdgeInsets.only(right: i == 2 ? 0 : 6),
-                                      height: 12,
-                                      decoration: BoxDecoration(
-                                        color: i < _matchCount
-                                            ? AppTheme.mintGreen
-                                            : AppTheme.paperCream,
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(color: AppTheme.inkBlack, width: 2),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                const Expanded(
-                                  child: Text(
-                                    'Perform the target sign correctly to continue.',
-                                    style: TextStyle(
-                                      color: AppTheme.inkBlack,
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                OutlinedButton.icon(
-                                  onPressed: _matched ? null : _skipCurrentSign,
-                                  icon: const Icon(Icons.skip_next_rounded),
-                                  label: const Text('Skip'),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 2),
-                            const Align(
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                'Skipping moves to the next sign.',
-                                style: TextStyle(
-                                  color: AppTheme.inkBlack,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 10,
                                 ),
                               ),
                             ),
                           ],
                         ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'Perform the target sign correctly to continue.',
+                                style: TextStyle(
+                                  color: AppTheme.inkBlack,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            OutlinedButton.icon(
+                              onPressed: _matched ? null : _skipCurrentSign,
+                              icon: const Icon(Icons.skip_next_rounded),
+                              label: const Text('Skip'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        const Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Skipping moves to the next sign.',
+                            style: TextStyle(
+                              color: AppTheme.inkBlack,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
             ),
           ),
         ],
@@ -533,7 +650,11 @@ class _LessonPracticePageState extends State<LessonPracticePage>
           shape: BoxShape.circle,
           border: Border.all(color: AppTheme.inkBlack, width: 3),
           boxShadow: const [
-            BoxShadow(color: AppTheme.inkBlack, blurRadius: 0, offset: Offset(3, 3)),
+            BoxShadow(
+              color: AppTheme.inkBlack,
+              blurRadius: 0,
+              offset: Offset(3, 3),
+            ),
           ],
         ),
         child: Icon(icon, color: AppTheme.inkBlack, size: 20),
