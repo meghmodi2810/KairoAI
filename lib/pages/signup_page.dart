@@ -1,7 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import '../main_navigation.dart';
+import '../auth_wrapper.dart';
 import '../theme/app_theme.dart';
 import '../theme/neo_brutal_widgets.dart';
 import 'login_page.dart';
@@ -64,7 +64,7 @@ class _SignUpPageState extends State<SignUpPage> {
         password: _passCtrl.text.trim(),
       );
       if (!mounted) return;
-      _goToMain();
+      _goToAuthGate();
     } on FirebaseAuthException catch (e) {
       _showError(_authMessage(e.code));
     } catch (_) {
@@ -95,7 +95,7 @@ class _SignUpPageState extends State<SignUpPage> {
         );
         return;
       }
-      _goToMain();
+      _goToAuthGate();
     } on FirebaseAuthException catch (e) {
       _showError(e.message ?? _authMessage(e.code));
     } catch (_) {
@@ -118,13 +118,13 @@ class _SignUpPageState extends State<SignUpPage> {
     }
   }
 
-  void _goToMain() {
+  void _goToAuthGate() {
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const MainNavigation(),
+        pageBuilder: (context, animation, secondaryAnimation) => const AuthWrapper(),
         transitionDuration: const Duration(milliseconds: 240),
-        transitionsBuilder: (_, animation, __, child) =>
+        transitionsBuilder: (context, animation, secondaryAnimation, child) =>
             FadeTransition(opacity: animation, child: child),
       ),
     );
@@ -134,9 +134,9 @@ class _SignUpPageState extends State<SignUpPage> {
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const LoginPage(),
+        pageBuilder: (context, animation, secondaryAnimation) => const LoginPage(),
         transitionDuration: const Duration(milliseconds: 240),
-        transitionsBuilder: (_, animation, __, child) =>
+        transitionsBuilder: (context, animation, secondaryAnimation, child) =>
             FadeTransition(opacity: animation, child: child),
       ),
     );

@@ -620,14 +620,20 @@ class _AdminBarChartState extends State<AdminBarChart>
         widget.highlightIndex ??
         (widget.values.length - 1);
 
+    const double tooltipReserve = 28;
+    const double labelsHeight = 20;
+    const double labelsGap = 8;
+    final chartAreaHeight = widget.height + tooltipReserve;
+
     return SizedBox(
-      height: widget.height + 30,
+      height: chartAreaHeight + labelsGap + labelsHeight,
       child: AnimatedBuilder(
         animation: _progress,
         builder: (context, child) {
           return Column(
             children: [
-              Expanded(
+              SizedBox(
+                height: chartAreaHeight,
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: widget.values.asMap().entries.map((e) {
@@ -635,6 +641,7 @@ class _AdminBarChartState extends State<AdminBarChart>
                     final v = e.value;
                     final frac = (v / maxVal) * _progress.value;
                     final isHighlight = i == highlightIdx;
+                    final barHeight = (widget.height * frac).clamp(4.0, widget.height);
                     
                     return Expanded(
                       child: GestureDetector(
@@ -642,40 +649,41 @@ class _AdminBarChartState extends State<AdminBarChart>
                         behavior: HitTestBehavior.opaque,
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.end,
+                          child: Stack(
+                            alignment: Alignment.bottomCenter,
                             children: [
-                              if (_tappedIndex == i) ...[
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 3,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: c.isDark ? c.bgSurface3 : c.bgSurface,
-                                    borderRadius: BorderRadius.circular(4),
-                                    border: Border.all(color: c.border2),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.1),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 2),
+                              if (_tappedIndex == i)
+                                Positioned(
+                                  bottom: barHeight + 6,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: c.isDark ? c.bgSurface3 : c.bgSurface,
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(color: c.border2),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.1),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Text(
+                                      v.toInt().toString(),
+                                      style: TextStyle(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w700,
+                                        color: c.textPrimary,
                                       ),
-                                    ],
-                                  ),
-                                  child: Text(
-                                    v.toInt().toString(),
-                                    style: TextStyle(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w700,
-                                      color: c.textPrimary,
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 4),
-                              ],
                               Container(
-                                height: (widget.height * frac).clamp(4.0, widget.height),
+                                height: barHeight,
                                 decoration: BoxDecoration(
                                   color: isHighlight
                                       ? (c.isDark ? c.accentBright : c.accent)
@@ -691,17 +699,22 @@ class _AdminBarChartState extends State<AdminBarChart>
                   }).toList(),
                 ),
               ),
-              const SizedBox(height: 8),
-              Row(
-                children: widget.labels.map((l) {
-                  return Expanded(
-                    child: Text(
-                      l,
-                      textAlign: TextAlign.center,
-                      style: adminMeta(c.textMuted),
-                    ),
-                  );
-                }).toList(),
+              const SizedBox(height: labelsGap),
+              SizedBox(
+                height: labelsHeight,
+                child: Row(
+                  children: widget.labels.map((l) {
+                    return Expanded(
+                      child: Text(
+                        l,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: adminMeta(c.textMuted),
+                      ),
+                    );
+                  }).toList(),
+                ),
               ),
             ],
           );

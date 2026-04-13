@@ -37,22 +37,24 @@ class _AdminIssuesScreenState extends State<AdminIssuesScreen> {
   }
 
   bool _matchesIssue(IssueModel issue) {
+    final issueStatus = issue.status.replaceAll('_', '-').toLowerCase();
     if (_search.isNotEmpty) {
       final q = _search.toLowerCase();
       if (!issue.title.toLowerCase().contains(q) &&
-          !issue.description.toLowerCase().contains(q)) {
+          !issue.description.toLowerCase().contains(q) &&
+          !issue.readableReporter.toLowerCase().contains(q)) {
         return false;
       }
     }
     switch (_statusFilter) {
       case 'Open':
-        return issue.status == 'open' || issue.status == 'new';
+        return issueStatus == 'open' || issueStatus == 'new';
       case 'In-progress':
-        return issue.status == 'in-progress';
+        return issueStatus == 'in-progress';
       case 'Resolved':
-        return issue.status == 'resolved';
+        return issueStatus == 'resolved';
       case 'Closed':
-        return issue.status == 'closed';
+        return issueStatus == 'closed';
       default:
         return true;
     }
@@ -101,14 +103,18 @@ class _AdminIssuesScreenState extends State<AdminIssuesScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) => _IssueDetailSheet(
-        issue: issue,
-        admin: widget.admin,
-        onStatusChange: (s) => _updateStatus(issue, s),
-        onDelete: () {
-          Navigator.of(context).pop();
-          _deleteIssue(issue);
-        },
+      useSafeArea: true,
+      builder: (sheetContext) => FractionallySizedBox(
+        heightFactor: 0.92,
+        child: _IssueDetailSheet(
+          issue: issue,
+          admin: widget.admin,
+          onStatusChange: (s) => _updateStatus(issue, s),
+          onDelete: () {
+            Navigator.of(sheetContext).pop();
+            _deleteIssue(issue);
+          },
+        ),
       ),
     ).whenComplete(() {
       if (mounted) setState(() => _selectedIssueId = null);
@@ -123,6 +129,8 @@ class _AdminIssuesScreenState extends State<AdminIssuesScreen> {
       appBar: AdminTopBar(
         title: 'Issues',
         onMenuTap: widget.onMenuTap,
+        adminName: widget.admin.displayName,
+        adminEmail: widget.admin.email,
       ),
       body: Column(
         children: [
@@ -220,8 +228,9 @@ class _IssueRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = ac(context);
+    final normalizedStatus = issue.status.replaceAll('_', '-').toLowerCase();
     AdminTagVariant statusVariant;
-    switch (issue.status) {
+    switch (normalizedStatus) {
       case 'resolved':
         statusVariant = AdminTagVariant.active;
       case 'in-progress':
@@ -264,16 +273,23 @@ class _IssueRow extends StatelessWidget {
           Text(issue.description, style: adminMeta(c.textMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
           const SizedBox(height: 4),
           Text(
-            'Ref: ${issue.reportedBy.isNotEmpty ? issue.reportedBy : "Anonymous"}',
+            'Reporter: ${issue.readableReporter}',
             style: TextStyle(fontSize: 10, color: c.textMuted, fontWeight: FontWeight.w600),
           ),
+          if (issue.sourceScreen.isNotEmpty || issue.lessonId != null || issue.signLabel != null)
+            Text(
+              'Context: ${issue.sourceScreen.isNotEmpty ? issue.sourceScreen : 'unknown'}${issue.lessonId != null ? ' · lesson ${issue.lessonId}' : ''}${issue.signLabel != null ? ' · sign ${issue.signLabel}' : ''}',
+              style: TextStyle(fontSize: 10, color: c.textMuted, fontWeight: FontWeight.w600),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
         ],
       ),
       trailing: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          AdminTag(label: issue.status.toUpperCase(), variant: statusVariant),
+          AdminTag(label: normalizedStatus.toUpperCase(), variant: statusVariant),
           const SizedBox(height: 4),
           Text(
             issue.priority.toUpperCase(),
@@ -315,6 +331,13 @@ class _IssueDetailSheetState extends State<_IssueDetailSheet> {
   final _db = AdminDatabaseService();
   final _noteCtrl = TextEditingController();
   bool _addingNote = false;
+  late String _currentStatus;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentStatus = widget.issue.status.replaceAll('_', '-').toLowerCase();
+  }
 
   @override
   void dispose() {
@@ -350,117 +373,144 @@ class _IssueDetailSheetState extends State<_IssueDetailSheet> {
     final issue = widget.issue;
     final bottomPad = MediaQuery.of(context).padding.bottom;
 
-    return Container(
-      decoration: BoxDecoration(
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+      child: Material(
         color: c.bgSurface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      padding: EdgeInsets.fromLTRB(16, 8, 16, 16 + bottomPad),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Center(
-            child: Container(
-              width: 32,
-              height: 4,
-              decoration: BoxDecoration(color: c.border, borderRadius: BorderRadius.circular(2)),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(issue.title, style: adminH2(c.textPrimary)),
-                    const SizedBox(height: 4),
-                    Text('Reported: ${issue.reportedBy}', style: adminMeta(c.textMuted)),
-                  ],
-                ),
-              ),
-              AdminTag(label: issue.priority, variant: AdminTagVariant.inactive),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: c.bgBase, borderRadius: BorderRadius.circular(8)),
-            child: Text(issue.description, style: adminBody(c.textSecondary)),
-          ),
-          const SizedBox(height: 20),
-          Text('WORKFLOW STATUS', style: adminLabel(c.textMuted)),
-          const SizedBox(height: 8),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: ['open', 'in-progress', 'resolved', 'closed']
-                  .map((s) => Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: AdminFilterChip(
-                      label: s.toUpperCase(),
-                      selected: issue.status == s,
-                      onTap: () => widget.onStatusChange(s),
-                    ),
-                  )).toList(),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Text('INTERNAL NOTES (${issue.adminNotes.length})', style: adminLabel(c.textMuted)),
-          const SizedBox(height: 8),
-          if (issue.adminNotes.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Text('No admin notes recorded.', style: adminBodySm(c.textMuted)),
-            )
-          else
-            ...issue.adminNotes.map((n) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+        child: Column(
+          children: [
+            const SizedBox(height: 8),
+            Center(
               child: Container(
-                padding: const EdgeInsets.all(10),
+                width: 32,
+                height: 4,
                 decoration: BoxDecoration(
-                  border: Border.all(color: c.border),
-                  borderRadius: BorderRadius.circular(6),
+                  color: c.border,
+                  borderRadius: BorderRadius.circular(2),
                 ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(16, 4, 16, 16 + bottomPad),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(n.content, style: adminBodySm(c.textPrimary)),
-                    const SizedBox(height: 4),
-                    Text('${n.adminName} · Just now', style: adminMeta(c.textMuted)),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(issue.title, style: adminH2(c.textPrimary)),
+                              const SizedBox(height: 4),
+                              Text('Reported: ${issue.readableReporter}', style: adminMeta(c.textMuted)),
+                              if (issue.reporterEmail.isNotEmpty)
+                                Text(issue.reporterEmail, style: adminMeta(c.textMuted)),
+                              if (issue.sourceScreen.isNotEmpty || issue.contextType.isNotEmpty)
+                                Text(
+                                  'Context: ${issue.sourceScreen.isNotEmpty ? issue.sourceScreen : 'n/a'} · ${issue.contextType.isNotEmpty ? issue.contextType : 'general'}',
+                                  style: adminMeta(c.textMuted),
+                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        AdminTag(label: issue.priority, variant: AdminTagVariant.inactive),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: c.bgBase,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(issue.description, style: adminBody(c.textSecondary)),
+                    ),
+                    const SizedBox(height: 20),
+                    Text('WORKFLOW STATUS', style: adminLabel(c.textMuted)),
+                    const SizedBox(height: 8),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: ['open', 'in-progress', 'resolved', 'closed']
+                            .map((s) => Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: AdminFilterChip(
+                                    label: s.toUpperCase(),
+                                    selected: _currentStatus == s,
+                                    onTap: () {
+                                      setState(() => _currentStatus = s);
+                                      widget.onStatusChange(s);
+                                    },
+                                  ),
+                                ))
+                            .toList(),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text('INTERNAL NOTES (${issue.adminNotes.length})', style: adminLabel(c.textMuted)),
+                    const SizedBox(height: 8),
+                    if (issue.adminNotes.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Text('No admin notes recorded.', style: adminBodySm(c.textMuted)),
+                      )
+                    else
+                      ...issue.adminNotes.map((n) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: c.border),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(n.content, style: adminBodySm(c.textPrimary)),
+                                  const SizedBox(height: 4),
+                                  Text('${n.adminName} · Just now', style: adminMeta(c.textMuted)),
+                                ],
+                              ),
+                            ),
+                          )),
+                    const SizedBox(height: 12),
+                    AdminInput(
+                      label: 'Resolution note',
+                      hint: 'Add a resolution note...',
+                      controller: _noteCtrl,
+                      maxLines: 2,
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: AdminButton(
+                            label: 'Add Note',
+                            variant: AdminButtonVariant.secondary,
+                            onTap: _addingNote ? null : _addNote,
+                            isLoading: _addingNote,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        AdminButton(
+                          label: 'Delete',
+                          variant: AdminButtonVariant.ghost,
+                          fullWidth: false,
+                          onTap: widget.onDelete,
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
-            )),
-          const SizedBox(height: 12),
-          AdminInput(
-            label: 'Resolution note',
-            hint: 'Add a resolution note...',
-            controller: _noteCtrl,
-            maxLines: 2,
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: AdminButton(
-                  label: 'Add Note',
-                  variant: AdminButtonVariant.secondary,
-                  onTap: _addingNote ? null : _addNote,
-                  isLoading: _addingNote,
-                ),
-              ),
-              const SizedBox(width: 12),
-              AdminButton(
-                label: 'Delete',
-                variant: AdminButtonVariant.ghost,
-                onTap: widget.onDelete,
-              ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/app_models.dart';
 import '../services/database_service.dart';
@@ -33,19 +32,19 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _loadData() async {
     try {
-      final currentUser = _auth.currentUser;
-      if (currentUser != null) {
-        await _db.createUserDocument(currentUser);
-      }
-
       final user = await _db.getCurrentUser();
       final categories = await _db.getCategories();
+
+      bool isCategoryLockedForUser(CategoryModel category) {
+        final currentLevel = user?.currentLevel ?? 1;
+        return category.isLocked || currentLevel < category.requiredLevel;
+      }
 
       LessonModel? nextLesson;
       String? nextCategoryId;
 
       for (final category in categories) {
-        if (category.isLocked) continue;
+        if (isCategoryLockedForUser(category)) continue;
         final lessons = await _db.getLessons(category.id);
         for (final lesson in lessons) {
           final progress = await _db.getLessonProgress(lesson.id);
@@ -415,6 +414,18 @@ class _HomePageState extends State<HomePage> {
     return user.todayLessonPracticeMinutes;
   }
 
+  bool _isCategoryLocked(CategoryModel category) {
+    final currentLevel = _user?.currentLevel ?? 1;
+    return category.isLocked || currentLevel < category.requiredLevel;
+  }
+
+  String _categoryLockMessage(CategoryModel category) {
+    if (category.isLocked) {
+      return '${category.name} is temporarily locked by admin.';
+    }
+    return 'Reach level ${category.requiredLevel} to unlock ${category.name}.';
+  }
+
   Widget _categoriesList() {
     if (_categories.isEmpty) {
       return NeoEmptyState(
@@ -428,18 +439,17 @@ class _HomePageState extends State<HomePage> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: _categories.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      separatorBuilder: (context, index) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final category = _categories[index];
+        final locked = _isCategoryLocked(category);
         final color = _parseColor(category.color);
 
         return GestureDetector(
-          onTap: category.isLocked
+          onTap: locked
               ? () => ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(
-                      'Reach level ${category.requiredLevel} to unlock ${category.name}.',
-                    ),
+                    content: Text(_categoryLockMessage(category)),
                   ),
                 )
               : () => Navigator.push(
@@ -457,14 +467,14 @@ class _HomePageState extends State<HomePage> {
                   width: 50,
                   height: 50,
                   decoration: BoxDecoration(
-                    color: category.isLocked
+                    color: locked
                         ? AppTheme.paperCream
                         : color.withValues(alpha: 0.24),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: AppTheme.inkBlack, width: 2),
                   ),
                   child: Center(
-                    child: category.isLocked
+                    child: locked
                         ? const Icon(Icons.lock, color: AppTheme.inkBlack)
                         : Text(
                             category.iconEmoji,
@@ -480,7 +490,7 @@ class _HomePageState extends State<HomePage> {
                       Text(
                         category.name,
                         style: TextStyle(
-                          color: category.isLocked
+                          color: locked
                               ? AppTheme.inkBlack.withValues(alpha: 0.6)
                               : AppTheme.inkBlack,
                           fontSize: 16,

@@ -6,6 +6,8 @@ class DatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  static const List<int> _defaultXpThresholds = <int>[0, 120, 280, 520, 860, 1300];
+
   String? get currentUserId => _auth.currentUser?.uid;
 
   // ==================== USER OPERATIONS ====================
@@ -15,6 +17,12 @@ class DatabaseService {
     String? learningGoal,
     int? dailyGoalMinutes,
   }) async {
+    // Admin accounts must not be mirrored into learner documents.
+    final adminSnapshot = await _db.collection('admins').doc(user.uid).get();
+    if (adminSnapshot.exists) {
+      return;
+    }
+
     final userDoc = _db.collection('users').doc(user.uid);
     final docSnapshot = await userDoc.get();
 
@@ -30,6 +38,7 @@ class DatabaseService {
         coins: 100, // Starting bonus
         learningGoal: learningGoal,
         dailyGoalMinutes: dailyGoalMinutes ?? 10,
+        currentLevel: 1,
       );
       await userDoc.set(newUser.toFirestore());
     } else {
@@ -89,6 +98,63 @@ class DatabaseService {
 
     if (updates.isNotEmpty) {
       await _db.collection('users').doc(currentUserId).update(updates);
+      if (xpToAdd != null) {
+        await _syncUserLevelFromXp();
+      }
+    }
+  }
+
+  Future<List<int>> _loadXpThresholds() async {
+    try {
+      final doc = await _db.collection('settings').doc('level_config').get();
+      if (!doc.exists) {
+        return _defaultXpThresholds;
+      }
+
+      final data = doc.data() ?? <String, dynamic>{};
+      final rawList = (data['xpThresholds'] as List<dynamic>? ?? _defaultXpThresholds)
+          .map((v) => (v as num).toInt())
+          .toSet()
+          .toList()
+        ..sort();
+
+      if (rawList.isEmpty || rawList.first != 0) {
+        rawList.insert(0, 0);
+      }
+
+      return rawList;
+    } catch (_) {
+      return _defaultXpThresholds;
+    }
+  }
+
+  int _deriveLevelFromXp(int xp, List<int> thresholds) {
+    final safeXp = xp < 0 ? 0 : xp;
+    var level = 1;
+    for (var i = 0; i < thresholds.length; i++) {
+      if (safeXp >= thresholds[i]) {
+        level = i + 1;
+      } else {
+        break;
+      }
+    }
+    return level;
+  }
+
+  Future<void> _syncUserLevelFromXp() async {
+    if (currentUserId == null) return;
+
+    final userDoc = await _db.collection('users').doc(currentUserId).get();
+    if (!userDoc.exists) return;
+
+    final data = userDoc.data() ?? <String, dynamic>{};
+    final xp = (data['xp'] as num?)?.toInt() ?? 0;
+    final thresholds = await _loadXpThresholds();
+    final derivedLevel = _deriveLevelFromXp(xp, thresholds);
+    final storedLevel = (data['currentLevel'] as num?)?.toInt() ?? 1;
+
+    if (derivedLevel != storedLevel) {
+      await userDoc.reference.update(<String, dynamic>{'currentLevel': derivedLevel});
     }
   }
 
@@ -543,6 +609,9 @@ class DatabaseService {
 
     // Track lesson-only time for the daily goal widget.
     await _updateTodayLessonPracticeMinutes(timeSpentSeconds);
+
+    // Keep user level derived from XP thresholds.
+    await _syncUserLevelFromXp();
 
     // Update streak
     await updateStreak();

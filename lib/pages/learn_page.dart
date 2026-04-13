@@ -48,107 +48,128 @@ class LearnPage extends StatelessWidget {
           ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 100),
-            sliver: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance
-                  .collection('categories')
-                  .orderBy('order')
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const SliverFillRemaining(
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        color: AppTheme.cobaltBlue,
-                      ),
-                    ),
-                  );
-                }
+            sliver: StreamBuilder<DocumentSnapshot>(
+              stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
+              builder: (context, userSnapshot) {
+                final userData = userSnapshot.data?.data() as Map<String, dynamic>?;
+                final currentLevel =
+                    (userData?['currentLevel'] as num?)?.toInt() ?? 1;
 
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return SliverFillRemaining(
-                    child: NeoEmptyState(
-                      icon: Icons.route,
-                      title: 'No Learning Path Yet',
-                      subtitle: 'Your admin will add categories here.',
-                    ),
-                  );
-                }
-
-                final docs = snapshot.data!.docs;
-
-                return SliverList.builder(
-                  itemCount: docs.length,
-                  itemBuilder: (context, index) {
-                    final category = CategoryModel.fromFirestore(docs[index]);
-                    final color = AppTheme
-                        .categoryColors[index % AppTheme.categoryColors.length];
-                    final isLast = index == docs.length - 1;
-
-                    return IntrinsicHeight(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          SizedBox(
-                            width: 44,
-                            child: Column(
-                              children: [
-                                Container(
-                                  width: 26,
-                                  height: 26,
-                                  decoration: BoxDecoration(
-                                    color: category.isLocked
-                                        ? AppTheme.paperCream
-                                        : color,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: AppTheme.inkBlack,
-                                      width: 3,
-                                    ),
-                                  ),
-                                  child: Icon(
-                                    category.isLocked ? Icons.lock : Icons.flag,
-                                    color: AppTheme.inkBlack,
-                                    size: 14,
-                                  ),
-                                ),
-                                if (!isLast)
-                                  Expanded(
-                                    child: Container(
-                                      width: 6,
-                                      margin: const EdgeInsets.symmetric(
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: AppTheme.inkBlack,
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
+                return StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('categories')
+                      .orderBy('order')
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const SliverFillRemaining(
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            color: AppTheme.cobaltBlue,
                           ),
-                          Expanded(
-                            child: Padding(
-                              padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
-                              child: _CategoryNode(
-                                uid: uid,
-                                category: category,
-                                color: color,
-                                onTap: category.isLocked
-                                    ? null
-                                    : () => Navigator.push(
+                        ),
+                      );
+                    }
+
+                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                      return SliverFillRemaining(
+                        child: NeoEmptyState(
+                          icon: Icons.route,
+                          title: 'No Learning Path Yet',
+                          subtitle: 'Your admin will add categories here.',
+                        ),
+                      );
+                    }
+
+                    final docs = snapshot.data!.docs;
+
+                    return SliverList.builder(
+                      itemCount: docs.length,
+                      itemBuilder: (context, index) {
+                        final category = CategoryModel.fromFirestore(docs[index]);
+                        final color = AppTheme
+                            .categoryColors[index % AppTheme.categoryColors.length];
+                        final isLast = index == docs.length - 1;
+                        final isLocked =
+                            category.isLocked || currentLevel < category.requiredLevel;
+                        final lockMessage = category.isLocked
+                            ? '${category.name} is temporarily locked by admin.'
+                            : 'Reach level ${category.requiredLevel} to unlock ${category.name}.';
+
+                        return IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              SizedBox(
+                                width: 44,
+                                child: Column(
+                                  children: [
+                                    Container(
+                                      width: 26,
+                                      height: 26,
+                                      decoration: BoxDecoration(
+                                        color: isLocked
+                                            ? AppTheme.paperCream
+                                            : color,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: AppTheme.inkBlack,
+                                          width: 3,
+                                        ),
+                                      ),
+                                      child: Icon(
+                                        isLocked ? Icons.lock : Icons.flag,
+                                        color: AppTheme.inkBlack,
+                                        size: 14,
+                                      ),
+                                    ),
+                                    if (!isLast)
+                                      Expanded(
+                                        child: Container(
+                                          width: 6,
+                                          margin: const EdgeInsets.symmetric(
+                                            vertical: 4,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.inkBlack,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              Expanded(
+                                child: Padding(
+                                  padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
+                                  child: _CategoryNode(
+                                    uid: uid,
+                                    category: category,
+                                    color: color,
+                                    isLocked: isLocked,
+                                    onTap: () {
+                                      if (isLocked) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text(lockMessage)),
+                                        );
+                                        return;
+                                      }
+                                      Navigator.push(
                                         context,
                                         MaterialPageRoute(
                                           builder: (_) => CategoryLessonsPage(
                                             category: category,
                                           ),
                                         ),
-                                      ),
+                                      );
+                                    },
+                                  ),
+                                ),
                               ),
-                            ),
+                            ],
                           ),
-                        ],
-                      ),
+                        );
+                      },
                     );
                   },
                 );
@@ -165,12 +186,14 @@ class _CategoryNode extends StatelessWidget {
   final String uid;
   final CategoryModel category;
   final Color color;
+  final bool isLocked;
   final VoidCallback? onTap;
 
   const _CategoryNode({
     required this.uid,
     required this.category,
     required this.color,
+    required this.isLocked,
     required this.onTap,
   });
 
@@ -180,21 +203,21 @@ class _CategoryNode extends StatelessWidget {
       onTap: onTap,
       child: NeoPanel(
         radius: 16,
-        color: category.isLocked ? AppTheme.paperCream : AppTheme.warmWhite,
+        color: isLocked ? AppTheme.paperCream : AppTheme.warmWhite,
         child: Row(
           children: [
             Container(
               width: 54,
               height: 54,
               decoration: BoxDecoration(
-                color: category.isLocked
+                color: isLocked
                     ? AppTheme.paperCream
                     : color.withValues(alpha: 0.25),
                 borderRadius: BorderRadius.circular(13),
                 border: Border.all(color: AppTheme.inkBlack, width: 2),
               ),
               child: Center(
-                child: category.isLocked
+                child: isLocked
                     ? const Icon(Icons.lock, color: AppTheme.inkBlack)
                     : Text(
                         category.iconEmoji,
@@ -211,7 +234,7 @@ class _CategoryNode extends StatelessWidget {
                     category.name,
                     style: TextStyle(
                       color: AppTheme.inkBlack.withValues(
-                        alpha: category.isLocked ? 0.5 : 1,
+                        alpha: isLocked ? 0.5 : 1,
                       ),
                       fontSize: 17,
                       fontWeight: FontWeight.w900,
@@ -289,7 +312,7 @@ class _CategoryNode extends StatelessWidget {
                 ],
               ),
             ),
-            if (!category.isLocked)
+            if (!isLocked)
               const Icon(
                 Icons.arrow_forward_ios_rounded,
                 color: AppTheme.inkBlack,

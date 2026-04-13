@@ -1,6 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import '../main_navigation.dart';
+import '../auth_wrapper.dart';
 import '../theme/app_theme.dart';
 import '../theme/neo_brutal_widgets.dart';
 
@@ -61,11 +61,11 @@ class _SetAccountPasswordPageState extends State<SetAccountPasswordPage> {
       await user.linkWithCredential(credential);
       await user.reload();
       if (!mounted) return;
-      _goToMain();
+      _goToAuthGate();
     } on FirebaseAuthException catch (e) {
       if (e.code == 'provider-already-linked') {
         if (!mounted) return;
-        _goToMain();
+        _goToAuthGate();
         return;
       }
       _showError(_authMessage(e.code));
@@ -91,16 +91,16 @@ class _SetAccountPasswordPageState extends State<SetAccountPasswordPage> {
     }
   }
 
-  void _goToMain() {
+  void _goToAuthGate() {
     Navigator.pushAndRemoveUntil(
       context,
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) => const MainNavigation(),
+        pageBuilder: (context, animation, secondaryAnimation) => const AuthWrapper(),
         transitionDuration: const Duration(milliseconds: 240),
-        transitionsBuilder: (_, animation, __, child) =>
+        transitionsBuilder: (context, animation, secondaryAnimation, child) =>
             FadeTransition(opacity: animation, child: child),
       ),
-      (_) => false,
+      (route) => false,
     );
   }
 

@@ -1,13 +1,26 @@
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:math';
 import 'package:kairo_ai/admin/models/admin_models.dart';
+import 'package:kairo_ai/firebase_options.dart';
 import 'package:kairo_ai/models/app_models.dart';
 
 class AdminDatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
+  final FirebaseFunctions _functions = FirebaseFunctions.instance;
+
+  String _normalizeIssueStatus(String status) {
+    final normalized = status.trim().toLowerCase();
+    if (normalized == 'in_progress' || normalized == 'inprogress') {
+      return 'in-progress';
+    }
+    return normalized;
+  }
 
   // ==================== LESSON OPERATIONS ====================
   // Lessons are stored in categories/{categoryId}/lessons subcollection
@@ -406,12 +419,17 @@ class AdminDatabaseService {
         await doc.reference.delete();
       }
       
-      // Reset user stats
+      // Reset canonical learner stats
       await _db.collection('users').doc(learnerId).update({
         'xp': 0,
-        'level': 1,
-        'completedLessonIds': [],
+        'currentLevel': 1,
+        'totalLessonsCompleted': 0,
+        'totalSignsLearned': 0,
+        'totalPracticeMinutes': 0,
+        'todayLessonPracticeMinutes': 0,
+        'todayLessonPracticeDate': null,
         'streakDays': 0,
+        'lastStreakDate': null,
       });
       
       await _logAuditAction(
@@ -426,32 +444,60 @@ class AdminDatabaseService {
     }
   }
 
-  /// Delete learner account
+  /// Legacy bool wrapper used by older code paths.
   Future<bool> deleteLearner(String learnerId) async {
+    final result = await deleteLearnerCompletely(learnerId);
+    return result.success;
+  }
+
+  /// Delete learner firestore + auth account through an admin-only backend function.
+  Future<AdminActionResult> deleteLearnerCompletely(String learnerId) async {
     try {
-      // Delete progress subcollection
-      final progressSnapshot = await _db
-          .collection('users')
-          .doc(learnerId)
-          .collection('progress')
-          .get();
-      
-      for (final doc in progressSnapshot.docs) {
-        await doc.reference.delete();
+      final callable = _functions.httpsCallable('deleteLearnerAccount');
+      final response = await callable.call(<String, dynamic>{
+        'learnerId': learnerId,
+      });
+
+      final payload = (response.data is Map)
+          ? Map<String, dynamic>.from(response.data as Map)
+          : <String, dynamic>{};
+      final success = payload['success'] == true;
+
+      if (!success) {
+        final backendMessage = (payload['message'] ?? '').toString().trim();
+        return AdminActionResult(
+          success: false,
+          message: backendMessage.isNotEmpty
+              ? backendMessage
+              : 'Deletion could not be completed on the backend.',
+        );
       }
-      
-      // Delete user document
-      await _db.collection('users').doc(learnerId).delete();
-      
+
       await _logAuditAction(
         action: 'delete',
         entityType: 'learner',
         entityId: learnerId,
+        changes: <String, dynamic>{'fullDelete': true},
       );
-      return true;
+
+      return const AdminActionResult(
+        success: true,
+        message: 'Learner removed from Authentication and Firestore.',
+      );
+    } on FirebaseFunctionsException catch (e) {
+      final backendMessage = (e.message ?? '').trim();
+      return AdminActionResult(
+        success: false,
+        message: backendMessage.isNotEmpty
+            ? backendMessage
+            : 'Secure deletion endpoint is unavailable right now.',
+      );
     } catch (e) {
       debugPrint('Error deleting learner: $e');
-      return false;
+      return const AdminActionResult(
+        success: false,
+        message: 'Delete failed before completion. Nothing was removed in UI.',
+      );
     }
   }
 
@@ -532,7 +578,14 @@ class AdminDatabaseService {
     Query query = _db.collection('issues');
     
     if (status != null) {
-      query = query.where('status', isEqualTo: status);
+      final normalizedStatus = _normalizeIssueStatus(status);
+      if (normalizedStatus == 'open') {
+        query = query.where('status', whereIn: <String>['open', 'new']);
+      } else if (normalizedStatus == 'in-progress') {
+        query = query.where('status', whereIn: <String>['in-progress', 'in_progress']);
+      } else {
+        query = query.where('status', isEqualTo: normalizedStatus);
+      }
     }
     if (priority != null) {
       query = query.where('priority', isEqualTo: priority);
@@ -562,11 +615,12 @@ class AdminDatabaseService {
   /// Update issue status
   Future<bool> updateIssueStatus(String issueId, String status) async {
     try {
+      final normalizedStatus = _normalizeIssueStatus(status);
       final updates = <String, dynamic>{
-        'status': status,
+        'status': normalizedStatus,
       };
       
-      if (status == 'resolved' || status == 'closed') {
+      if (normalizedStatus == 'resolved' || normalizedStatus == 'closed') {
         updates['resolvedAt'] = FieldValue.serverTimestamp();
       }
       
@@ -575,7 +629,7 @@ class AdminDatabaseService {
         action: 'status_change',
         entityType: 'issue',
         entityId: issueId,
-        changes: {'status': status},
+        changes: {'status': normalizedStatus},
       );
       return true;
     } catch (e) {
@@ -700,6 +754,493 @@ class AdminDatabaseService {
     }
   }
 
+  // ==================== LEVEL CONFIG OPERATIONS ====================
+
+  Stream<LevelConfigModel> levelConfigStream() {
+    return _db.collection('settings').doc('level_config').snapshots().map((doc) {
+      if (doc.exists) {
+        return LevelConfigModel.fromFirestore(doc);
+      }
+      return const LevelConfigModel();
+    });
+  }
+
+  Future<LevelConfigModel> getLevelConfig() async {
+    try {
+      final doc = await _db.collection('settings').doc('level_config').get();
+      if (doc.exists) {
+        return LevelConfigModel.fromFirestore(doc);
+      }
+    } catch (e) {
+      debugPrint('Error loading level config: $e');
+    }
+    return const LevelConfigModel();
+  }
+
+  Future<bool> updateLevelConfig(LevelConfigModel config, {String? updatedBy}) async {
+    try {
+      final normalized = LevelConfigModel.normalizeThresholds(config.xpThresholds);
+      final payload = config.copyWith(
+        xpThresholds: normalized,
+        updatedAt: DateTime.now(),
+        updatedBy: updatedBy,
+      );
+
+      await _db.collection('settings').doc('level_config').set(payload.toFirestore());
+      await _logAuditAction(
+        action: 'update_level_config',
+        entityType: 'settings',
+        entityId: 'level_config',
+        changes: <String, dynamic>{'xpThresholds': normalized},
+      );
+      return true;
+    } catch (e) {
+      debugPrint('Error updating level config: $e');
+      return false;
+    }
+  }
+
+  Future<int> recalculateAllLearnerLevels() async {
+    try {
+      final config = await getLevelConfig();
+      final usersSnapshot = await _db.collection('users').get();
+
+      if (usersSnapshot.docs.isEmpty) {
+        return 0;
+      }
+
+      var updated = 0;
+      var batch = _db.batch();
+      var writesInBatch = 0;
+
+      for (final userDoc in usersSnapshot.docs) {
+        final data = userDoc.data();
+        final xp = (data['xp'] as num?)?.toInt() ?? 0;
+        final currentLevel = config.levelForXp(xp);
+
+        final totalLessonsCompleted =
+            (data['totalLessonsCompleted'] as num?)?.toInt() ??
+            ((data['completedLessonIds'] as List?)?.length ?? 0);
+
+        batch.set(userDoc.reference, <String, dynamic>{
+          'xp': xp,
+          'currentLevel': currentLevel,
+          'totalLessonsCompleted': totalLessonsCompleted,
+        }, SetOptions(merge: true));
+
+        writesInBatch += 1;
+        updated += 1;
+
+        if (writesInBatch >= 400) {
+          await batch.commit();
+          batch = _db.batch();
+          writesInBatch = 0;
+        }
+      }
+
+      if (writesInBatch > 0) {
+        await batch.commit();
+      }
+
+      await _logAuditAction(
+        action: 'recalculate_levels',
+        entityType: 'users',
+        entityId: null,
+        changes: <String, dynamic>{'updatedLearners': updated},
+      );
+
+      return updated;
+    } catch (e) {
+      debugPrint('Error recalculating learner levels: $e');
+      return 0;
+    }
+  }
+
+  // ==================== ADMIN MANAGEMENT OPERATIONS ====================
+
+  Stream<List<AdminModel>> adminsStream() {
+    return _db
+        .collection('admins')
+        .orderBy('createdAt', descending: false)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => AdminModel.fromFirestore(doc)).toList());
+  }
+
+  Future<int> getActiveAdminCount() async {
+    final snapshot = await _db
+        .collection('admins')
+        .where('isActive', isEqualTo: true)
+        .count()
+        .get();
+    return snapshot.count ?? 0;
+  }
+
+  Future<AdminActionResult> setAdminActiveStatus({
+    required String adminId,
+    required bool isActive,
+    required String actingAdminId,
+  }) async {
+    try {
+      final targetDoc = await _db.collection('admins').doc(adminId).get();
+      if (!targetDoc.exists) {
+        return const AdminActionResult(
+          success: false,
+          message: 'Admin record was not found.',
+        );
+      }
+
+      final target = AdminModel.fromFirestore(targetDoc);
+      final activeCount = await getActiveAdminCount();
+
+      if (!isActive) {
+        final isTargetActive = target.isActive;
+        final isLastActive = isTargetActive && activeCount <= 1;
+        if (isLastActive) {
+          return const AdminActionResult(
+            success: false,
+            message: 'At least one active admin is required at all times.',
+          );
+        }
+      }
+
+      await _db.collection('admins').doc(adminId).update(<String, dynamic>{
+        'isActive': isActive,
+        'statusUpdatedAt': FieldValue.serverTimestamp(),
+      });
+
+      await _logAuditAction(
+        action: isActive ? 'activate_admin' : 'deactivate_admin',
+        entityType: 'admin',
+        entityId: adminId,
+        changes: <String, dynamic>{'actor': actingAdminId},
+      );
+
+      return AdminActionResult(
+        success: true,
+        message: isActive ? 'Admin reactivated.' : 'Admin deactivated.',
+      );
+    } catch (e) {
+      debugPrint('Error updating admin status: $e');
+      return const AdminActionResult(
+        success: false,
+        message: 'Could not update admin status right now.',
+      );
+    }
+  }
+
+  Future<AdminActionResult> removeAdminAccess({
+    required String adminId,
+    required String actingAdminId,
+  }) async {
+    try {
+      final targetDoc = await _db.collection('admins').doc(adminId).get();
+      if (!targetDoc.exists) {
+        return const AdminActionResult(
+          success: false,
+          message: 'Admin record was already removed.',
+        );
+      }
+
+      final target = AdminModel.fromFirestore(targetDoc);
+      final activeCount = await getActiveAdminCount();
+
+      if (target.isActive && activeCount <= 1) {
+        return const AdminActionResult(
+          success: false,
+          message: 'Cannot remove the last active admin.',
+        );
+      }
+
+      await _db.collection('admins').doc(adminId).delete();
+
+      await _logAuditAction(
+        action: 'remove_admin',
+        entityType: 'admin',
+        entityId: adminId,
+        changes: <String, dynamic>{'actor': actingAdminId},
+      );
+
+      return const AdminActionResult(
+        success: true,
+        message: 'Admin access removed.',
+      );
+    } catch (e) {
+      debugPrint('Error removing admin: $e');
+      return const AdminActionResult(
+        success: false,
+        message: 'Failed to remove admin access.',
+      );
+    }
+  }
+
+  Future<AdminActionResult> promoteAdminByEmail(String email) async {
+    try {
+      final callable = _functions.httpsCallable('promoteAdminByEmail');
+      final response = await callable.call(<String, dynamic>{'email': email.trim()});
+
+      final payload = (response.data is Map)
+          ? Map<String, dynamic>.from(response.data as Map)
+          : <String, dynamic>{};
+      final success = payload['success'] == true;
+
+      if (!success) {
+        final backendMessage = (payload['message'] ?? '').toString().trim();
+        return AdminActionResult(
+          success: false,
+          message: backendMessage.isNotEmpty
+              ? backendMessage
+              : 'Promotion request could not be completed.',
+        );
+      }
+
+      final promotedUid = (payload['uid'] ?? '').toString().trim();
+      if (promotedUid.isNotEmpty) {
+        await _db.collection('admins').doc(promotedUid).set(<String, dynamic>{
+          'email': (payload['email'] ?? email).toString().trim().toLowerCase(),
+          'displayName': (payload['displayName'] ?? '').toString().trim(),
+          'isActive': true,
+          'role': 'admin',
+          'permissions': <String>[],
+          'createdAt': FieldValue.serverTimestamp(),
+          'lastLoginAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+
+      await _logAuditAction(
+        action: 'promote_admin',
+        entityType: 'admin',
+        entityId: promotedUid.isNotEmpty ? promotedUid : null,
+        changes: <String, dynamic>{'email': email.trim().toLowerCase()},
+      );
+
+      return const AdminActionResult(
+        success: true,
+        message: 'Admin access granted successfully.',
+      );
+    } on FirebaseFunctionsException catch (e) {
+      final backendMessage = (e.message ?? '').trim();
+      return AdminActionResult(
+        success: false,
+        message: backendMessage.isNotEmpty
+            ? backendMessage
+            : 'Secure promotion endpoint is unavailable.',
+      );
+    } catch (e) {
+      debugPrint('Error promoting admin: $e');
+      return const AdminActionResult(
+        success: false,
+        message: 'Failed to promote this account to admin.',
+      );
+    }
+  }
+
+  Future<AdminActionResult> createManagedUser({
+    required String email,
+    required String displayName,
+    required String temporaryPassword,
+    required bool createAsAdmin,
+    required String actingAdminId,
+  }) async {
+    final normalizedEmail = email.trim().toLowerCase();
+    final normalizedName = displayName.trim();
+    final password = temporaryPassword.trim();
+
+    if (normalizedEmail.isEmpty) {
+      return const AdminActionResult(
+        success: false,
+        message: 'Email is required.',
+      );
+    }
+    if (normalizedName.isEmpty) {
+      return const AdminActionResult(
+        success: false,
+        message: 'Display name is required.',
+      );
+    }
+    if (password.length < 6) {
+      return const AdminActionResult(
+        success: false,
+        message: 'Temporary password must be at least 6 characters.',
+      );
+    }
+
+    FirebaseApp? secondaryApp;
+    try {
+      final appName = 'admin-create-user-${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(9999)}';
+      secondaryApp = await Firebase.initializeApp(
+        name: appName,
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+
+      final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
+      final credential = await secondaryAuth.createUserWithEmailAndPassword(
+        email: normalizedEmail,
+        password: password,
+      );
+
+      final createdUser = credential.user;
+      if (createdUser == null) {
+        return const AdminActionResult(
+          success: false,
+          message: 'User account was not created. Please retry.',
+        );
+      }
+
+      await createdUser.updateDisplayName(normalizedName);
+      await secondaryAuth.signOut();
+
+      final now = DateTime.now();
+      if (createAsAdmin) {
+        await _db.collection('users').doc(createdUser.uid).delete().catchError((_) {});
+        await _db.collection('admins').doc(createdUser.uid).set(<String, dynamic>{
+          'email': normalizedEmail,
+          'displayName': normalizedName,
+          'isActive': true,
+          'role': 'admin',
+          'permissions': <String>[],
+          'createdAt': FieldValue.serverTimestamp(),
+          'lastLoginAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        await _logAuditAction(
+          action: 'create_admin',
+          entityType: 'admin',
+          entityId: createdUser.uid,
+          changes: <String, dynamic>{
+            'email': normalizedEmail,
+            'actor': actingAdminId,
+          },
+        );
+
+        return const AdminActionResult(
+          success: true,
+          message: 'Admin account created successfully.',
+        );
+      }
+
+      await _db.collection('admins').doc(createdUser.uid).delete().catchError((_) {});
+      final learner = UserModel(
+        uid: createdUser.uid,
+        email: normalizedEmail,
+        displayName: normalizedName,
+        createdAt: now,
+        lastLoginAt: now,
+        gems: 0,
+        coins: 100,
+        streakDays: 0,
+        totalLessonsCompleted: 0,
+        totalSignsLearned: 0,
+        totalPracticeMinutes: 0,
+        currentLevel: 1,
+        xp: 0,
+        isActive: true,
+      );
+      await _db.collection('users').doc(createdUser.uid).set(
+            learner.toFirestore(),
+            SetOptions(merge: true),
+          );
+
+      await _logAuditAction(
+        action: 'create_learner',
+        entityType: 'learner',
+        entityId: createdUser.uid,
+        changes: <String, dynamic>{
+          'email': normalizedEmail,
+          'actor': actingAdminId,
+        },
+      );
+
+      return const AdminActionResult(
+        success: true,
+        message: 'Learner account created successfully.',
+      );
+    } on FirebaseAuthException catch (e) {
+      if (createAsAdmin && e.code == 'email-already-in-use') {
+        final promoteResult = await promoteAdminByEmail(normalizedEmail);
+        if (promoteResult.success) {
+          return const AdminActionResult(
+            success: true,
+            message: 'Existing account found and promoted to admin.',
+          );
+        }
+        return promoteResult;
+      }
+      return AdminActionResult(
+        success: false,
+        message: _authCreateErrorMessage(e.code),
+      );
+    } catch (e) {
+      debugPrint('Error creating managed user: $e');
+      return const AdminActionResult(
+        success: false,
+        message: 'Could not create user account right now.',
+      );
+    } finally {
+      if (secondaryApp != null) {
+        try {
+          await secondaryApp.delete();
+        } catch (_) {}
+      }
+    }
+  }
+
+  Future<AdminActionResult> updateAdminDisplayName({
+    required String adminId,
+    required String displayName,
+    required String actingAdminId,
+  }) async {
+    final nextName = displayName.trim();
+    if (nextName.isEmpty) {
+      return const AdminActionResult(
+        success: false,
+        message: 'Display name cannot be empty.',
+      );
+    }
+
+    try {
+      await _db.collection('admins').doc(adminId).update(<String, dynamic>{
+        'displayName': nextName,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      await _logAuditAction(
+        action: 'update_admin',
+        entityType: 'admin',
+        entityId: adminId,
+        changes: <String, dynamic>{
+          'displayName': nextName,
+          'actor': actingAdminId,
+        },
+      );
+
+      return const AdminActionResult(
+        success: true,
+        message: 'Admin profile updated.',
+      );
+    } catch (e) {
+      debugPrint('Error updating admin profile: $e');
+      return const AdminActionResult(
+        success: false,
+        message: 'Could not update admin profile.',
+      );
+    }
+  }
+
+  String _authCreateErrorMessage(String code) {
+    switch (code) {
+      case 'email-already-in-use':
+        return 'This email is already in use.';
+      case 'invalid-email':
+        return 'Please enter a valid email address.';
+      case 'weak-password':
+        return 'Temporary password is too weak.';
+      case 'operation-not-allowed':
+        return 'Email/password sign up is disabled in Firebase Auth.';
+      default:
+        return 'Could not create account ($code).';
+    }
+  }
+
   // ==================== ANALYTICS OPERATIONS ====================
 
   /// Get total learner count
@@ -767,7 +1308,7 @@ class AdminDatabaseService {
       // Get total issues
       final openIssuesSnapshot = await _db
           .collection('issues')
-          .where('status', whereIn: ['new', 'in-progress'])
+          .where('status', whereIn: <String>['new', 'open', 'in-progress', 'in_progress'])
           .count()
           .get();
       
@@ -853,6 +1394,79 @@ class AdminDatabaseService {
     } catch (e) {
       debugPrint('Error getting sign practice logs: $e');
       return [];
+    }
+  }
+
+  Future<Map<String, String>> getSignLabelsById() async {
+    try {
+      final labels = <String, String>{};
+
+      void absorbLabel(String key, String value) {
+        final normalizedKey = key.trim();
+        final normalizedValue = value.trim();
+        if (normalizedKey.isEmpty || normalizedValue.isEmpty) {
+          return;
+        }
+        labels[normalizedKey] = normalizedValue;
+      }
+
+      Future<void> absorbSnapshot(QuerySnapshot<Map<String, dynamic>> snapshot) async {
+        for (final doc in snapshot.docs) {
+          final data = doc.data();
+          final label = (data['word'] ??
+                  data['signCharacter'] ??
+                  data['character'] ??
+                  data['label'] ??
+                  data['text'] ??
+                  '')
+              .toString()
+              .trim();
+
+          if (label.isNotEmpty) {
+            absorbLabel(doc.id, label);
+          }
+        }
+      }
+
+      await absorbSnapshot(await _db.collection('signs').get());
+      await absorbSnapshot(await _db.collectionGroup('signs').get());
+
+      // Some logs may capture sign characters as IDs. Keep direct label map too.
+      for (final value in labels.values.toList(growable: false)) {
+        absorbLabel(value, value);
+      }
+
+      return labels;
+    } catch (e) {
+      debugPrint('Error resolving sign labels: $e');
+      return <String, String>{};
+    }
+  }
+
+  Future<double> getOverallPracticeAccuracy({int sampleLimit = 800}) async {
+    try {
+      final snapshot = await _db
+          .collection('sign_practice_logs')
+          .orderBy('timestamp', descending: true)
+          .limit(sampleLimit)
+          .get();
+
+      if (snapshot.docs.isEmpty) {
+        return 0;
+      }
+
+      var correct = 0;
+      for (final doc in snapshot.docs) {
+        final isCorrect = (doc.data()['isCorrect'] ?? false) == true;
+        if (isCorrect) {
+          correct += 1;
+        }
+      }
+
+      return correct / snapshot.docs.length;
+    } catch (e) {
+      debugPrint('Error calculating practice accuracy: $e');
+      return 0;
     }
   }
 

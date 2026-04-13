@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/app_models.dart';
 import '../../models/lesson_assessment_models.dart';
+import '../../services/issue_report_service.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/neo_brutal_widgets.dart';
 
@@ -251,6 +253,148 @@ class _MatchingAssessmentPageState extends State<MatchingAssessmentPage> {
     }
 
     _finishAssessment(status: AssessmentStatus.skipped);
+  }
+
+  Future<void> _reportAssessmentIssue() async {
+    final hostContext = context;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sign in again to submit a report.')),
+      );
+      return;
+    }
+
+    final titleCtrl = TextEditingController(text: 'Matching assessment issue');
+    final detailsCtrl = TextEditingController();
+    final issueService = IssueReportService();
+    bool submitting = false;
+
+    final submitted = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (localContext, setLocalState) {
+            return AlertDialog(
+              title: const Text('Report assessment issue'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: titleCtrl,
+                    decoration: const InputDecoration(labelText: 'Title'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: detailsCtrl,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      labelText: 'Details',
+                      hintText: 'What made this matching step difficult?',
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: submitting
+                      ? null
+                      : () => Navigator.of(dialogContext, rootNavigator: true).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: submitting
+                      ? null
+                      : () async {
+                          final title = titleCtrl.text.trim();
+                          final details = detailsCtrl.text.trim();
+                          if (title.isEmpty || details.isEmpty) {
+                            if (!hostContext.mounted) return;
+                            ScaffoldMessenger.of(hostContext).showSnackBar(
+                              const SnackBar(
+                                content: Text('Please enter title and details.'),
+                              ),
+                            );
+                            return;
+                          }
+
+                          setLocalState(() => submitting = true);
+
+                          try {
+                            String? selectedSignLabel;
+                            final selectedSignId = _selectedSignId;
+                            if (selectedSignId != null && selectedSignId.isNotEmpty) {
+                              for (final sign in _signs) {
+                                if (sign.id == selectedSignId) {
+                                  selectedSignLabel = sign.word;
+                                  break;
+                                }
+                              }
+                            }
+
+                            await issueService.submit(
+                              IssueReportPayload(
+                                title: title,
+                                description: details,
+                                type: 'bug',
+                                priority: 'medium',
+                                reporterUid: user.uid,
+                                reporterEmail: user.email ?? '',
+                                reporterDisplayName: user.displayName ?? 'Learner',
+                                sourceScreen: 'matching_assessment',
+                                contextType: 'assessment_flow',
+                                signId: selectedSignId,
+                                signLabel: selectedSignLabel,
+                                metadata: <String, dynamic>{
+                                  'assignedCount': _assignedBySignId.length,
+                                  'totalSigns': _signs.length,
+                                  'attemptCount': _attemptCount,
+                                },
+                              ),
+                            );
+
+                            if (!dialogContext.mounted) return;
+                            Navigator.of(dialogContext, rootNavigator: true).pop(true);
+                          } catch (_) {
+                            if (!localContext.mounted) return;
+                            setLocalState(() => submitting = false);
+                            if (!hostContext.mounted) return;
+                            ScaffoldMessenger.of(hostContext).showSnackBar(
+                              const SnackBar(
+                                content: Text('Could not send report. Please retry.'),
+                              ),
+                            );
+                          }
+                        },
+                  child: submitting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Submit'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (submitted == true && hostContext.mounted) {
+      ScaffoldMessenger.of(hostContext).showSnackBar(
+        const SnackBar(
+          content: Text('Issue reported. Thanks for the feedback.'),
+        ),
+      );
+    }
+
+    Future<void>.delayed(const Duration(milliseconds: 250), () {
+      titleCtrl.dispose();
+      detailsCtrl.dispose();
+    });
   }
 
   Widget _buildImageOrPlaceholder(
@@ -671,6 +815,11 @@ class _MatchingAssessmentPageState extends State<MatchingAssessmentPage> {
             ),
           ),
           actions: [
+            IconButton(
+              onPressed: _reportAssessmentIssue,
+              icon: const Icon(Icons.bug_report_outlined, color: AppTheme.inkBlack),
+              tooltip: 'Report issue',
+            ),
             TextButton(
               onPressed: _skipAssessment,
               child: const Text(

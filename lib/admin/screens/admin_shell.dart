@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:kairo_ai/admin/models/admin_models.dart';
 import 'package:kairo_ai/admin/services/admin_auth_service.dart';
 import 'package:kairo_ai/admin/theme/admin_theme.dart';
-import 'package:kairo_ai/main.dart';
 import 'package:kairo_ai/admin/widgets/a_overlays.dart';
 import 'package:kairo_ai/admin/screens/dashboard/admin_dashboard_screen.dart';
 import 'package:kairo_ai/admin/screens/lessons/admin_lessons_screen.dart';
@@ -72,75 +71,69 @@ class _AdminShellState extends State<AdminShell> {
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: MyApp.themeProvider,
-      builder: (context, _) {
-        final bool isDarkMode = MyApp.themeProvider.isDarkMode;
-        return Theme(
-          data: isDarkMode ? adminThemeDark() : adminThemeLight(),
-          child: Builder(
-            builder: (context) {
-              final c2 = ac(context);
-              return PopScope(
-                canPop: false,
-                onPopInvokedWithResult: (didPop, result) {
-                  if (didPop) return;
-                  _handleBack();
-                },
-                child: Scaffold(
-                  key: _scaffoldKey,
-                  backgroundColor: c2.bgBase,
-                  drawer: AdminDrawer(
-                    adminName: widget.admin.displayName,
-                    adminEmail: widget.admin.email,
-                    selectedIndex: _selectedIndex,
-                    onTabSelected: _onTabSelected,
-                    onSignOut: _handleSignOut,
-                  ),
-                  body: IndexedStack(
-                    index: _selectedIndex,
-                    children: [
-                      AdminDashboardScreen(
-                        admin: widget.admin,
-                        onMenuTap: _openDrawer,
-                        onTabChange: (idx, {subIndex}) =>
-                            _onTabSelected(idx, settingsTab: subIndex),
-                      ),
-                      AdminLessonsScreen(
-                        admin: widget.admin,
-                        onMenuTap: _openDrawer,
-                      ),
-                      AdminUsersScreen(
-                        admin: widget.admin,
-                        onMenuTap: _openDrawer,
-                      ),
-                      AdminAnalyticsScreen(
-                        admin: widget.admin,
-                        onMenuTap: _openDrawer,
-                      ),
-                      AdminIssuesScreen(
-                        admin: widget.admin,
-                        onMenuTap: _openDrawer,
-                      ),
-                      AdminSettingsScreen(
-                        admin: widget.admin,
-                        onMenuTap: _openDrawer,
-                        initialTabIndex: _settingsTabIndex,
-                      ),
-                    ],
-                  ),
-                  bottomNavigationBar: _selectedIndex < 5
-                      ? AdminNavBar(
-                          selectedIndex: _selectedIndex,
-                          onTabSelected: _onTabSelected,
-                        )
-                      : null,
-                ),
-              );
+    return Theme(
+      data: adminThemeLight(),
+      child: Builder(
+        builder: (context) {
+          final c2 = ac(context);
+          return PopScope(
+            canPop: false,
+            onPopInvokedWithResult: (didPop, result) {
+              if (didPop) return;
+              _handleBack();
             },
-          ),
-        );
-      },
+            child: Scaffold(
+              key: _scaffoldKey,
+              backgroundColor: c2.bgBase,
+              drawer: AdminDrawer(
+                adminName: widget.admin.displayName,
+                adminEmail: widget.admin.email,
+                selectedIndex: _selectedIndex,
+                onTabSelected: _onTabSelected,
+                onSignOut: _handleSignOut,
+              ),
+              body: IndexedStack(
+                index: _selectedIndex,
+                children: [
+                  AdminDashboardScreen(
+                    admin: widget.admin,
+                    onMenuTap: _openDrawer,
+                    onTabChange: (idx, {subIndex}) =>
+                        _onTabSelected(idx, settingsTab: subIndex),
+                  ),
+                  AdminLessonsScreen(
+                    admin: widget.admin,
+                    onMenuTap: _openDrawer,
+                  ),
+                  AdminUsersScreen(
+                    admin: widget.admin,
+                    onMenuTap: _openDrawer,
+                  ),
+                  AdminAnalyticsScreen(
+                    admin: widget.admin,
+                    onMenuTap: _openDrawer,
+                  ),
+                  AdminIssuesScreen(
+                    admin: widget.admin,
+                    onMenuTap: _openDrawer,
+                  ),
+                  AdminSettingsScreen(
+                    admin: widget.admin,
+                    onMenuTap: _openDrawer,
+                    initialTabIndex: _settingsTabIndex,
+                  ),
+                ],
+              ),
+              bottomNavigationBar: _selectedIndex < 5
+                  ? AdminNavBar(
+                      selectedIndex: _selectedIndex,
+                      onTabSelected: _onTabSelected,
+                    )
+                  : null,
+            ),
+          );
+        },
+      ),
     );
   }
 

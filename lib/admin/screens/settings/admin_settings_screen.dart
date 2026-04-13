@@ -8,7 +8,6 @@ import 'package:kairo_ai/admin/widgets/a_top_bar.dart';
 import 'package:kairo_ai/admin/widgets/a_components.dart';
 import 'package:kairo_ai/admin/widgets/a_inputs.dart';
 import 'package:kairo_ai/admin/widgets/a_overlays.dart';
-import 'package:kairo_ai/main.dart';
 
 class AdminSettingsScreen extends StatefulWidget {
   final AdminModel admin;
@@ -34,9 +33,9 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
   void initState() {
     super.initState();
     _tabCtrl = TabController(
-      length: 3,
+      length: 4,
       vsync: this,
-      initialIndex: (widget.initialTabIndex < 3) ? widget.initialTabIndex : 0,
+      initialIndex: (widget.initialTabIndex < 4) ? widget.initialTabIndex : 0,
     );
   }
 
@@ -54,6 +53,8 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
       appBar: AdminTopBar(
         title: 'Settings',
         onMenuTap: widget.onMenuTap,
+        adminName: widget.admin.displayName,
+        adminEmail: widget.admin.email,
       ),
       body: Column(
         children: [
@@ -70,7 +71,8 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
               labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
               unselectedLabelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
               tabs: const [
-                Tab(text: 'MAINTENANCE'),
+                Tab(text: 'LEVELS'),
+                Tab(text: 'ADMINS'),
                 Tab(text: 'ACTIVITY'),
                 Tab(text: 'PROFILE'),
               ],
@@ -80,7 +82,8 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
             child: TabBarView(
               controller: _tabCtrl,
               children: [
-                _MaintenanceTab(admin: widget.admin),
+                _LevelConfigTab(admin: widget.admin),
+                _AdminManagementTab(admin: widget.admin),
                 _AuditLogTab(),
                 _AccountTab(admin: widget.admin),
               ],
@@ -92,85 +95,133 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen>
   }
 }
 
-class _MaintenanceTab extends StatefulWidget {
+class _LevelConfigTab extends StatefulWidget {
   final AdminModel admin;
-  const _MaintenanceTab({required this.admin});
+  const _LevelConfigTab({required this.admin});
 
   @override
-  State<_MaintenanceTab> createState() => _MaintenanceTabState();
+  State<_LevelConfigTab> createState() => _LevelConfigTabState();
 }
 
-class _MaintenanceTabState extends State<_MaintenanceTab> {
+class _LevelConfigTabState extends State<_LevelConfigTab> {
   final _db = AdminDatabaseService();
-  final _msgCtrl = TextEditingController();
+  final _thresholdCtrl = TextEditingController();
   bool _loading = true;
   bool _saving = false;
-  bool _enabled = false;
+  bool _recalculating = false;
+  int? _lastRecalculatedUsers;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _loadConfig();
   }
 
   @override
   void dispose() {
-    _msgCtrl.dispose();
+    _thresholdCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _load() async {
+  Future<void> _loadConfig() async {
     setState(() => _loading = true);
-    try {
-      final mode = await _db.getMaintenanceMode();
-      if (!mounted) return;
-      setState(() {
-        _enabled = mode?.isEnabled ?? false;
-        _msgCtrl.text = mode?.message ?? '';
-        _loading = false;
-      });
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
+    final config = await _db.getLevelConfig();
+    if (!mounted) return;
+    setState(() {
+      _thresholdCtrl.text = config.xpThresholds.join(', ');
+      _loading = false;
+    });
+  }
+
+  List<int>? _parseThresholds() {
+    final raw = _thresholdCtrl.text
+        .split(RegExp(r'[,\s]+'))
+        .map((v) => v.trim())
+        .where((v) => v.isNotEmpty)
+        .toList(growable: false);
+
+    if (raw.isEmpty) return null;
+
+    final values = <int>[];
+    for (final token in raw) {
+      final parsed = int.tryParse(token);
+      if (parsed == null) {
+        return null;
+      }
+      values.add(parsed);
+    }
+    return LevelConfigModel.normalizeThresholds(values);
+  }
+
+  Future<void> _saveConfig() async {
+    final thresholds = _parseThresholds();
+    if (thresholds == null || thresholds.length < 2) {
+      AdminToast.show(
+        context,
+        'Provide at least 2 valid XP thresholds.',
+        type: AdminToastType.error,
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
+    final ok = await _db.updateLevelConfig(
+      LevelConfigModel(xpThresholds: thresholds),
+      updatedBy: widget.admin.uid,
+    );
+    if (!mounted) return;
+    setState(() => _saving = false);
+
+    AdminToast.show(
+      context,
+      ok ? 'Level configuration updated.' : 'Failed to save level configuration.',
+      type: ok ? AdminToastType.success : AdminToastType.error,
+    );
+
+    if (ok) {
+      await _loadConfig();
     }
   }
 
-  Future<void> _toggle() async {
-    final newEnabled = !_enabled;
-    if (newEnabled) {
-      final confirmed = await AdminConfirmModal.show(
-        context,
-        title: 'Activate maintenance?',
-        body: 'Learners will see a lockout screen. This is typically used for critical platform updates.',
-        confirmLabel: 'Activate now',
-        isDestructive: true,
-      );
-      if (!confirmed || !mounted) return;
-    }
-    setState(() => _saving = true);
-    final mode = MaintenanceModeModel(
-      isEnabled: newEnabled,
-      message: _msgCtrl.text.trim().isNotEmpty
-          ? _msgCtrl.text.trim()
-          : 'KairoAI is currently undergoing scheduled maintenance.',
-      enabledAt: newEnabled ? DateTime.now() : null,
+  Future<void> _recalculateLevels() async {
+    final confirmed = await AdminConfirmModal.show(
+      context,
+      title: 'Recalculate all learner levels?',
+      body: 'This applies the current XP thresholds to every learner account.',
+      confirmLabel: 'Recalculate now',
+      isDestructive: false,
     );
-    final ok = await _db.updateMaintenanceMode(mode);
+    if (!confirmed || !mounted) return;
+
+    setState(() => _recalculating = true);
+    final updatedCount = await _db.recalculateAllLearnerLevels();
     if (!mounted) return;
     setState(() {
-      _saving = false;
-      if (ok) _enabled = newEnabled;
+      _recalculating = false;
+      _lastRecalculatedUsers = updatedCount;
     });
+
     AdminToast.show(
       context,
-      ok ? (newEnabled ? 'Maintenance active' : 'Platform live') : 'Platform sync failed',
-      type: ok ? (newEnabled ? AdminToastType.warning : AdminToastType.success) : AdminToastType.error,
+      'Recalculated levels for $updatedCount learner(s).',
+      type: AdminToastType.success,
     );
+  }
+
+  List<int> _previewThresholds() {
+    final parsed = _parseThresholds();
+    if (parsed == null || parsed.isEmpty) {
+      return LevelConfigModel.defaultThresholds;
+    }
+    return parsed;
   }
 
   @override
   Widget build(BuildContext context) {
     final c = ac(context);
-    if (_loading) return AdminSkeletonLoader.listRows(count: 3);
+    if (_loading) return AdminSkeletonLoader.listRows(count: 5);
+
+    final previewThresholds = _previewThresholds();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(screenPad),
@@ -179,60 +230,258 @@ class _MaintenanceTabState extends State<_MaintenanceTab> {
         children: [
           AdminCard(
             padding: const EdgeInsets.all(20),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 10,
-                  height: 10,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: _enabled ? c.error : c.success,
-                    border: Border.all(color: c.bgSurface, width: 2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: (_enabled ? c.error : c.success).withValues(alpha: 0.3),
-                        blurRadius: 4,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _enabled ? 'Maintenance active' : 'System operational',
-                        style: adminH3(c.textPrimary),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _enabled ? 'Access is restricted for all learners.' : 'All services are functioning normally.',
-                        style: adminBodySm(c.textMuted),
-                      ),
-                    ],
-                  ),
+                Text('XP Level Configuration', style: adminH2(c.textPrimary)),
+                const SizedBox(height: 6),
+                Text(
+                  'Define level thresholds with XP breakpoints. Level is derived from XP; it is never manually assigned.',
+                  style: adminBodySm(c.textSecondary),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 24),
-          AdminSectionHeader(title: 'Lockout notification'),
+          const SizedBox(height: 18),
           AdminInput(
-            label: 'Lockout notification',
-            hint: 'Message for learners...',
-            controller: _msgCtrl,
-            maxLines: 4,
+            label: 'XP thresholds',
+            hint: '0, 120, 280, 520, 860, 1300',
+            helperText: 'Comma or space separated values. First level starts at 0 XP.',
+            controller: _thresholdCtrl,
+            maxLines: 2,
+            onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 16),
-          AdminButton(
-            label: _enabled ? 'Restore platform access' : 'Restrict access now',
-            variant: _enabled ? AdminButtonVariant.secondary : AdminButtonVariant.destructive,
-            onTap: _saving ? null : _toggle,
-            isLoading: _saving,
+          AdminCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: previewThresholds
+                  .asMap()
+                  .entries
+                  .map((entry) {
+                    final i = entry.key;
+                    final threshold = entry.value;
+                    return AdminRow(
+                      isLast: i == previewThresholds.length - 1,
+                      title: Text('Level ${i + 1}', style: adminH3(c.textPrimary)),
+                      subtitle: Text('Starts at $threshold XP', style: adminMeta(c.textSecondary)),
+                    );
+                  })
+                  .toList(growable: false),
+            ),
           ),
+          if (_lastRecalculatedUsers != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              'Last recalculation updated $_lastRecalculatedUsers learner(s).',
+              style: adminBodySm(c.textMuted),
+            ),
+          ],
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: AdminButton(
+                  label: 'Save thresholds',
+                  variant: AdminButtonVariant.accent,
+                  isLoading: _saving,
+                  onTap: _saving ? null : _saveConfig,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: AdminButton(
+                  label: 'Recalculate levels',
+                  variant: AdminButtonVariant.secondary,
+                  isLoading: _recalculating,
+                  onTap: _recalculating ? null : _recalculateLevels,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: bottomBuf),
         ],
       ),
+    );
+  }
+}
+
+class _AdminManagementTab extends StatefulWidget {
+  final AdminModel admin;
+  const _AdminManagementTab({required this.admin});
+
+  @override
+  State<_AdminManagementTab> createState() => _AdminManagementTabState();
+}
+
+class _AdminManagementTabState extends State<_AdminManagementTab> {
+  final _db = AdminDatabaseService();
+  String? _busyAdminId;
+
+  @override
+  Future<void> _toggleAdminStatus(AdminModel target, bool toActive) async {
+    final title = toActive ? 'Reactivate admin?' : 'Deactivate admin?';
+    final body = toActive
+        ? 'This account will regain full admin access.'
+        : 'This account will lose admin access until reactivated.';
+
+    final confirmed = await AdminConfirmModal.show(
+      context,
+      title: title,
+      body: body,
+      confirmLabel: toActive ? 'Reactivate' : 'Deactivate',
+      isDestructive: !toActive,
+    );
+    if (!confirmed || !mounted) return;
+
+    setState(() => _busyAdminId = target.id);
+    final result = await _db.setAdminActiveStatus(
+      adminId: target.id,
+      isActive: toActive,
+      actingAdminId: widget.admin.id,
+    );
+    if (!mounted) return;
+    setState(() => _busyAdminId = null);
+
+    AdminToast.show(
+      context,
+      result.message,
+      type: result.success ? AdminToastType.success : AdminToastType.error,
+    );
+  }
+
+  Future<void> _removeAdmin(AdminModel target) async {
+    final confirmed = await AdminConfirmModal.show(
+      context,
+      title: 'Remove admin access?',
+      body: 'This will fully remove admin permissions for ${target.email}.',
+      confirmLabel: 'Remove admin',
+      isDestructive: true,
+    );
+    if (!confirmed || !mounted) return;
+
+    setState(() => _busyAdminId = target.id);
+    final result = await _db.removeAdminAccess(
+      adminId: target.id,
+      actingAdminId: widget.admin.id,
+    );
+    if (!mounted) return;
+    setState(() => _busyAdminId = null);
+
+    AdminToast.show(
+      context,
+      result.message,
+      type: result.success ? AdminToastType.success : AdminToastType.error,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ac(context);
+
+    return StreamBuilder<List<AdminModel>>(
+      stream: _db.adminsStream(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return AdminSkeletonLoader.listRows(count: 6);
+        }
+        if (snapshot.hasError) {
+          return AdminErrorState(onRetry: () => setState(() {}));
+        }
+
+        final admins = snapshot.data ?? <AdminModel>[];
+        final activeCount = admins.where((admin) => admin.isActive).length;
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(screenPad),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AdminCard(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Single Admin Tier', style: adminH2(c.textPrimary)),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Every active admin has full governance access. Last active admin is protected from removal/deactivation.',
+                      style: adminBodySm(c.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              AdminSectionHeader(
+                title: 'Active admins: $activeCount · Total: ${admins.length}',
+              ),
+              if (admins.isEmpty)
+                const AdminEmptyState(
+                  icon: LucideIcons.shield,
+                  title: 'No admin accounts found',
+                  body: 'Add an admin by email to initialize governance.',
+                )
+              else
+                AdminCard(
+                  padding: EdgeInsets.zero,
+                  child: Column(
+                    children: admins.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final admin = entry.value;
+                      final isSelf = admin.id == widget.admin.id;
+                      final isBusy = _busyAdminId == admin.id;
+
+                      return AdminRow(
+                        isLast: index == admins.length - 1,
+                        leading: AdminAvatar(name: admin.displayName),
+                        title: Text(
+                          admin.displayName.isNotEmpty
+                              ? admin.displayName
+                              : admin.email,
+                          style: adminH3(c.textPrimary),
+                        ),
+                        subtitle: Text(
+                          '${admin.email}${isSelf ? ' · You' : ''}',
+                          style: adminMeta(c.textSecondary),
+                        ),
+                        trailing: isBusy
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : PopupMenuButton<String>(
+                                icon: Icon(LucideIcons.moreVertical, size: 16, color: c.textMuted),
+                                onSelected: (value) {
+                                  if (value == 'activate') {
+                                    _toggleAdminStatus(admin, true);
+                                  } else if (value == 'deactivate') {
+                                    _toggleAdminStatus(admin, false);
+                                  } else if (value == 'remove') {
+                                    _removeAdmin(admin);
+                                  }
+                                },
+                                itemBuilder: (_) => <PopupMenuEntry<String>>[
+                                  PopupMenuItem<String>(
+                                    value: admin.isActive ? 'deactivate' : 'activate',
+                                    child: Text(admin.isActive ? 'Deactivate' : 'Reactivate'),
+                                  ),
+                                  const PopupMenuItem<String>(
+                                    value: 'remove',
+                                    child: Text('Remove admin access'),
+                                  ),
+                                ],
+                              ),
+                        showChevron: false,
+                      );
+                    }).toList(growable: false),
+                  ),
+                ),
+              const SizedBox(height: bottomBuf),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -306,27 +555,78 @@ class _AccountTabState extends State<_AccountTab> {
   final _auth = AdminAuthService();
   final _currentPw = TextEditingController();
   final _newPw = TextEditingController();
+  final _confirmNewPw = TextEditingController();
+  String? _currentPwError;
+  String? _newPwError;
+  String? _confirmPwError;
   bool _changingPw = false;
 
   @override
   void dispose() {
     _currentPw.dispose();
     _newPw.dispose();
+    _confirmNewPw.dispose();
     super.dispose();
   }
 
+  String? _passwordConstraintError(String value) {
+    final password = value.trim();
+    if (password.length < 8) {
+      return 'Must be at least 8 characters.';
+    }
+    if (!RegExp(r'[A-Z]').hasMatch(password)) {
+      return 'Include at least 1 uppercase letter.';
+    }
+    if (!RegExp(r'[a-z]').hasMatch(password)) {
+      return 'Include at least 1 lowercase letter.';
+    }
+    if (!RegExp(r'\d').hasMatch(password)) {
+      return 'Include at least 1 number.';
+    }
+    return null;
+  }
+
   Future<void> _updatePassword() async {
-    if (_currentPw.text.isEmpty || _newPw.text.isEmpty) {
-      AdminToast.show(context, 'Verify all fields', type: AdminToastType.error);
+    final currentPassword = _currentPw.text;
+    final newPassword = _newPw.text;
+    final confirmPassword = _confirmNewPw.text;
+
+    final currentErr = currentPassword.isEmpty ? 'Current password is required.' : null;
+    String? newErr = newPassword.isEmpty ? 'New password is required.' : _passwordConstraintError(newPassword);
+    String? confirmErr;
+
+    if (confirmPassword.isEmpty) {
+      confirmErr = 'Please confirm the new password.';
+    } else if (newPassword != confirmPassword) {
+      confirmErr = 'New password and confirmation must match.';
+    }
+
+    if (currentErr == null && newErr == null && currentPassword.trim() == newPassword.trim()) {
+      newErr = 'New password must be different from current password.';
+    }
+
+    setState(() {
+      _currentPwError = currentErr;
+      _newPwError = newErr;
+      _confirmPwError = confirmErr;
+    });
+
+    if (currentErr != null || newErr != null || confirmErr != null) {
+      AdminToast.show(context, 'Please resolve password validation errors.', type: AdminToastType.error);
       return;
     }
+
     setState(() => _changingPw = true);
-    final ok = await _auth.changePassword(_currentPw.text.trim(), _newPw.text.trim());
+    final ok = await _auth.changePassword(currentPassword.trim(), newPassword.trim());
     if (!mounted) return;
     setState(() => _changingPw = false);
     if (ok) {
       _currentPw.clear();
       _newPw.clear();
+      _confirmNewPw.clear();
+      _currentPwError = null;
+      _newPwError = null;
+      _confirmPwError = null;
       AdminToast.show(context, 'Account security updated');
     } else {
       AdminToast.show(context, 'Verification failed', type: AdminToastType.error);
@@ -355,38 +655,52 @@ class _AccountTabState extends State<_AccountTab> {
               ],
             ),
           ),
-          AdminSectionHeader(title: 'Display theme'),
-          AdminCard(
-            padding: const EdgeInsets.all(0),
-            child: AdminRow(
-              isLast: true,
-              leading: Icon(
-                MyApp.themeProvider.isDarkMode ? LucideIcons.moon : LucideIcons.sun,
-                size: 14,
-                color: c.accent,
-              ),
-              title: Text('Dark appearance', style: adminH3(c.textPrimary)),
-              subtitle: Text('Switch between light and dark modes', style: adminMeta(c.textSecondary)),
-              trailing: Switch.adaptive(
-                value: MyApp.themeProvider.isDarkMode,
-                activeTrackColor: c.accent,
-                onChanged: (v) {
-                   MyApp.themeProvider.toggleTheme();
-                   setState(() {}); // Rebuild local toggle
-                },
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
 
           AdminSectionHeader(title: 'Security refresh'),
           AdminCard(
             padding: const EdgeInsets.all(20),
             child: Column(
               children: [
-                AdminInput(label: 'Current password', controller: _currentPw, obscureText: true),
+                AdminInput(
+                  label: 'Current password',
+                  controller: _currentPw,
+                  obscureText: true,
+                  errorText: _currentPwError,
+                  onChanged: (_) {
+                    if (_currentPwError != null) {
+                      setState(() => _currentPwError = null);
+                    }
+                  },
+                ),
                 const SizedBox(height: 16),
-                AdminInput(label: 'New security key', controller: _newPw, obscureText: true),
+                AdminInput(
+                  label: 'New password',
+                  controller: _newPw,
+                  obscureText: true,
+                  errorText: _newPwError,
+                  helperText: 'At least 8 characters with uppercase, lowercase, and number.',
+                  onChanged: (_) {
+                    if (_newPwError != null || _confirmPwError != null) {
+                      setState(() {
+                        _newPwError = null;
+                        _confirmPwError = null;
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+                AdminInput(
+                  label: 'Confirm new password',
+                  controller: _confirmNewPw,
+                  obscureText: true,
+                  errorText: _confirmPwError,
+                  onChanged: (_) {
+                    if (_confirmPwError != null) {
+                      setState(() => _confirmPwError = null);
+                    }
+                  },
+                ),
                 const SizedBox(height: 20),
                 AdminButton(
                   label: 'Apply changes',

@@ -26,6 +26,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
   bool _hasError = false;
   Map<String, dynamic> _analytics = {};
   List<SignPracticeLogModel> _practiceLogs = [];
+  Map<String, String> _signLabelsById = <String, String>{};
 
   List<double> _dailyValues = [];
   List<String> _dailyLabels = [];
@@ -45,14 +46,17 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
       final results = await Future.wait([
         _db.getAnalyticsSummary(),
         _db.getSignPracticeLogs(limit: 200),
+        _db.getSignLabelsById(),
       ]);
       if (!mounted) return;
       final analytics = results[0] as Map<String, dynamic>;
       final logs = results[1] as List<SignPracticeLogModel>;
+      final labels = results[2] as Map<String, String>;
       _buildChartData(logs);
       setState(() {
         _analytics = analytics;
         _practiceLogs = logs;
+        _signLabelsById = labels;
         _loading = false;
       });
     } catch (e) {
@@ -96,12 +100,49 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
 
   List<_TopSign> _getTopSigns() {
     final Map<String, int> counts = {};
+    final Map<String, String> fallbackLabels = {};
     for (final log in _practiceLogs) {
-      counts[log.signId] = (counts[log.signId] ?? 0) + 1;
+      final key = log.signId.trim().isNotEmpty
+          ? log.signId.trim()
+          : log.signCharacter.trim();
+      if (key.isEmpty) {
+        continue;
+      }
+      counts[key] = (counts[key] ?? 0) + 1;
+
+      final directLabel = log.signCharacter.trim();
+      if (directLabel.isNotEmpty) {
+        fallbackLabels[key] = directLabel;
+      }
     }
     final entries = counts.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
-    return entries.take(5).map((e) => _TopSign(e.key, e.value)).toList();
+    return entries.take(5).toList(growable: false).asMap().entries.map((entry) {
+      final rank = entry.key + 1;
+      final e = entry.value;
+
+      final mappedLabel = _signLabelsById[e.key]?.trim();
+      final fallbackLabel = fallbackLabels[e.key]?.trim();
+      String label;
+
+      if (mappedLabel != null && mappedLabel.isNotEmpty) {
+        label = mappedLabel;
+      } else if (fallbackLabel != null && fallbackLabel.isNotEmpty) {
+        label = fallbackLabel;
+      } else if (_looksLikeOpaqueId(e.key)) {
+        label = 'Unknown sign #$rank';
+      } else {
+        label = e.key.trim().isEmpty ? 'Unknown sign #$rank' : e.key;
+      }
+
+      return _TopSign(label, e.value);
+    }).toList();
+  }
+
+  bool _looksLikeOpaqueId(String value) {
+    final v = value.trim();
+    if (v.length < 12) return false;
+    return RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(v);
   }
 
   @override
@@ -111,7 +152,12 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
     if (_loading) {
       return Scaffold(
         backgroundColor: c.bgBase,
-        appBar: AdminTopBar(title: 'Analytics', onMenuTap: widget.onMenuTap),
+        appBar: AdminTopBar(
+          title: 'Analytics',
+          onMenuTap: widget.onMenuTap,
+          adminName: widget.admin.displayName,
+          adminEmail: widget.admin.email,
+        ),
         body: AdminSkeletonLoader.listRows(count: 10),
       );
     }
@@ -119,7 +165,12 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
     if (_hasError) {
       return Scaffold(
         backgroundColor: c.bgBase,
-        appBar: AdminTopBar(title: 'Analytics', onMenuTap: widget.onMenuTap),
+        appBar: AdminTopBar(
+          title: 'Analytics',
+          onMenuTap: widget.onMenuTap,
+          adminName: widget.admin.displayName,
+          adminEmail: widget.admin.email,
+        ),
         body: AdminErrorState(onRetry: _loadData),
       );
     }
@@ -134,6 +185,8 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
       appBar: AdminTopBar(
         title: 'Analytics',
         onMenuTap: widget.onMenuTap,
+        adminName: widget.admin.displayName,
+        adminEmail: widget.admin.email,
         action: AdminTopBarIconButton(
           icon: LucideIcons.refreshCcw,
           onTap: _loadData,
@@ -238,7 +291,7 @@ class _AdminAnalyticsScreenState extends State<AdminAnalyticsScreen> {
                                 ),
                               ),
                             ),
-                            title: Text(s.signId, style: adminH3(c.textPrimary)),
+                            title: Text(s.label, style: adminH3(c.textPrimary)),
                             trailing: Text(
                               '${s.count} sessions',
                               style: adminMeta(c.textSecondary),
@@ -288,7 +341,7 @@ class _ReportCard extends StatelessWidget {
 }
 
 class _TopSign {
-  final String signId;
+  final String label;
   final int count;
-  _TopSign(this.signId, this.count);
+  _TopSign(this.label, this.count);
 }

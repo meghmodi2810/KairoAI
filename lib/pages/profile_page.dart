@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../services/issue_report_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/neo_brutal_widgets.dart';
 import 'login_page.dart';
@@ -22,12 +23,16 @@ class ProfilePage extends StatelessWidget {
 
           final name = (data?['displayName'] ?? user?.displayName ?? 'Learner') as String;
           final email = user?.email ?? '';
-          final level = (data?['level'] ?? 1) as int;
-          final xp = (data?['xp'] ?? 0) as int;
-          final streak = (data?['streakDays'] ?? 0) as int;
-          final gems = (data?['gems'] ?? 0) as int;
-          final signsLearned = (data?['totalSignsLearned'] ?? 0) as int;
-          final lessonsCompleted = ((data?['completedLessonIds']) as List?)?.length ?? 0;
+            final level = (data?['currentLevel'] as num?)?.toInt() ??
+              (data?['level'] as num?)?.toInt() ??
+              1;
+            final xp = (data?['xp'] as num?)?.toInt() ?? 0;
+            final streak = (data?['streakDays'] as num?)?.toInt() ?? 0;
+            final gems = (data?['gems'] as num?)?.toInt() ?? 0;
+            final lessonsCompleted =
+              (data?['totalLessonsCompleted'] as num?)?.toInt() ??
+              ((data?['completedLessonIds']) as List?)?.length ??
+              0;
 
           return CustomScrollView(
             slivers: [
@@ -159,8 +164,6 @@ class ProfilePage extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 10),
-                        _infoRow('Signs learned', '$signsLearned signs'),
-                        const SizedBox(height: 8),
                         _infoRow('Current tier', 'Level $level'),
                         const SizedBox(height: 8),
                         _infoRow('Support', 'Help and FAQ available'),
@@ -180,13 +183,16 @@ class ProfilePage extends StatelessWidget {
                     child: Column(
                       children: [
                         NeoPrimaryButton(
-                          label: 'Need Help',
+                          label: 'Report An Issue',
                           onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Help and support will be available soon.')),
+                            _showIssueReportDialog(
+                              context,
+                              reporterUid: uid,
+                              reporterName: name,
+                              reporterEmail: email,
                             );
                           },
-                          icon: Icons.help_outline,
+                          icon: Icons.bug_report_outlined,
                         ),
                         const SizedBox(height: 10),
                         SizedBox(
@@ -295,4 +301,156 @@ class _StatTile extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<void> _showIssueReportDialog(
+  BuildContext context, {
+  required String reporterUid,
+  required String reporterName,
+  required String reporterEmail,
+}) async {
+  final hostContext = context;
+  final titleCtrl = TextEditingController();
+  final descriptionCtrl = TextEditingController();
+  final service = IssueReportService();
+  String selectedType = 'other';
+  String selectedPriority = 'medium';
+  bool submitting = false;
+
+  final submitted = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) {
+      return StatefulBuilder(
+        builder: (localContext, setLocalState) {
+          return AlertDialog(
+            title: const Text('Report an issue'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: titleCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Title',
+                      hintText: 'Short summary',
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: descriptionCtrl,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      labelText: 'What happened?',
+                      hintText: 'Tell us what went wrong and what you expected.',
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedType,
+                    decoration: const InputDecoration(labelText: 'Type'),
+                    items: const [
+                      DropdownMenuItem(value: 'bug', child: Text('Bug')),
+                      DropdownMenuItem(value: 'content', child: Text('Content issue')),
+                      DropdownMenuItem(value: 'feature', child: Text('Feature request')),
+                      DropdownMenuItem(value: 'other', child: Text('Other')),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setLocalState(() => selectedType = value);
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedPriority,
+                    decoration: const InputDecoration(labelText: 'Priority'),
+                    items: const [
+                      DropdownMenuItem(value: 'low', child: Text('Low')),
+                      DropdownMenuItem(value: 'medium', child: Text('Medium')),
+                      DropdownMenuItem(value: 'high', child: Text('High')),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setLocalState(() => selectedPriority = value);
+                    },
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: submitting
+                    ? null
+                    : () => Navigator.of(dialogContext, rootNavigator: true).pop(false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: submitting
+                    ? null
+                    : () async {
+                        final title = titleCtrl.text.trim();
+                        final description = descriptionCtrl.text.trim();
+
+                        if (title.isEmpty || description.isEmpty) {
+                          if (!hostContext.mounted) return;
+                          ScaffoldMessenger.of(hostContext).showSnackBar(
+                            const SnackBar(content: Text('Please provide both title and details.')),
+                          );
+                          return;
+                        }
+
+                        setLocalState(() => submitting = true);
+
+                        try {
+                          await service.submit(
+                            IssueReportPayload(
+                              title: title,
+                              description: description,
+                              type: selectedType,
+                              priority: selectedPriority,
+                              reporterUid: reporterUid,
+                              reporterEmail: reporterEmail,
+                              reporterDisplayName: reporterName,
+                              sourceScreen: 'profile',
+                              contextType: 'general_support',
+                            ),
+                          );
+
+                          if (!dialogContext.mounted) return;
+                          Navigator.of(dialogContext, rootNavigator: true).pop(true);
+                        } catch (_) {
+                          if (!localContext.mounted) return;
+                          setLocalState(() => submitting = false);
+                          if (!hostContext.mounted) return;
+                          ScaffoldMessenger.of(hostContext).showSnackBar(
+                            const SnackBar(content: Text('Could not submit issue right now. Please try again.')),
+                          );
+                        }
+                      },
+                child: submitting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Submit'),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+
+  if (submitted == true && hostContext.mounted) {
+    ScaffoldMessenger.of(hostContext).showSnackBar(
+      const SnackBar(content: Text('Issue submitted. Our team will review it soon.')),
+    );
+  }
+
+  Future<void>.delayed(const Duration(milliseconds: 250), () {
+    titleCtrl.dispose();
+    descriptionCtrl.dispose();
+  });
 }

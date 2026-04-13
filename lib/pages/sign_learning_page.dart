@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/app_models.dart';
 import '../models/lesson_assessment_models.dart';
 import '../services/database_service.dart';
+import '../services/issue_report_service.dart';
 import '../services/sign_image_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/neo_brutal_widgets.dart';
@@ -321,6 +323,157 @@ class _SignLearningPageState extends State<SignLearningPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Lesson restarted from the beginning.')),
     );
+  }
+
+  Future<void> _openQuickReportDialog() async {
+    final hostContext = context;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sign in again to submit a report.')),
+      );
+      return;
+    }
+
+    final titleCtrl = TextEditingController(
+      text: 'Issue while learning ${widget.lesson.title}',
+    );
+    final descriptionCtrl = TextEditingController();
+    final issueService = IssueReportService();
+    String issueType = 'bug';
+    bool submitting = false;
+
+    final submitted = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (localContext, setLocalState) {
+            return AlertDialog(
+              title: const Text('Report lesson issue'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: titleCtrl,
+                    decoration: const InputDecoration(labelText: 'Title'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: descriptionCtrl,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      labelText: 'Details',
+                      hintText: 'Describe what went wrong in this lesson.',
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    initialValue: issueType,
+                    decoration: const InputDecoration(labelText: 'Type'),
+                    items: const [
+                      DropdownMenuItem(value: 'bug', child: Text('Bug')),
+                      DropdownMenuItem(value: 'content', child: Text('Content issue')),
+                      DropdownMenuItem(value: 'other', child: Text('Other')),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setLocalState(() => issueType = value);
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: submitting
+                      ? null
+                      : () => Navigator.of(dialogContext, rootNavigator: true).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: submitting
+                      ? null
+                      : () async {
+                          final title = titleCtrl.text.trim();
+                          final details = descriptionCtrl.text.trim();
+
+                          if (title.isEmpty || details.isEmpty) {
+                            if (!hostContext.mounted) return;
+                            ScaffoldMessenger.of(hostContext).showSnackBar(
+                              const SnackBar(
+                                content: Text('Please add both title and details.'),
+                              ),
+                            );
+                            return;
+                          }
+
+                          setLocalState(() => submitting = true);
+
+                          try {
+                            await issueService.submit(
+                              IssueReportPayload(
+                                title: title,
+                                description: details,
+                                type: issueType,
+                                priority: 'medium',
+                                reporterUid: user.uid,
+                                reporterEmail: user.email ?? '',
+                                reporterDisplayName:
+                                    user.displayName ?? 'Learner',
+                                sourceScreen: 'sign_learning',
+                                contextType: 'lesson_flow',
+                                lessonId: widget.lesson.id,
+                                categoryId: widget.categoryId,
+                                signId: _current.id,
+                                signLabel: _current.word,
+                                metadata: <String, dynamic>{
+                                  'guidedIndex': _index,
+                                  'totalSigns': _signs.length,
+                                },
+                              ),
+                            );
+
+                            if (!dialogContext.mounted) return;
+                            Navigator.of(dialogContext, rootNavigator: true).pop(true);
+                          } catch (_) {
+                            if (!localContext.mounted) return;
+                            setLocalState(() => submitting = false);
+                            if (!hostContext.mounted) return;
+                            ScaffoldMessenger.of(hostContext).showSnackBar(
+                              const SnackBar(
+                                content: Text('Report failed. Please retry in a moment.'),
+                              ),
+                            );
+                          }
+                        },
+                  child: submitting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Submit'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (submitted == true && hostContext.mounted) {
+      ScaffoldMessenger.of(hostContext).showSnackBar(
+        const SnackBar(
+          content: Text('Issue reported. Thanks for the details.'),
+        ),
+      );
+    }
+
+    Future<void>.delayed(const Duration(milliseconds: 250), () {
+      titleCtrl.dispose();
+      descriptionCtrl.dispose();
+    });
   }
 
   @override
@@ -1341,27 +1494,54 @@ class _SignLearningPageState extends State<SignLearningPage> {
                     ),
                   Align(
                     alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      onPressed: _assessmentFlowStarted
-                          ? null
-                          : _restartLessonFromStart,
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppTheme.inkBlack,
-                        visualDensity: VisualDensity.compact,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton.icon(
+                          onPressed: _assessmentFlowStarted
+                              ? null
+                              : _openQuickReportDialog,
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppTheme.inkBlack,
+                            visualDensity: VisualDensity.compact,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                          ),
+                          icon: const Icon(Icons.bug_report_outlined, size: 18),
+                          label: const Text(
+                            'Report Issue',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 12,
+                            ),
+                          ),
                         ),
-                      ),
-                      icon: const Icon(Icons.restart_alt_rounded, size: 18),
-                      label: const Text(
-                        'Restart Lesson',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 12,
+                        TextButton.icon(
+                          onPressed: _assessmentFlowStarted
+                              ? null
+                              : _restartLessonFromStart,
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppTheme.inkBlack,
+                            visualDensity: VisualDensity.compact,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                          ),
+                          icon: const Icon(Icons.restart_alt_rounded, size: 18),
+                          label: const Text(
+                            'Restart Lesson',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              fontSize: 12,
+                            ),
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 6),

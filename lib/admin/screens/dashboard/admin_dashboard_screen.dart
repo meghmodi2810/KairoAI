@@ -31,6 +31,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int _totalUsers = 0;
   int _activeLearners = 0;
   int _openIssues = 0;
+  int _newLearnersThisWeek = 0;
+  double _practiceAccuracy = 0;
   List<AuditLogModel> _recentActivity = [];
   List<UserModel> _recentLearners = [];
   List<double> _chartValues = [0, 0, 0, 0, 0, 0, 0];
@@ -59,13 +61,20 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       final learnersResult = await _db.getLearners(limit: 5);
 
       // 4. Get chart data
-      final chartData = await _getRealChartData();
+      final extra = await Future.wait([
+        _getRealChartData(),
+        _db.getOverallPracticeAccuracy(),
+      ]);
+      final chartData = extra[0] as List<double>;
+      final practiceAccuracy = extra[1] as double;
 
       if (!mounted) return;
       setState(() {
         _totalUsers = summary['totalLearners'] as int;
         _activeLearners = summary['activeLearners'] as int;
         _openIssues = summary['openIssues'] as int;
+        _newLearnersThisWeek = (summary['newLearnersThisWeek'] as int?) ?? 0;
+        _practiceAccuracy = practiceAccuracy;
         _recentActivity = activity;
         _recentLearners = learnersResult.learners;
         _chartValues = chartData;
@@ -101,6 +110,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         appBar: AdminTopBar(
           title: 'Dashboard',
           onMenuTap: widget.onMenuTap,
+          adminName: widget.admin.displayName,
+          adminEmail: widget.admin.email,
           action: AdminTopBarIconButton(
             icon: LucideIcons.bell,
             showBadge: false,
@@ -113,7 +124,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (_error != null) {
       return Scaffold(
         backgroundColor: c.bgBase,
-        appBar: AdminTopBar(title: 'Dashboard', onMenuTap: widget.onMenuTap),
+        appBar: AdminTopBar(
+          title: 'Dashboard',
+          onMenuTap: widget.onMenuTap,
+          adminName: widget.admin.displayName,
+          adminEmail: widget.admin.email,
+        ),
         body: AdminErrorState(message: _error, onRetry: _loadData),
       );
     }
@@ -123,6 +139,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       appBar: AdminTopBar(
         title: 'Dashboard',
         onMenuTap: widget.onMenuTap,
+        adminName: widget.admin.displayName,
+        adminEmail: widget.admin.email,
         action: AdminTopBarIconButton(
           icon: LucideIcons.bell,
           showBadge: _openIssues > 0,
@@ -154,7 +172,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   children: [
                     Text(_formatDate().toUpperCase(), style: adminMeta(c.textMuted).copyWith(fontWeight: FontWeight.w500)),
                     const SizedBox(height: 4),
-                    Text('${_getGreeting()}, Admin', style: adminH1(c.textPrimary).copyWith(fontSize: 16)),
+                    Text(
+                      '${_getGreeting()}, ${widget.admin.displayName.isNotEmpty ? widget.admin.displayName : 'Admin'}',
+                      style: adminH1(c.textPrimary).copyWith(fontSize: 16),
+                    ),
                     const SizedBox(height: 6),
                     Row(
                       children: [
@@ -185,17 +206,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   AdminStat(
                     label: 'Users',
                     value: _formatNumber(_totalUsers),
-                    delta: 124, // Matches HTML '+124 this week'
+                    delta: _newLearnersThisWeek > 0
+                        ? _newLearnersThisWeek.toDouble()
+                        : null,
                   ),
                   AdminStat(
                     label: 'Active',
                     value: _formatNumber(_activeLearners),
-                    delta: 12, // Matches HTML '+12% today'
                   ),
                   AdminStat(
                     label: 'Accuracy',
-                    value: '93%',
-                    // Delta is null to match 'avg all users' text
+                    value: '${(_practiceAccuracy * 100).toStringAsFixed(0)}%',
                   ),
                 ],
               ),
@@ -267,7 +288,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               AdminSectionHeader(
                 title: 'Operation Logs',
                 actionLabel: 'Logs',
-                onAction: () => widget.onTabChange(5, subIndex: 1),
+                onAction: () => widget.onTabChange(5, subIndex: 2),
               ),
               AdminCard(
                 padding: EdgeInsets.zero,

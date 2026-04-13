@@ -101,6 +101,8 @@ class _AdminLessonsScreenState extends State<AdminLessonsScreen> {
       appBar: AdminTopBar(
         title: 'Lessons',
         onMenuTap: widget.onMenuTap,
+        adminName: widget.admin.displayName,
+        adminEmail: widget.admin.email,
         action: _actionLoading
             ? const SizedBox(
                 width: 48,

@@ -8,6 +8,8 @@ class AdminTopBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final AdminTopBarVariant variant;
   final Widget? action;
+  final String? adminName;
+  final String? adminEmail;
   final String? backLabel;
   final VoidCallback? onBack;
   final VoidCallback? onMenuTap;
@@ -17,6 +19,8 @@ class AdminTopBar extends StatelessWidget implements PreferredSizeWidget {
     required this.title,
     this.variant = AdminTopBarVariant.root,
     this.action,
+    this.adminName,
+    this.adminEmail,
     this.backLabel,
     this.onBack,
     this.onMenuTap,
@@ -79,8 +83,8 @@ class AdminTopBar extends StatelessWidget implements PreferredSizeWidget {
             else ...[
               const SizedBox(width: 8),
               Container(
-                width: 36,
-                height: 36,
+                constraints: const BoxConstraints(minHeight: 36),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
                 decoration: BoxDecoration(
                   color: c.bgSurface2,
                   borderRadius: BorderRadius.circular(8),
@@ -89,11 +93,24 @@ class AdminTopBar extends StatelessWidget implements PreferredSizeWidget {
                     BoxShadow(color: Color(0xFF111111), offset: Offset(2, 2), blurRadius: 0),
                   ],
                 ),
-                child: Center(
-                  child: Text(
-                    'AD',
-                    style: adminLabel(c.textSecondary),
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _IdentityCircle(
+                      adminName: adminName,
+                      adminEmail: adminEmail,
+                    ),
+                    if ((adminName ?? '').trim().isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      Text(
+                        (adminName ?? '').trim(),
+                        style: adminMeta(c.textSecondary).copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ],
@@ -101,6 +118,57 @@ class AdminTopBar extends StatelessWidget implements PreferredSizeWidget {
         ),
       ),
     );
+  }
+}
+
+class _IdentityCircle extends StatelessWidget {
+  final String? adminName;
+  final String? adminEmail;
+
+  const _IdentityCircle({
+    required this.adminName,
+    required this.adminEmail,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ac(context);
+    final initials = _initials();
+    return Container(
+      width: 22,
+      height: 22,
+      decoration: BoxDecoration(
+        color: c.accentFill,
+        shape: BoxShape.circle,
+        border: Border.all(color: c.border, width: 1.5),
+      ),
+      child: Center(
+        child: Text(
+          initials,
+          style: adminLabel(c.textPrimary).copyWith(fontSize: 9),
+        ),
+      ),
+    );
+  }
+
+  String _initials() {
+    final normalizedName = (adminName ?? '').trim();
+    if (normalizedName.isNotEmpty) {
+      final parts = normalizedName
+          .split(' ')
+          .where((part) => part.trim().isNotEmpty)
+          .toList(growable: false);
+      if (parts.length >= 2) {
+        return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+      }
+      return parts.first[0].toUpperCase();
+    }
+
+    final email = (adminEmail ?? '').trim();
+    if (email.isNotEmpty) {
+      return email[0].toUpperCase();
+    }
+    return 'A';
   }
 }
 

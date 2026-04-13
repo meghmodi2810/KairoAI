@@ -344,59 +344,6 @@ ThemeData adminThemeLight() {
   );
 }
 
-ThemeData adminThemeDark() {
-  final base = ThemeData.dark(useMaterial3: true);
-  return base.copyWith(
-    scaffoldBackgroundColor: dBgBase,
-    colorScheme: const ColorScheme.dark(
-      primary: dAccentBright,
-      surface: dBgSurface,
-      error: dError,
-      onPrimary: dBgBase,
-      onSurface: dTextPrimary,
-    ),
-    textTheme: GoogleFonts.spaceGroteskTextTheme(base.textTheme),
-    extensions: const [AdminColors.dark],
-    appBarTheme: const AppBarTheme(
-      backgroundColor: dBgSurface,
-      surfaceTintColor: Colors.transparent,
-      elevation: 0,
-      scrolledUnderElevation: 0,
-    ),
-    dividerColor: dBorder,
-    dividerTheme: const DividerThemeData(color: dBorder, thickness: 1.5, space: 0),
-    inputDecorationTheme: InputDecorationTheme(
-      filled: true,
-      fillColor: dBgSurface3,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(radiusInput),
-        borderSide: const BorderSide(color: dBorder2, width: 2),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(radiusInput),
-        borderSide: const BorderSide(color: dBorder2, width: 2),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(radiusInput),
-        borderSide: const BorderSide(color: dAccentBright, width: 2.5),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(radiusInput),
-        borderSide: const BorderSide(color: dError, width: 2.5),
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-    ),
-    cardTheme: CardThemeData(
-      color: dBgSurface,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(radiusCard),
-        side: const BorderSide(color: dBorder, width: 2.5),
-      ),
-    ),
-  );
-}
-
 /// Helper to get AdminColors from context
 AdminColors ac(BuildContext context) =>
     Theme.of(context).extension<AdminColors>() ?? AdminColors.light;

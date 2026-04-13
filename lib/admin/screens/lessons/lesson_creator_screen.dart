@@ -39,6 +39,7 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
   String _type = 'alphabet'; // 'alphabet', 'numeric', 'both'
   bool _isActive = false;
   bool _isSaving = false;
+  bool _orderEditedByAdmin = false;
 
   // List of signs picked for THIS lesson
   List<AdminSignItem> _selectedSigns = [];
@@ -89,6 +90,7 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
     _coinsCtrl.text = '${l.coinsReward}';
     _selectedCategoryId = l.categoryId;
     _selectedSigns = List<AdminSignItem>.from(l.signs);
+    _orderEditedByAdmin = true;
   }
 
   Future<void> _loadSupportData() async {
@@ -101,6 +103,9 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
       final allSigns = await _db.getAllSigns();
 
       if (!mounted) return;
+      var shouldSuggestOrder = false;
+      String categoryForSuggestion = _selectedCategoryId;
+
       setState(() {
         _categories = cats.docs
             .map((d) => CategoryModel.fromFirestore(d))
@@ -110,18 +115,30 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
 
         if (_selectedCategoryId.isEmpty && _categories.isNotEmpty) {
           _selectedCategoryId = _categories.first.id;
-          _updateNextOrder(_selectedCategoryId);
+          categoryForSuggestion = _selectedCategoryId;
+          shouldSuggestOrder = true;
         } else if (_selectedCategoryId.isNotEmpty) {
-          if (!_isEdit) _updateNextOrder(_selectedCategoryId);
+          if (!_isEdit) {
+            categoryForSuggestion = _selectedCategoryId;
+            shouldSuggestOrder = true;
+          }
         }
       });
+
+      if (shouldSuggestOrder) {
+        await _updateNextOrder(categoryForSuggestion, force: !_isEdit);
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() => _loadingSupport = false);
     }
   }
 
-  Future<void> _updateNextOrder(String catId) async {
+  Future<void> _updateNextOrder(String catId, {bool force = false}) async {
+    if (_orderEditedByAdmin && !force) {
+      return;
+    }
+
     try {
       final snapshot = await FirebaseFirestore.instance
           .collection('categories')
@@ -266,6 +283,8 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
         appBar: AdminTopBar(
           title: 'Lesson Creator',
           variant: AdminTopBarVariant.sub,
+          adminName: widget.admin.displayName,
+          adminEmail: widget.admin.email,
         ),
         body: AdminSkeletonLoader.listRows(count: 15),
       );
@@ -276,6 +295,8 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
       appBar: AdminTopBar(
         title: _isEdit ? 'Edit Lesson' : 'New Lesson',
         variant: AdminTopBarVariant.sub,
+        adminName: widget.admin.displayName,
+        adminEmail: widget.admin.email,
         action: AdminTopBarSaveButton(
           onTap: _isSaving ? null : _save,
           isLoading: _isSaving,
@@ -314,13 +335,11 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
                             return Padding(
                               padding: const EdgeInsets.only(right: 8),
                               child: AdminFilterChip(
-                                label: cat.id,
+                                label: cat.name,
                                 selected: isSelected,
                                 onTap: () {
-                                  setState(() {
-                                    _selectedCategoryId = cat.id;
-                                    _updateNextOrder(cat.id);
-                                  });
+                                  setState(() => _selectedCategoryId = cat.id);
+                                  _updateNextOrder(cat.id);
                                 },
                               ),
                             );
@@ -447,6 +466,19 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
                       style: adminH2(c.accent),
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  AdminInput(
+                    label: 'Manual Order Override',
+                    hint: '1',
+                    controller: _orderCtrl,
+                    keyboardType: TextInputType.number,
+                    helperText:
+                        'If left unchanged, next order is suggested automatically.',
+                    onChanged: (_) {
+                      _orderEditedByAdmin = true;
+                    },
+                  ),
+                  const SizedBox(height: 8),
                   AdminRow(
                     title: Text(
                       'Publish Lesson',

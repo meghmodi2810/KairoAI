@@ -1,13 +1,10 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import '../main_navigation.dart';
+import '../auth_wrapper.dart';
 import '../theme/app_theme.dart';
 import '../theme/neo_brutal_widgets.dart';
 import 'signup_page.dart';
-import 'package:kairo_ai/admin/models/admin_models.dart';
-import 'package:kairo_ai/admin/screens/admin_shell.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -57,7 +54,7 @@ class _LoginPageState extends State<LoginPage> {
         password: _passCtrl.text.trim(),
       );
       if (cred.user == null || !mounted) return;
-      await _navigateAfterLogin(cred.user!.uid);
+      _goToAuthGate();
     } on FirebaseAuthException catch (e) {
       _showError(_authMessage(e.code));
     } catch (_) {
@@ -82,7 +79,7 @@ class _LoginPageState extends State<LoginPage> {
       final cred = await _auth.signInWithCredential(credential);
       if (cred.user == null || !mounted) return;
 
-      await _navigateAfterLogin(cred.user!.uid);
+      _goToAuthGate();
     } on FirebaseAuthException catch (e) {
       _showError(e.message ?? _authMessage(e.code));
     } catch (_) {
@@ -109,25 +106,14 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  Future<void> _navigateAfterLogin(String uid) async {
-    Widget destination = const MainNavigation();
-    try {
-      final doc = await FirebaseFirestore.instance.collection('admins').doc(uid).get();
-      if (doc.exists) {
-        final admin = AdminModel.fromFirestore(doc);
-        if (admin.isActive) {
-          destination = AdminShell(admin: admin);
-        }
-      }
-    } catch (_) {}
-
+  void _goToAuthGate() {
     if (!mounted) return;
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) => destination,
+        pageBuilder: (context, animation, secondaryAnimation) => const AuthWrapper(),
         transitionDuration: const Duration(milliseconds: 250),
-        transitionsBuilder: (_, animation, __, child) =>
+        transitionsBuilder: (context, animation, secondaryAnimation, child) =>
             FadeTransition(opacity: animation, child: child),
       ),
     );
@@ -261,9 +247,9 @@ class _LoginPageState extends State<LoginPage> {
                               Navigator.push(
                                 context,
                                 PageRouteBuilder(
-                                  pageBuilder: (_, __, ___) => const SignUpPage(),
+                                  pageBuilder: (context, animation, secondaryAnimation) => const SignUpPage(),
                                   transitionDuration: const Duration(milliseconds: 240),
-                                  transitionsBuilder: (_, animation, __, child) =>
+                                  transitionsBuilder: (context, animation, secondaryAnimation, child) =>
                                       FadeTransition(opacity: animation, child: child),
                                 ),
                               );

@@ -391,7 +391,7 @@ class _AdminInputState extends State<AdminInput> {
   }
 }
 
-class AdminSearchBar extends StatelessWidget {
+class AdminSearchBar extends StatefulWidget {
   final TextEditingController controller;
   final String hint;
   final ValueChanged<String>? onChanged;
@@ -406,48 +406,98 @@ class AdminSearchBar extends StatelessWidget {
   });
 
   @override
+  State<AdminSearchBar> createState() => _AdminSearchBarState();
+}
+
+class _AdminSearchBarState extends State<AdminSearchBar> {
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onControllerChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant AdminSearchBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_onControllerChanged);
+      widget.controller.addListener(_onControllerChanged);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onControllerChanged);
+    super.dispose();
+  }
+
+  void _onControllerChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final c = ac(context);
-    return Container(
-      height: 40,
-      decoration: BoxDecoration(
-        color: c.bgSurface2,
-        borderRadius: BorderRadius.circular(radiusInput),
-        border: Border.all(color: c.border2, width: 2),
-      ),
-      child: TextField(
-        controller: controller,
-        onChanged: onChanged,
-        style: adminBody(c.textPrimary),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: adminBody(c.textMuted),
-          prefixIcon: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: Icon(LucideIcons.search, size: 14, color: c.textMuted),
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: widget.controller,
+      builder: (context, value, _) {
+        final hasValue = value.text.trim().isNotEmpty;
+        return Container(
+          height: 40,
+          decoration: BoxDecoration(
+            color: c.bgSurface2,
+            borderRadius: BorderRadius.circular(radiusInput),
+            border: Border.all(color: c.border2, width: 2),
           ),
-          prefixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-          suffixIcon: controller.text.isNotEmpty
-              ? GestureDetector(
-                  onTap: () {
-                    controller.clear();
-                    onClear?.call();
-                    onChanged?.call('');
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.all(10),
-                    child: Icon(LucideIcons.x, size: 14, color: c.textMuted),
-                  ),
-                )
-              : null,
-          suffixIconConstraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-          filled: false,
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 8),
-        ),
-      ),
+          child: TextField(
+            controller: widget.controller,
+            onChanged: widget.onChanged,
+            textAlignVertical: TextAlignVertical.center,
+            style: adminBody(c.textPrimary).copyWith(height: 1.15),
+            decoration: InputDecoration(
+              hintText: widget.hint,
+              hintStyle: adminBody(c.textMuted).copyWith(height: 1.15),
+              prefixIcon: Icon(
+                LucideIcons.search,
+                size: 15,
+                color: c.textMuted,
+              ),
+              prefixIconConstraints: const BoxConstraints(
+                minWidth: 38,
+                maxWidth: 38,
+                minHeight: 38,
+              ),
+              suffixIcon: hasValue
+                  ? IconButton(
+                      icon: Icon(LucideIcons.x, size: 14, color: c.textMuted),
+                      splashRadius: 16,
+                      padding: EdgeInsets.zero,
+                      onPressed: () {
+                        widget.controller.clear();
+                        widget.onClear?.call();
+                        widget.onChanged?.call('');
+                      },
+                    )
+                  : null,
+              suffixIconConstraints: const BoxConstraints(
+                minWidth: 36,
+                maxWidth: 36,
+                minHeight: 36,
+              ),
+              filled: false,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 10,
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

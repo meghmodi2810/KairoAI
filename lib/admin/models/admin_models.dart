@@ -83,6 +83,91 @@ class AdminModel {
   }
 }
 
+class AdminActionResult {
+  final bool success;
+  final String message;
+
+  const AdminActionResult({
+    required this.success,
+    required this.message,
+  });
+}
+
+class LevelConfigModel {
+  static const List<int> defaultThresholds = <int>[0, 120, 280, 520, 860, 1300];
+
+  final List<int> xpThresholds;
+  final DateTime? updatedAt;
+  final String? updatedBy;
+
+  const LevelConfigModel({
+    this.xpThresholds = defaultThresholds,
+    this.updatedAt,
+    this.updatedBy,
+  });
+
+  factory LevelConfigModel.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>? ?? <String, dynamic>{};
+    final rawThresholds = (data['xpThresholds'] as List<dynamic>? ?? defaultThresholds)
+        .map((v) => (v as num).toInt())
+        .toList(growable: false);
+
+    return LevelConfigModel(
+      xpThresholds: normalizeThresholds(rawThresholds),
+      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
+      updatedBy: data['updatedBy'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toFirestore() {
+    return <String, dynamic>{
+      'xpThresholds': normalizeThresholds(xpThresholds),
+      'updatedAt': updatedAt != null
+          ? Timestamp.fromDate(updatedAt!)
+          : FieldValue.serverTimestamp(),
+      'updatedBy': updatedBy,
+    };
+  }
+
+  static List<int> normalizeThresholds(List<int> source) {
+    final cleaned = source
+        .map((v) => v < 0 ? 0 : v)
+        .toSet()
+        .toList()
+      ..sort();
+    if (cleaned.isEmpty || cleaned.first != 0) {
+      cleaned.insert(0, 0);
+    }
+    return cleaned;
+  }
+
+  int levelForXp(int xp) {
+    final safeXp = xp < 0 ? 0 : xp;
+    final thresholds = normalizeThresholds(xpThresholds);
+    var level = 1;
+    for (var i = 0; i < thresholds.length; i++) {
+      if (safeXp >= thresholds[i]) {
+        level = i + 1;
+      } else {
+        break;
+      }
+    }
+    return level;
+  }
+
+  LevelConfigModel copyWith({
+    List<int>? xpThresholds,
+    DateTime? updatedAt,
+    String? updatedBy,
+  }) {
+    return LevelConfigModel(
+      xpThresholds: xpThresholds ?? this.xpThresholds,
+      updatedAt: updatedAt ?? this.updatedAt,
+      updatedBy: updatedBy ?? this.updatedBy,
+    );
+  }
+}
+
 /// Lesson model for admin management with full CRUD fields
 class AdminLessonModel {
   final String id;
@@ -449,14 +534,21 @@ class WordCharacter {
 /// Issue/Feedback model for admin management
 class IssueModel {
   final String id;
-  final String reportedBy; // userId or email
+  final String reportedBy;
+  final String reporterUid;
+  final String reporterEmail;
+  final String reporterDisplayName;
   final String title;
   final String description;
   final String type; // 'bug', 'feature', 'content', 'other'
   final String priority; // 'low', 'medium', 'high', 'critical'
   final String status; // 'open', 'in_progress', 'resolved', 'closed'
+  final String sourceScreen;
+  final String contextType;
   final String? lessonId;
+  final String? categoryId;
   final String? signId;
+  final String? signLabel;
   final List<String> attachments;
   final Map<String, dynamic>? deviceInfo;
   final String? appVersion;
@@ -467,13 +559,20 @@ class IssueModel {
   IssueModel({
     required this.id,
     required this.reportedBy,
+    this.reporterUid = '',
+    this.reporterEmail = '',
+    this.reporterDisplayName = '',
     required this.title,
     required this.description,
     this.type = 'other',
     this.priority = 'medium',
     this.status = 'open',
+    this.sourceScreen = '',
+    this.contextType = '',
     this.lessonId,
+    this.categoryId,
     this.signId,
+    this.signLabel,
     this.attachments = const [],
     this.deviceInfo,
     this.appVersion,
@@ -484,25 +583,58 @@ class IssueModel {
 
   factory IssueModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    final rawAttachments = data['attachments'];
+    final attachments = rawAttachments is List
+        ? rawAttachments.map((a) => a.toString()).toList(growable: false)
+        : const <String>[];
+
+    final rawDeviceInfo = data['deviceInfo'];
+    final deviceInfo = rawDeviceInfo is Map
+        ? Map<String, dynamic>.from(rawDeviceInfo)
+        : null;
+
+    final rawAdminNotes = data['adminNotes'];
+    final adminNotes = <AdminNote>[];
+    if (rawAdminNotes is List) {
+      for (final note in rawAdminNotes) {
+        if (note is Map) {
+          adminNotes.add(AdminNote.fromMap(Map<String, dynamic>.from(note)));
+        }
+      }
+    }
+
+    final reporterUid =
+      (data['reporterUid'] ?? data['reportedBy'] ?? data['learnerId'] ?? '')
+        .toString();
+    final reporterEmail =
+      (data['reporterEmail'] ?? data['learnerEmail'] ?? '').toString();
+    final reporterDisplayName =
+      (data['reporterDisplayName'] ?? data['reporterName'] ?? '').toString();
+    final fallbackReporter = reporterDisplayName.isNotEmpty
+      ? reporterDisplayName
+      : (reporterEmail.isNotEmpty ? reporterEmail : reporterUid);
+
     return IssueModel(
       id: doc.id,
-      reportedBy:
-          data['reportedBy'] ?? data['learnerId'] ?? data['learnerEmail'] ?? '',
+      reportedBy: fallbackReporter,
+      reporterUid: reporterUid,
+      reporterEmail: reporterEmail,
+      reporterDisplayName: reporterDisplayName,
       title: data['title'] ?? '',
       description: data['description'] ?? '',
       type: data['type'] ?? data['category'] ?? 'other',
       priority: data['priority'] ?? 'medium',
       status: data['status'] ?? 'open',
+      sourceScreen: data['sourceScreen'] ?? '',
+      contextType: data['contextType'] ?? '',
       lessonId: data['lessonId'],
+      categoryId: data['categoryId'],
       signId: data['signId'],
-      attachments: List<String>.from(data['attachments'] ?? []),
-      deviceInfo: data['deviceInfo'] as Map<String, dynamic>?,
+      signLabel: data['signLabel'],
+      attachments: attachments,
+      deviceInfo: deviceInfo,
       appVersion: data['appVersion'],
-      adminNotes:
-          (data['adminNotes'] as List<dynamic>?)
-              ?.map((n) => AdminNote.fromMap(n as Map<String, dynamic>))
-              .toList() ??
-          [],
+      adminNotes: adminNotes,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       resolvedAt: (data['resolvedAt'] as Timestamp?)?.toDate(),
     );
@@ -511,13 +643,20 @@ class IssueModel {
   Map<String, dynamic> toFirestore() {
     return {
       'reportedBy': reportedBy,
+      'reporterUid': reporterUid,
+      'reporterEmail': reporterEmail,
+      'reporterDisplayName': reporterDisplayName,
       'title': title,
       'description': description,
       'type': type,
       'priority': priority,
       'status': status,
+      'sourceScreen': sourceScreen,
+      'contextType': contextType,
       'lessonId': lessonId,
+      'categoryId': categoryId,
       'signId': signId,
+      'signLabel': signLabel,
       'attachments': attachments,
       'deviceInfo': deviceInfo,
       'appVersion': appVersion,
@@ -525,6 +664,19 @@ class IssueModel {
       'createdAt': Timestamp.fromDate(createdAt),
       'resolvedAt': resolvedAt != null ? Timestamp.fromDate(resolvedAt!) : null,
     };
+  }
+
+  String get readableReporter {
+    if (reporterDisplayName.trim().isNotEmpty) {
+      return reporterDisplayName.trim();
+    }
+    if (reporterEmail.trim().isNotEmpty) {
+      return reporterEmail.trim();
+    }
+    if (reporterUid.trim().isNotEmpty) {
+      return reporterUid.trim();
+    }
+    return reportedBy.trim().isNotEmpty ? reportedBy.trim() : 'Unknown reporter';
   }
 }
 
@@ -545,14 +697,26 @@ class AdminNote {
   String get note => content;
 
   factory AdminNote.fromMap(Map<String, dynamic> map) {
+    final rawTimestamp = map['createdAt'] ?? map['timestamp'];
+    DateTime parsedCreatedAt;
+
+    if (rawTimestamp is Timestamp) {
+      parsedCreatedAt = rawTimestamp.toDate();
+    } else if (rawTimestamp is DateTime) {
+      parsedCreatedAt = rawTimestamp;
+    } else if (rawTimestamp is int) {
+      parsedCreatedAt = DateTime.fromMillisecondsSinceEpoch(rawTimestamp);
+    } else if (rawTimestamp is String) {
+      parsedCreatedAt = DateTime.tryParse(rawTimestamp) ?? DateTime.now();
+    } else {
+      parsedCreatedAt = DateTime.now();
+    }
+
     return AdminNote(
       adminId: map['adminId'] ?? '',
       adminName: map['adminName'] ?? '',
       content: map['content'] ?? map['note'] ?? '',
-      createdAt:
-          (map['createdAt'] as Timestamp?)?.toDate() ??
-          (map['timestamp'] as Timestamp?)?.toDate() ??
-          DateTime.now(),
+      createdAt: parsedCreatedAt,
     );
   }
 

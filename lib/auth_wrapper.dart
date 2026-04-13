@@ -5,10 +5,30 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'pages/onboarding_page.dart';
 import 'pages/login_page.dart';
 import 'main_navigation.dart';
-import 'package:kairo_ai/main.dart';
 import 'admin/screens/admin_shell.dart';
 import 'admin/theme/admin_theme.dart';
 import 'admin/models/admin_models.dart';
+import 'services/database_service.dart';
+
+enum _AuthDestination {
+  admin,
+  learner,
+  inactiveAdmin,
+  inactiveLearner,
+  maintenance,
+}
+
+class _AuthDecision {
+  final _AuthDestination destination;
+  final AdminModel? admin;
+  final String message;
+
+  const _AuthDecision({
+    required this.destination,
+    this.admin,
+    this.message = '',
+  });
+}
 
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
@@ -18,6 +38,7 @@ class AuthWrapper extends StatefulWidget {
 }
 
 class _AuthWrapperState extends State<AuthWrapper> {
+  final DatabaseService _db = DatabaseService();
   bool _isLoading = true;
   bool _onboardingComplete = false;
 
@@ -61,9 +82,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
   }
 
   Widget _withAdminTheme(BuildContext context, Widget child) {
-    final isDark = MyApp.themeProvider.isDarkMode;
     return Theme(
-      data: isDark ? adminThemeDark() : adminThemeLight(),
+      data: adminThemeLight(),
       child: child,
     );
   }
@@ -72,6 +92,147 @@ class _AuthWrapperState extends State<AuthWrapper> {
     return const Scaffold(
       backgroundColor: paper,
       body: SizedBox.expand(),
+    );
+  }
+
+  Future<_AuthDecision> _resolveAuthDecision(User user) async {
+    final uid = user.uid;
+
+    final adminDoc = await _checkAdminStatus(uid);
+    if (adminDoc != null && adminDoc.exists) {
+      try {
+        final admin = AdminModel.fromFirestore(adminDoc);
+        if (admin.isActive) {
+          return _AuthDecision(destination: _AuthDestination.admin, admin: admin);
+        }
+        return const _AuthDecision(
+          destination: _AuthDestination.inactiveAdmin,
+          message: 'Your admin account is currently inactive. Contact another admin for reactivation.',
+        );
+      } catch (e) {
+        debugPrint('AuthWrapper: Failed to parse admin document: $e');
+      }
+    }
+
+    try {
+      await _db.createUserDocument(user);
+    } catch (e) {
+      debugPrint('AuthWrapper: Learner bootstrap failed: $e');
+    }
+
+    var learnerIsActive = true;
+    try {
+      final learnerDoc =
+          await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      learnerIsActive = (learnerDoc.data()?['isActive'] ?? true) == true;
+    } catch (e) {
+      debugPrint('AuthWrapper: Could not resolve learner status: $e');
+    }
+
+    if (!learnerIsActive) {
+      return const _AuthDecision(
+        destination: _AuthDestination.inactiveLearner,
+        message: 'This learner account has been deactivated. Please contact support.',
+      );
+    }
+
+    try {
+      final maintenanceDoc = await FirebaseFirestore.instance
+          .collection('settings')
+          .doc('maintenance')
+          .get();
+      if (maintenanceDoc.exists) {
+        final data = maintenanceDoc.data() ?? <String, dynamic>{};
+        if ((data['isEnabled'] ?? false) == true) {
+          return _AuthDecision(
+            destination: _AuthDestination.maintenance,
+            message: (data['message'] ??
+                    'KairoAI is currently under maintenance. Please check back soon.')
+                .toString(),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('AuthWrapper: Could not resolve maintenance mode: $e');
+    }
+
+    return const _AuthDecision(destination: _AuthDestination.learner);
+  }
+
+  Widget _blockedAccessScreen({
+    required String title,
+    required String body,
+    required Color accent,
+    bool showRefresh = false,
+  }) {
+    return Scaffold(
+      backgroundColor: paper,
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 110,
+                  height: 110,
+                  decoration: BoxDecoration(
+                    color: accent,
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: ink, width: 4),
+                    boxShadow: const [
+                      BoxShadow(color: ink, blurRadius: 0, offset: Offset(8, 8)),
+                    ],
+                  ),
+                  child: const Icon(Icons.block_rounded, color: ink, size: 56),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: ink,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 28,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  body,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: ink,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                if (showRefresh)
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => setState(() {}),
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('Check Again'),
+                    ),
+                  ),
+                if (showRefresh) const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      await FirebaseAuth.instance.signOut();
+                    },
+                    icon: const Icon(Icons.logout_rounded),
+                    label: const Text('Sign Out'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -209,28 +370,49 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
         // User is logged in - check if admin or learner
         if (snapshot.hasData) {
-          return FutureBuilder<DocumentSnapshot?>(
-            future: _checkAdminStatus(snapshot.data!.uid),
-            builder: (context, adminSnapshot) {
-              if (adminSnapshot.connectionState == ConnectionState.waiting) {
+          return FutureBuilder<_AuthDecision>(
+            future: _resolveAuthDecision(snapshot.data!),
+            builder: (context, decisionSnapshot) {
+              if (decisionSnapshot.connectionState == ConnectionState.waiting) {
                 return _transitionPlaceholder();
               }
 
-              // Check if user is an admin
-              if (adminSnapshot.hasData &&
-                  adminSnapshot.data != null &&
-                  adminSnapshot.data!.exists) {
-                try {
-                  final admin = AdminModel.fromFirestore(adminSnapshot.data!);
-                  if (admin.isActive) {
-                    return _withAdminTheme(
-                      context,
-                      AdminShell(admin: admin),
-                    );
-                  }
-                } catch (e) {
-                  debugPrint('Error parsing admin data: $e');
-                }
+              final decision = decisionSnapshot.data;
+              if (decision == null) {
+                return _transitionPlaceholder();
+              }
+
+              if (decision.destination == _AuthDestination.admin &&
+                  decision.admin != null) {
+                return _withAdminTheme(
+                  context,
+                  AdminShell(admin: decision.admin!),
+                );
+              }
+
+              if (decision.destination == _AuthDestination.inactiveAdmin) {
+                return _blockedAccessScreen(
+                  title: 'Admin Access Blocked',
+                  body: decision.message,
+                  accent: yellow,
+                );
+              }
+
+              if (decision.destination == _AuthDestination.inactiveLearner) {
+                return _blockedAccessScreen(
+                  title: 'Account Deactivated',
+                  body: decision.message,
+                  accent: const Color(0xFFFF9A76),
+                );
+              }
+
+              if (decision.destination == _AuthDestination.maintenance) {
+                return _blockedAccessScreen(
+                  title: 'Maintenance Mode',
+                  body: decision.message,
+                  accent: blue,
+                  showRefresh: true,
+                );
               }
 
               // Regular user - go to main navigation

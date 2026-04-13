@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:kairo_ai/admin/models/admin_models.dart';
 import 'package:kairo_ai/admin/services/admin_database_service.dart';
@@ -27,6 +28,9 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
   final _db = AdminDatabaseService();
   UserModel? _user;
   List<LessonProgress> _progress = [];
+  final Map<String, String> _lessonTitlesByKey = <String, String>{};
+  final Map<String, int> _lessonSignCountsByKey = <String, int>{};
+  final Map<String, String> _categoryNamesById = <String, String>{};
   bool _loading = true;
   bool _hasError = false;
   bool _actionLoading = false;
@@ -45,6 +49,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
     try {
       final user = await _db.getLearner(widget.userId);
       final progress = await _db.getLearnerProgress(widget.userId);
+      final displayData = await _resolveProgressDisplayData(progress);
       if (!mounted) return;
       if (user == null) {
         setState(() {
@@ -53,9 +58,25 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
         });
         return;
       }
+
+      progress.sort((a, b) {
+        final aTimestamp = a.completedAt ?? a.startedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final bTimestamp = b.completedAt ?? b.startedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return bTimestamp.compareTo(aTimestamp);
+      });
+
       setState(() {
         _user = user;
         _progress = progress;
+        _lessonTitlesByKey
+          ..clear()
+          ..addAll(displayData.lessonTitlesByKey);
+        _lessonSignCountsByKey
+          ..clear()
+          ..addAll(displayData.lessonSignCountsByKey);
+        _categoryNamesById
+          ..clear()
+          ..addAll(displayData.categoryNamesById);
         _loading = false;
       });
     } catch (e) {
@@ -65,6 +86,99 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
         _loading = false;
       });
     }
+  }
+
+  Future<_ProgressDisplayData> _resolveProgressDisplayData(
+    List<LessonProgress> progress,
+  ) async {
+    final lessonTitlesByKey = <String, String>{};
+    final lessonSignCountsByKey = <String, int>{};
+    final categoryNamesById = <String, String>{};
+
+    final categoryIds = <String>{};
+    for (final p in progress) {
+      if (p.categoryId.trim().isNotEmpty) {
+        categoryIds.add(p.categoryId.trim());
+      }
+    }
+
+    for (final categoryId in categoryIds) {
+      try {
+        final categoryDoc = await FirebaseFirestore.instance
+            .collection('categories')
+            .doc(categoryId)
+            .get();
+        if (categoryDoc.exists) {
+          final data = categoryDoc.data() ?? <String, dynamic>{};
+          final name = (data['name'] ?? categoryId).toString().trim();
+          if (name.isNotEmpty) {
+            categoryNamesById[categoryId] = name;
+          }
+        }
+      } catch (_) {}
+    }
+
+    for (final p in progress) {
+      final categoryId = p.categoryId.trim();
+      final lessonId = p.lessonId.trim();
+      if (categoryId.isEmpty || lessonId.isEmpty) {
+        continue;
+      }
+
+      final lessonKey = '$categoryId/$lessonId';
+      if (lessonTitlesByKey.containsKey(lessonKey)) {
+        continue;
+      }
+
+      try {
+        final lessonDoc = await FirebaseFirestore.instance
+            .collection('categories')
+            .doc(categoryId)
+            .collection('lessons')
+            .doc(lessonId)
+            .get();
+        if (lessonDoc.exists) {
+          final lessonData = lessonDoc.data() ?? <String, dynamic>{};
+          final lessonTitle = (lessonData['title'] ?? lessonId).toString().trim();
+          if (lessonTitle.isNotEmpty) {
+            lessonTitlesByKey[lessonKey] = lessonTitle;
+          }
+
+          final explicitTotalSigns = (lessonData['totalSigns'] as num?)?.toInt();
+          if (explicitTotalSigns != null && explicitTotalSigns > 0) {
+            lessonSignCountsByKey[lessonKey] = explicitTotalSigns;
+          }
+        }
+      } catch (_) {}
+    }
+
+    return _ProgressDisplayData(
+      lessonTitlesByKey: lessonTitlesByKey,
+      lessonSignCountsByKey: lessonSignCountsByKey,
+      categoryNamesById: categoryNamesById,
+    );
+  }
+
+  String _lessonKey(LessonProgress p) => '${p.categoryId.trim()}/${p.lessonId.trim()}';
+
+  String _normalizeStatus(String status) {
+    final normalized = status.trim().toLowerCase();
+    if (normalized == 'completed') return 'Completed';
+    if (normalized == 'in_progress' || normalized == 'in-progress') {
+      return 'In progress';
+    }
+    return 'Not started';
+  }
+
+  String _formatDurationSeconds(int seconds) {
+    if (seconds <= 0) return '0m';
+    final totalMinutes = seconds ~/ 60;
+    final hours = totalMinutes ~/ 60;
+    final minutes = totalMinutes % 60;
+    if (hours > 0) {
+      return '${hours}h ${minutes}m';
+    }
+    return '${minutes}m';
   }
 
   Future<void> _toggleStatus() async {
@@ -133,14 +247,17 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
     if (!confirmed || !mounted) return;
 
     setState(() => _actionLoading = true);
-    final ok = await _db.deleteLearner(widget.userId);
+    final result = await _db.deleteLearnerCompletely(widget.userId);
     if (!mounted) return;
     setState(() => _actionLoading = false);
-    if (ok) {
-      AdminToast.show(context, 'Account deleted.', type: AdminToastType.success);
-      Navigator.of(context).pop();
+    if (result.success) {
+      AdminToast.show(context, result.message, type: AdminToastType.success);
+      Navigator.of(context).pop(<String, dynamic>{
+        'deleted': true,
+        'userId': widget.userId,
+      });
     } else {
-      AdminToast.show(context, 'Delete failed.', type: AdminToastType.error);
+      AdminToast.show(context, result.message, type: AdminToastType.error);
     }
   }
 
@@ -229,9 +346,11 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
     if (_loading) {
       return Scaffold(
         backgroundColor: c.bgBase,
-        appBar: const AdminTopBar(
+        appBar: AdminTopBar(
           title: 'User',
           variant: AdminTopBarVariant.sub,
+          adminName: widget.admin.displayName,
+          adminEmail: widget.admin.email,
         ),
         body: AdminSkeletonLoader.listRows(count: 10),
       );
@@ -240,9 +359,11 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
     if (_hasError || _user == null) {
       return Scaffold(
         backgroundColor: c.bgBase,
-        appBar: const AdminTopBar(
+        appBar: AdminTopBar(
           title: 'User',
           variant: AdminTopBarVariant.sub,
+          adminName: widget.admin.displayName,
+          adminEmail: widget.admin.email,
         ),
         body: AdminErrorState(
           message: 'Could not load user.',
@@ -259,6 +380,8 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
       appBar: AdminTopBar(
         title: 'User detail',
         variant: AdminTopBarVariant.sub,
+        adminName: widget.admin.displayName,
+        adminEmail: widget.admin.email,
         action: _actionLoading
             ? const SizedBox(
                 width: 48,
@@ -359,31 +482,104 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
             // Individual Lesson Progress
             AdminSectionHeader(title: 'Lesson progress detail'),
             if (_progress.isEmpty)
-              const AdminEmptyState(icon: LucideIcons.book, title: 'No progress', body: 'This user hasn\'t started any lessons yet.'),
+              const AdminEmptyState(
+                icon: LucideIcons.book,
+                title: 'No lesson activity yet',
+                body: 'Progress cards will appear here once this learner starts lessons.',
+              ),
             ..._progress.asMap().entries.map((e) {
               final p = e.value;
-              final bool isDone = p.status == 'completed';
-              // Fallback for missing fields in model
-              const int totalSigns = 10; // Expected average signs
-              final double progressVal = isDone ? 1.0 : (p.signsCompleted.length / totalSigns);
+              final isDone = p.status == 'completed';
+              final lessonKey = _lessonKey(p);
+              final lessonTitle = _lessonTitlesByKey[lessonKey] ?? 'Lesson ${p.lessonId}';
+              final categoryTitle = _categoryNamesById[p.categoryId] ?? p.categoryId;
+              final trackedTotalSigns = _lessonSignCountsByKey[lessonKey] ??
+                  (p.signsCompleted.length + p.signsSkipped.length);
+              final completedSigns = p.signsCompleted.length;
+
+              double progressVal;
+              if (isDone) {
+                progressVal = 1.0;
+              } else if (trackedTotalSigns > 0) {
+                progressVal = completedSigns / trackedTotalSigns;
+              } else if (p.status == 'in_progress') {
+                progressVal = 0.1;
+              } else {
+                progressVal = 0.0;
+              }
               
               return AdminCard(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 radius: 0,
                 showBorder: false,
-                color: Colors.transparent,
+                showShadow: false,
+                color: c.bgSurface,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Lesson ${p.lessonId}', style: adminH3(c.textPrimary)),
-                        Text('${(progressVal * 100).toInt()}%', style: adminMeta(isDone ? c.success : c.textMuted)),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                lessonTitle,
+                                style: adminH3(c.textPrimary),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                categoryTitle,
+                                style: adminMeta(c.textMuted),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        AdminTag(
+                          label: _normalizeStatus(p.status).toUpperCase(),
+                          variant: isDone
+                              ? AdminTagVariant.active
+                              : (p.status == 'in_progress'
+                                  ? AdminTagVariant.pending
+                                  : AdminTagVariant.draft),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
                     AdminProgressBar(value: progressVal.clamp(0.0, 1.0)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 6,
+                      children: [
+                        Text(
+                          '${(progressVal * 100).toInt()}% complete',
+                          style: adminMeta(isDone ? c.success : c.textMuted),
+                        ),
+                        Text(
+                          'Signs: $completedSigns/${trackedTotalSigns > 0 ? trackedTotalSigns : '-'}',
+                          style: adminMeta(c.textSecondary),
+                        ),
+                        Text(
+                          'Accuracy: ${(p.accuracy * 100).toStringAsFixed(0)}%',
+                          style: adminMeta(c.textSecondary),
+                        ),
+                        Text(
+                          'Time: ${_formatDurationSeconds(p.timeSpentSeconds)}',
+                          style: adminMeta(c.textSecondary),
+                        ),
+                        Text(
+                          'Attempts: ${p.attemptsCount}',
+                          style: adminMeta(c.textSecondary),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               );
@@ -441,4 +637,16 @@ class _Divider extends StatelessWidget {
       color: ac(context).bgBase,
     );
   }
+}
+
+class _ProgressDisplayData {
+  final Map<String, String> lessonTitlesByKey;
+  final Map<String, int> lessonSignCountsByKey;
+  final Map<String, String> categoryNamesById;
+
+  const _ProgressDisplayData({
+    required this.lessonTitlesByKey,
+    required this.lessonSignCountsByKey,
+    required this.categoryNamesById,
+  });
 }
