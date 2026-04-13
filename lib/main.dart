@@ -16,10 +16,8 @@ void main() async {
         options: DefaultFirebaseOptions.currentPlatform,
       );
     } catch (_) {
-      if (!kIsWeb &&
-          (defaultTargetPlatform == TargetPlatform.iOS ||
-              defaultTargetPlatform == TargetPlatform.android)) {
-        // Mobile platforms can bootstrap from native Firebase config files.
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+        // iOS can bootstrap from GoogleService-Info.plist when available.
         await Firebase.initializeApp();
       } else {
         rethrow;

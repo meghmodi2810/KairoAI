@@ -1,24 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-const String _adminEmail = String.fromEnvironment('ADMIN_SETUP_EMAIL');
-const String _adminPassword = String.fromEnvironment('ADMIN_SETUP_PASSWORD');
-
-void _assertAdminCredentialsConfigured() {
-  if (_adminEmail.isEmpty || _adminPassword.isEmpty) {
-    throw StateError(
-      'Admin setup credentials are not configured. '
-      'Pass --dart-define=ADMIN_SETUP_EMAIL and --dart-define=ADMIN_SETUP_PASSWORD.',
-    );
-  }
-}
-
 /// ⭐ MAIN FUNCTION - Creates a NEW admin account
 /// Call this once: createAdminAccount()
+/// Password: kairo@041828@!!!!
 Future<void> createAdminAccount() async {
-  _assertAdminCredentialsConfigured();
-  final String adminEmail = _adminEmail;
-  final String adminPassword = _adminPassword;
+  const String adminEmail = 'offical.kairo.ai@gmail.com';
+  const String adminPassword = 'kairo@041828@!!!!'; // ← Change this after first login!
   
   try {
     // CREATE a new user in Firebase Auth
@@ -56,10 +44,11 @@ Future<void> createAdminAccount() async {
     print('✅ ADMIN ACCOUNT CREATED SUCCESSFULLY!');
     print('════════════════════════════════════════════');
     print('   Email: $adminEmail');
+    print('   Password: $adminPassword');
     print('   UID: $uid');
     print('   Role: super_admin');
     print('════════════════════════════════════════════');
-    print('⚠️  Rotate credentials after first login.');
+    print('⚠️  Change your password after first login!');
     print('════════════════════════════════════════════');
     
   } on FirebaseAuthException catch (e) {
@@ -78,19 +67,18 @@ Future<void> createAdminAccount() async {
 /// Call this from a button tap or from main() temporarily.
 /// 
 /// Usage:
-/// 1. Make sure the user with ADMIN_SETUP_EMAIL exists in Firebase Auth
+/// 1. Make sure the user with email 'offical.kairo.ai@gmail.com' exists in Firebase Auth
 /// 2. Call setupAdminUser() 
 /// 3. Remove the call after setup is complete
 Future<void> setupAdminUser() async {
-  _assertAdminCredentialsConfigured();
-  final String adminEmail = _adminEmail;
+  const String adminEmail = 'offical.kairo.ai@gmail.com';
   
   try {
     // Get the user by email from Firebase Auth
     // Note: This requires the user to already exist in Firebase Auth
     final userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
       email: adminEmail,
-      password: _adminPassword,
+      password: 'KairoAdmin@2026', // Default password
     );
     
     final uid = userCredential.user?.uid;
@@ -133,8 +121,7 @@ Future<void> setupAdminUser() async {
 /// Alternative: Create admin document directly if you know the UID
 /// You can find the UID in Firebase Console > Authentication > Users
 Future<void> setupAdminByUid(String uid) async {
-  _assertAdminCredentialsConfigured();
-  final String adminEmail = _adminEmail;
+  const String adminEmail = 'offical.kairo.ai@gmail.com';
   
   try {
     await FirebaseFirestore.instance.collection('admins').doc(uid).set({
