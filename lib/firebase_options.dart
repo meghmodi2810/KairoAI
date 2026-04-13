@@ -41,25 +41,28 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyCYLK75UJ1cN12CC_x6hICGDkIm6khPC4s',
-    appId: '1:15850903584:web:YOUR_WEB_APP_ID',
+    apiKey: String.fromEnvironment('FIREBASE_WEB_API_KEY'),
+    appId: String.fromEnvironment('FIREBASE_WEB_APP_ID'),
     messagingSenderId: '15850903584',
     projectId: 'kairo-ai-041828',
-    authDomain: 'kairo-ai-041828.firebaseapp.com',
+    authDomain: String.fromEnvironment(
+      'FIREBASE_WEB_AUTH_DOMAIN',
+      defaultValue: 'kairo-ai-041828.firebaseapp.com',
+    ),
     storageBucket: 'kairo-ai-041828.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyCYLK75UJ1cN12CC_x6hICGDkIm6khPC4s',
-    appId: '1:15850903584:android:6aaf804ebb28d65b234445',
+    apiKey: String.fromEnvironment('FIREBASE_ANDROID_API_KEY'),
+    appId: String.fromEnvironment('FIREBASE_ANDROID_APP_ID'),
     messagingSenderId: '15850903584',
     projectId: 'kairo-ai-041828',
     storageBucket: 'kairo-ai-041828.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyAXGO1FUaf5olmt_WwoQq4mxj0iGkYj8Bw',
-    appId: '1:15850903584:ios:f7b9faca498e0305234445',
+    apiKey: String.fromEnvironment('FIREBASE_IOS_API_KEY'),
+    appId: String.fromEnvironment('FIREBASE_IOS_APP_ID'),
     messagingSenderId: '15850903584',
     projectId: 'kairo-ai-041828',
     storageBucket: 'kairo-ai-041828.firebasestorage.app',
@@ -67,8 +70,8 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyCYLK75UJ1cN12CC_x6hICGDkIm6khPC4s',
-    appId: '1:15850903584:ios:YOUR_MACOS_APP_ID',
+    apiKey: String.fromEnvironment('FIREBASE_MACOS_API_KEY'),
+    appId: String.fromEnvironment('FIREBASE_MACOS_APP_ID'),
     messagingSenderId: '15850903584',
     projectId: 'kairo-ai-041828',
     storageBucket: 'kairo-ai-041828.firebasestorage.app',
@@ -76,11 +79,14 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyCYLK75UJ1cN12CC_x6hICGDkIm6khPC4s',
-    appId: '1:15850903584:web:YOUR_WINDOWS_APP_ID',
+    apiKey: String.fromEnvironment('FIREBASE_WINDOWS_API_KEY'),
+    appId: String.fromEnvironment('FIREBASE_WINDOWS_APP_ID'),
     messagingSenderId: '15850903584',
     projectId: 'kairo-ai-041828',
-    authDomain: 'kairo-ai-041828.firebaseapp.com',
+    authDomain: String.fromEnvironment(
+      'FIREBASE_WINDOWS_AUTH_DOMAIN',
+      defaultValue: 'kairo-ai-041828.firebaseapp.com',
+    ),
     storageBucket: 'kairo-ai-041828.firebasestorage.app',
   );
 }
