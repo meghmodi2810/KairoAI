@@ -68,6 +68,15 @@ class _LessonPracticePageState extends State<LessonPracticePage>
   }
 
   Future<void> _initCamera() async {
+    if (!_detection.isSupportedPlatform) {
+      if (!mounted) return;
+      setState(() {
+        _hasPermission = false;
+        _loading = false;
+      });
+      return;
+    }
+
     bool granted = await _detection.checkCameraPermission();
     if (!granted) {
       granted = await _detection.requestCameraPermission();
@@ -230,6 +239,7 @@ class _LessonPracticePageState extends State<LessonPracticePage>
 
   @override
   Widget build(BuildContext context) {
+    final supportsLiveDetection = _detection.isSupportedPlatform;
     final confidence = _result?.confidence ?? 0;
     final confidenceColor = _confidenceColor(confidence);
     final prediction = (_result?.handDetected ?? false)
@@ -504,20 +514,24 @@ class _LessonPracticePageState extends State<LessonPracticePage>
                   ? Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text(
-                          'Need camera access to practice.',
+                        Text(
+                          supportsLiveDetection
+                              ? 'Need camera access to practice.'
+                              : 'Live sign detection is currently available on Android and iOS only.',
                           style: TextStyle(
                             color: AppTheme.inkBlack,
                             fontWeight: FontWeight.w900,
                             fontSize: 16,
                           ),
                         ),
-                        const SizedBox(height: 10),
-                        ElevatedButton.icon(
-                          onPressed: _initCamera,
-                          icon: const Icon(Icons.camera_alt_rounded),
-                          label: const Text('Enable Camera'),
-                        ),
+                        if (supportsLiveDetection) ...[
+                          const SizedBox(height: 10),
+                          ElevatedButton.icon(
+                            onPressed: _initCamera,
+                            icon: const Icon(Icons.camera_alt_rounded),
+                            label: const Text('Enable Camera'),
+                          ),
+                        ],
                       ],
                     )
                   : Column(

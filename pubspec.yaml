@@ -123,6 +123,7 @@ flutter:
     - assets/signs/X/image.png
     - assets/signs/Y/image.png
     - assets/signs/Z/image.png
+    - isl_model_advanced.tflite
 
   # To add assets to your application, add an assets section, like this:
   # assets:

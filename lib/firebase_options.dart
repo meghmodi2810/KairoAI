@@ -58,8 +58,8 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyCYLK75UJ1cN12CC_x6hICGDkIm6khPC4s',
-    appId: '1:15850903584:ios:YOUR_IOS_APP_ID',
+    apiKey: 'AIzaSyAXGO1FUaf5olmt_WwoQq4mxj0iGkYj8Bw',
+    appId: '1:15850903584:ios:f7b9faca498e0305234445',
     messagingSenderId: '15850903584',
     projectId: 'kairo-ai-041828',
     storageBucket: 'kairo-ai-041828.firebasestorage.app',

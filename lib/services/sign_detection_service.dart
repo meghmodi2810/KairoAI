@@ -17,9 +17,21 @@ class SignDetectionService {
   int? _textureId;
   /// The ID of the native SurfaceTexture to render the camera preview
   int? get textureId => _textureId;
+
+  /// Native detection pipeline is available on mobile platforms.
+  bool get isSupportedPlatform =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS);
   
   /// Start hand sign detection
   Future<void> startDetection() async {
+    if (!isSupportedPlatform) {
+      throw UnsupportedError(
+        'Live sign detection is currently available only on Android and iOS.',
+      );
+    }
+
     try {
       // Reset prediction state before starting
       await resetPrediction();
@@ -33,14 +45,23 @@ class SignDetectionService {
         }
       }
       debugPrint('✅ Detection started (textureId : $_textureId)');
-    } on PlatformException catch (e) {
-      debugPrint('❌ Error starting detection: ${e.message}');
+    } catch (e) {
+      if (e is PlatformException) {
+        debugPrint('❌ Error starting detection: ${e.message}');
+      } else {
+        debugPrint('❌ Error starting detection: $e');
+      }
       rethrow;
     }
   }
   
   /// Stop hand sign detection
   Future<void> stopDetection() async {
+    if (!isSupportedPlatform) {
+      _textureId = null;
+      return;
+    }
+
     try {
       _subscription?.cancel();
       _subscription = null;
@@ -48,50 +69,86 @@ class SignDetectionService {
       _textureId = null;
       await _methodChannel.invokeMethod('stopDetection');
       debugPrint('✅ Detection stopped');
-    } on PlatformException catch (e) {
-      debugPrint('❌ Error stopping detection: ${e.message}');
+    } catch (e) {
+      if (e is PlatformException) {
+        debugPrint('❌ Error stopping detection: ${e.message}');
+      } else {
+        debugPrint('❌ Error stopping detection: $e');
+      }
       rethrow;
     }
   }
   
   /// Switch between front and back camera
   Future<bool> switchCamera() async {
+    if (!isSupportedPlatform) {
+      throw UnsupportedError(
+        'Camera switching is currently available only on Android and iOS.',
+      );
+    }
+
     try {
       // Reset predictions when switching camera
       await resetPrediction();
       final bool isFrontCamera = await _methodChannel.invokeMethod('switchCamera');
       debugPrint('📷 Switched to ${isFrontCamera ? "front" : "back"} camera');
       return isFrontCamera;
-    } on PlatformException catch (e) {
-      debugPrint('❌ Error switching camera: ${e.message}');
+    } catch (e) {
+      if (e is PlatformException) {
+        debugPrint('❌ Error switching camera: ${e.message}');
+      } else {
+        debugPrint('❌ Error switching camera: $e');
+      }
       rethrow;
     }
   }
   
   /// Reset prediction state (clear history)
   Future<void> resetPrediction() async {
+    if (!isSupportedPlatform) {
+      return;
+    }
+
     try {
       await _methodChannel.invokeMethod('resetPrediction');
       debugPrint('🔄 Prediction state reset');
-    } on PlatformException catch (e) {
-      debugPrint('❌ Error resetting prediction: ${e.message}');
+    } catch (e) {
+      if (e is PlatformException) {
+        debugPrint('❌ Error resetting prediction: ${e.message}');
+      } else {
+        debugPrint('❌ Error resetting prediction: $e');
+      }
       // Non-critical error, don't rethrow
     }
   }
   
   /// Check if using front camera
   Future<bool> isFrontCamera() async {
+    if (!isSupportedPlatform) {
+      return true;
+    }
+
     try {
       final bool isFront = await _methodChannel.invokeMethod('isFrontCamera');
       return isFront;
-    } on PlatformException catch (e) {
-      debugPrint('❌ Error checking camera: ${e.message}');
+    } catch (e) {
+      if (e is PlatformException) {
+        debugPrint('❌ Error checking camera: ${e.message}');
+      } else {
+        debugPrint('❌ Error checking camera: $e');
+      }
       return true; // Default to front
     }
   }
   
   /// Get continuous stream of detection results
   Stream<DetectionResult> get detectionStream {
+    if (!isSupportedPlatform) {
+      return Stream<DetectionResult>.error(
+        UnsupportedError('Live sign detection is currently available only on Android and iOS.'),
+      );
+    }
+
     // Always create a fresh stream to avoid stale data
     _detectionStream = _eventChannel
         .receiveBroadcastStream()
@@ -109,18 +166,30 @@ class SignDetectionService {
   
   /// Check camera permission status
   Future<bool> checkCameraPermission() async {
+    if (!isSupportedPlatform) {
+      return false;
+    }
+
     try {
       final bool hasPermission =
           await _methodChannel.invokeMethod('checkCameraPermission');
       return hasPermission;
-    } on PlatformException catch (e) {
-      debugPrint('❌ Error checking permission: ${e.message}');
+    } catch (e) {
+      if (e is PlatformException) {
+        debugPrint('❌ Error checking permission: ${e.message}');
+      } else {
+        debugPrint('❌ Error checking permission: $e');
+      }
       return false;
     }
   }
   
   /// Request camera permission
   Future<bool> requestCameraPermission() async {
+    if (!isSupportedPlatform) {
+      return false;
+    }
+
     try {
       final dynamic result = await _methodChannel.invokeMethod('requestCameraPermission');
       if (result is bool && result) {
@@ -134,8 +203,12 @@ class SignDetectionService {
       }
 
       return false;
-    } on PlatformException catch (e) {
-      debugPrint('❌ Error requesting permission: ${e.message}');
+    } catch (e) {
+      if (e is PlatformException) {
+        debugPrint('❌ Error requesting permission: ${e.message}');
+      } else {
+        debugPrint('❌ Error requesting permission: $e');
+      }
       return false;
     }
   }

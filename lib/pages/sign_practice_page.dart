@@ -53,6 +53,15 @@ class _SignPracticePageState extends State<SignPracticePage>
   }
 
   Future<void> _initialize() async {
+    if (!_detectionService.isSupportedPlatform) {
+      if (!mounted) return;
+      setState(() {
+        _hasPermission = false;
+        _loading = false;
+      });
+      return;
+    }
+
     bool allowed = await _detectionService.checkCameraPermission();
     if (!allowed) {
       allowed = await _detectionService.requestCameraPermission();
@@ -168,6 +177,7 @@ class _SignPracticePageState extends State<SignPracticePage>
 
   @override
   Widget build(BuildContext context) {
+    final supportsLiveDetection = _detectionService.isSupportedPlatform;
     final confidence = _result?.confidence ?? 0;
     final confidenceColor = _confidenceColor(confidence);
 
@@ -282,16 +292,18 @@ class _SignPracticePageState extends State<SignPracticePage>
                       const Icon(Icons.no_photography_rounded, color: AppTheme.inkBlack, size: 46),
                     const SizedBox(height: 10),
                     Text(
-                      _loading
-                          ? 'Starting camera...'
-                          : 'Need camera access to practice.',
+                      !supportsLiveDetection
+                          ? 'Live sign detection is currently available on Android and iOS only.'
+                          : _loading
+                              ? 'Starting camera...'
+                              : 'Need camera access to practice.',
                       style: const TextStyle(
                         color: AppTheme.inkBlack,
                         fontWeight: FontWeight.w900,
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    if (!_loading && !_hasPermission) ...[
+                    if (!_loading && !_hasPermission && supportsLiveDetection) ...[
                       const SizedBox(height: 10),
                       ElevatedButton.icon(
                         onPressed: _initialize,

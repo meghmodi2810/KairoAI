@@ -11,9 +11,18 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   if (Firebase.apps.isEmpty) {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+    try {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    } catch (_) {
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+        // iOS can bootstrap from GoogleService-Info.plist when available.
+        await Firebase.initializeApp();
+      } else {
+        rethrow;
+      }
+    }
   }
 
   // Install App Check provider so Firebase services can request valid attestations.

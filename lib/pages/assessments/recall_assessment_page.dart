@@ -75,6 +75,15 @@ class _RecallAssessmentPageState extends State<RecallAssessmentPage>
   }
 
   Future<void> _initCamera() async {
+    if (!_detection.isSupportedPlatform) {
+      if (!mounted) return;
+      setState(() {
+        _hasPermission = false;
+        _loading = false;
+      });
+      return;
+    }
+
     bool granted = await _detection.checkCameraPermission();
     if (!granted) {
       granted = await _detection.requestCameraPermission();
@@ -239,11 +248,6 @@ class _RecallAssessmentPageState extends State<RecallAssessmentPage>
     );
   }
 
-  Future<bool> _onWillPop() async {
-    await _skipRecall();
-    return false;
-  }
-
   Color _confidenceColor(double confidence) {
     if (confidence >= _minConfidence) return AppTheme.mintGreen;
     if (confidence >= 0.4) return AppTheme.signalYellow;
@@ -252,6 +256,7 @@ class _RecallAssessmentPageState extends State<RecallAssessmentPage>
 
   @override
   Widget build(BuildContext context) {
+    final supportsLiveDetection = _detection.isSupportedPlatform;
     if (!_hasPrompts) {
       return Scaffold(
         backgroundColor: AppTheme.paperCream,
@@ -313,8 +318,12 @@ class _RecallAssessmentPageState extends State<RecallAssessmentPage>
               : '--')
         : '--';
 
-    return WillPopScope(
-      onWillPop: _onWillPop,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        await _skipRecall();
+      },
       child: Scaffold(
         backgroundColor: AppTheme.charcoalNight,
         body: Stack(
@@ -506,20 +515,24 @@ class _RecallAssessmentPageState extends State<RecallAssessmentPage>
                     ? Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text(
-                            'Need camera access for recall test.',
+                          Text(
+                            supportsLiveDetection
+                                ? 'Need camera access for recall test.'
+                                : 'Live sign detection is currently available on Android and iOS only.',
                             style: TextStyle(
                               color: AppTheme.inkBlack,
                               fontWeight: FontWeight.w900,
                               fontSize: 16,
                             ),
                           ),
-                          const SizedBox(height: 10),
-                          ElevatedButton.icon(
-                            onPressed: _initCamera,
-                            icon: const Icon(Icons.camera_alt_rounded),
-                            label: const Text('Enable Camera'),
-                          ),
+                          if (supportsLiveDetection) ...[
+                            const SizedBox(height: 10),
+                            ElevatedButton.icon(
+                              onPressed: _initCamera,
+                              icon: const Icon(Icons.camera_alt_rounded),
+                              label: const Text('Enable Camera'),
+                            ),
+                          ],
                         ],
                       )
                     : Column(
