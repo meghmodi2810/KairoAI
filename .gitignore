@@ -45,15 +45,11 @@ app.*.map.json
 # Android Studio will place build artifacts here
 /android/app/debug
 /android/app/profile
-<<<<<<< HEAD
-/android/app/release
-=======
 /android/app/release
 
-
-# Adding config files into gitignore
+# Sensitive/firebase config files (keep local or inject via CI secrets)
 firebase.json
 upload_to_firebase.py
 firestore.rules
 **/google-services.json
->>>>>>> c16ebaed9c17ac9f88508a8bb88af34e99505c53
+ios/Runner/GoogleService-Info.plist

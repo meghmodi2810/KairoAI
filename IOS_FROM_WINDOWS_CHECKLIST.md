@@ -24,7 +24,10 @@ This project now contains iOS native sign detection support and can be built fro
 1. Configure iOS Firebase app in Firebase Console:
    - Add iOS app with bundle id `com.kairo.ai` (or your final bundle id).
    - Download `GoogleService-Info.plist`.
-2. Place `GoogleService-Info.plist` in `ios/Runner/` and add it to the Runner target in Xcode.
+2. Place `GoogleService-Info.plist` in `ios/Runner/` locally and add it to the Runner target in Xcode.
+   - Do not commit this file.
+   - The repository ignores it via `.gitignore`.
+   - For GitHub Actions, add secret `FIREBASE_IOS_PLIST_BASE64` containing base64 of the plist.
 3. Regenerate `lib/firebase_options.dart` with real iOS values:
    - Replace placeholder `YOUR_IOS_APP_ID` and `YOUR_MACOS_APP_ID`.
 4. Configure Apple signing:
@@ -36,9 +39,10 @@ This project now contains iOS native sign detection support and can be built fro
 ## Build from this Windows machine using cloud macOS
 
 1. Push your branch to GitHub.
-2. Open Actions tab and run `iOS Simulator Build`.
-3. Confirm workflow passes (native iOS compile validation).
-4. For TestFlight/App Store, add a signed iOS release workflow with secrets.
+2. Add repository secret `FIREBASE_IOS_PLIST_BASE64`.
+3. Open Actions tab and run `iOS Simulator Build`.
+4. Confirm workflow passes (native iOS compile validation).
+5. For TestFlight/App Store, add a signed iOS release workflow with secrets.
 
 ## Optional next upgrade
 
