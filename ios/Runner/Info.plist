@@ -45,5 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>We need camera access for sign detection and practice.</string>
+	<key>NSUserNotificationUsageDescription</key>
+	<string>Notifications help keep you on track with learning reminders.</string>
 </dict>
 </plist>

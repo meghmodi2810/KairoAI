@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/sign_detection_service.dart';
 import '../services/database_service.dart';
+import '../services/sign_image_service.dart';
 import '../theme/app_theme.dart';
 import '../models/admin_models.dart';
 import '../models/app_models.dart';
@@ -24,6 +25,7 @@ class WordPracticePage extends StatefulWidget {
 class _WordPracticePageState extends State<WordPracticePage> with WidgetsBindingObserver {
   final SignDetectionService _detectionService = SignDetectionService();
   final DatabaseService _db = DatabaseService();
+  final SignImageService _imageService = SignImageService();
 
   StreamSubscription<DetectionResult>? _subscription;
   DetectionResult? _result;
@@ -64,10 +66,7 @@ class _WordPracticePageState extends State<WordPracticePage> with WidgetsBinding
   }
 
   Future<void> _initialize() async {
-    bool allowed = await _detectionService.checkCameraPermission();
-    if (!allowed) {
-      allowed = await _detectionService.requestCameraPermission();
-    }
+    final allowed = await _detectionService.checkCameraPermission();
 
     if (!mounted) return;
     setState(() {
@@ -75,6 +74,19 @@ class _WordPracticePageState extends State<WordPracticePage> with WidgetsBinding
       _loading = false;
     });
 
+    if (allowed) {
+      await _startDetection();
+    }
+  }
+
+  Future<void> _requestCameraPermission() async {
+    setState(() => _loading = true);
+    final allowed = await _detectionService.requestCameraPermission();
+    if (!mounted) return;
+    setState(() {
+      _hasPermission = allowed;
+      _loading = false;
+    });
     if (allowed) {
       await _startDetection();
     }
@@ -284,255 +296,379 @@ class _WordPracticePageState extends State<WordPracticePage> with WidgetsBinding
     return AppTheme.punchRed;
   }
 
+  String _currentTargetChar() {
+    if (widget.wordModel.characters.isEmpty) return '';
+    if (_isCompleted) return '';
+    return widget.wordModel.characters[_activeCharIndex].char.toUpperCase();
+  }
+
+  Widget _buildSignMedia(String resolvedRef) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: Image.asset(
+        resolvedRef,
+        fit: BoxFit.contain,
+        errorBuilder: (context, error, stackTrace) =>
+            _buildSignPlaceholder(_currentTargetChar()),
+      ),
+    );
+  }
+
+  Widget _buildSignPlaceholder(String char) {
+    return Center(
+      child: Text(
+        char,
+        style: TextStyle(
+          color: AppTheme.cobaltBlue.withValues(alpha: 0.45),
+          fontWeight: FontWeight.w900,
+          fontSize: 96,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final charCount = widget.wordModel.characters.length;
     final confidence = _result?.confidence ?? 0;
     final confidenceColor = _confidenceColor(confidence);
-    final targetChar = _isCompleted ? '' : widget.wordModel.characters[_activeCharIndex].char.toUpperCase();
+    final targetChar = _currentTargetChar();
+    final progress = charCount == 0 ? 0.0 : (_activeCharIndex + 1) / charCount;
+    final stepLabel = charCount == 0 ? '0/0' : '${_activeCharIndex + 1}/$charCount';
+
+    if (charCount == 0) {
+      return Scaffold(
+        backgroundColor: AppTheme.paperCream,
+        body: NeoEmptyState(
+          icon: Icons.text_fields,
+          title: 'No Characters Found',
+          subtitle: 'This word has no valid sign characters.',
+        ),
+      );
+    }
 
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: _detecting && _detectionService.textureId != null
-                ? Align(
-                    alignment: Alignment.topCenter,
-                    child: FittedBox(
-                      fit: BoxFit.cover,
-                      child: SizedBox(
-                        width: 480,
-                        height: 640,
-                        child: Texture(textureId: _detectionService.textureId!),
-                      ),
-                    ),
-                  )
-                : const ColoredBox(color: Colors.black),
-          ),
-          Positioned.fill(
-            child: IgnorePointer(
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.8),
-                      Colors.transparent,
-                      Colors.black.withValues(alpha: 0.8),
-                    ],
-                  ),
+      backgroundColor: AppTheme.paperCream,
+      body: SafeArea(
+        child: Column(
+          children: [
+            if (_detecting && _detectionService.textureId != null)
+              SizedBox(
+                width: 1,
+                height: 1,
+                child: Opacity(
+                  opacity: 0,
+                  child: Texture(textureId: _detectionService.textureId!),
                 ),
               ),
-            ),
-          ),
-          SafeArea(
-            child: Padding(
+            Padding(
               padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-              child: Column(
+              child: Row(
                 children: [
-                  Row(
-                    children: [
-                      _circleButton(
-                        icon: Icons.close_rounded,
-                        onTap: () {
-                          _stopDetection();
-                          Navigator.pop(context);
-                        },
-                      ),
-                      const Spacer(),
-                      _circleButton(
-                        icon: Icons.cameraswitch_rounded,
-                        onTap: _switchCamera,
-                        background: AppTheme.electricBlue,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  // Word Display
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    alignment: WrapAlignment.center,
-                    children: List.generate(widget.wordModel.characters.length, (index) {
-                      final isCompleted = index < _activeCharIndex;
-                      final isActive = index == _activeCharIndex;
-                      final char = widget.wordModel.characters[index].char.toUpperCase();
-                      
-                      return Container(
-                        width: 48,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          color: isCompleted 
-                              ? AppTheme.mintGreen 
-                              : isActive ? AppTheme.signalYellow : AppTheme.warmWhite,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: isActive ? Colors.white : AppTheme.inkBlack, 
-                            width: isActive ? 4 : 2
-                          ),
-                          boxShadow: [
-                            BoxShadow(color: AppTheme.inkBlack, offset: Offset(isActive ? 4 : 2, isActive ? 4 : 2)),
-                          ],
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          char,
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w900,
+                  GestureDetector(
+                    onTap: () {
+                      _stopDetection();
+                      Navigator.pop(context);
+                    },
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: AppTheme.warmWhite,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.inkBlack, width: 3),
+                        boxShadow: const [
+                          BoxShadow(
                             color: AppTheme.inkBlack,
+                            blurRadius: 0,
+                            offset: Offset(3, 3),
                           ),
-                        ),
-                      );
-                    }),
+                        ],
+                      ),
+                      child: const Icon(Icons.arrow_back_rounded, color: AppTheme.inkBlack),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: NeoPanel(
+                      color: AppTheme.warmWhite,
+                      radius: 14,
+                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                      shadow: false,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.wordModel.text,
+                            style: const TextStyle(
+                              color: AppTheme.inkBlack,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 6),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: LinearProgressIndicator(
+                              value: progress,
+                              minHeight: 8,
+                              backgroundColor: AppTheme.paperCream,
+                              valueColor: const AlwaysStoppedAnimation<Color>(
+                                AppTheme.cobaltBlue,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    stepLabel,
+                    style: const TextStyle(
+                      color: AppTheme.inkBlack,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  _circleButton(
+                    icon: Icons.cameraswitch_rounded,
+                    onTap: _switchCamera,
+                    background: AppTheme.electricBlue,
                   ),
                 ],
               ),
             ),
-          ),
-          if (_loading || !_hasPermission)
-            Center(
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 24),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+                child: NeoPanel(
                   color: AppTheme.warmWhite,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.inkBlack, width: 3),
-                  boxShadow: const [
-                    BoxShadow(color: AppTheme.inkBlack, blurRadius: 0, offset: Offset(6, 6)),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_loading)
-                      const CircularProgressIndicator(color: AppTheme.cobaltBlue)
-                    else
-                      const Icon(Icons.no_photography_rounded, color: AppTheme.inkBlack, size: 46),
-                    const SizedBox(height: 10),
-                    Text(
-                      _loading
-                          ? 'Starting camera...'
-                          : 'Need camera access to practice.',
-                      style: const TextStyle(
-                        color: AppTheme.inkBlack,
-                        fontWeight: FontWeight.w900,
+                  radius: 18,
+                  child: Column(
+                    children: [
+                      Text(
+                        targetChar,
+                        style: const TextStyle(
+                          color: AppTheme.inkBlack,
+                          fontSize: 46,
+                          height: 1,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
-                      textAlign: TextAlign.center,
-                    ),
-                    if (!_loading && !_hasPermission) ...[
                       const SizedBox(height: 10),
-                      ElevatedButton.icon(
-                        onPressed: _initialize,
-                        icon: const Icon(Icons.camera_alt_rounded),
-                        label: const Text('Grant Permission'),
+                      Expanded(
+                        child: Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            color: AppTheme.paperCream,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: AppTheme.inkBlack, width: 3),
+                          ),
+                          child: FutureBuilder<String?>(
+                            future: _imageService.resolveImageRefForWord(targetChar),
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState == ConnectionState.waiting) {
+                                return const Center(
+                                  child: CircularProgressIndicator(
+                                    color: AppTheme.cobaltBlue,
+                                  ),
+                                );
+                              }
+
+                              final resolvedRef = (snapshot.data ?? '').trim();
+                              if (resolvedRef.isNotEmpty) {
+                                return _buildSignMedia(resolvedRef);
+                              }
+
+                              return _buildSignPlaceholder(targetChar);
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppTheme.signalYellow,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppTheme.inkBlack, width: 2),
+                        ),
+                        child: Text(
+                          'STEP $stepLabel',
+                          style: const TextStyle(
+                            color: AppTheme.inkBlack,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 10,
+                          ),
+                        ),
                       ),
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
-          if (!_isCompleted)
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: Container(
-                padding: EdgeInsets.fromLTRB(12, 10, 12, MediaQuery.of(context).padding.bottom + 10),
-                decoration: BoxDecoration(
-                  color: AppTheme.warmWhite,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                  border: Border.all(color: AppTheme.inkBlack, width: 3),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppTheme.electricBlue,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppTheme.inkBlack, width: 2),
-                          ),
-                          child: Text(
-                            'NOW SIGN: $targetChar',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
+            if (_isCompleted)
+              const SizedBox(height: 16)
+            else
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 16),
+                child: _loading || !_hasPermission
+                    ? Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: AppTheme.warmWhite,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppTheme.inkBlack, width: 3),
+                          boxShadow: const [
+                            BoxShadow(color: AppTheme.inkBlack, blurRadius: 0, offset: Offset(6, 6)),
+                          ],
                         ),
-                        const Spacer(),
-                        Icon(
-                          (_result?.handDetected ?? false) ? Icons.front_hand : Icons.pan_tool_alt,
-                          color: (_result?.handDetected ?? false) ? AppTheme.mintGreen : AppTheme.punchRed,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          (_result?.handDetected ?? false) ? 'Hand detected' : 'Show hand',
-                          style: const TextStyle(
-                            color: AppTheme.inkBlack,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Container(
-                            height: 12,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppTheme.inkBlack, width: 2),
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(6),
-                              child: LinearProgressIndicator(
-                                value: confidence,
-                                backgroundColor: AppTheme.paperCream,
-                                valueColor: AlwaysStoppedAnimation<Color>(confidenceColor),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_loading)
+                              const CircularProgressIndicator(color: AppTheme.cobaltBlue)
+                            else
+                              const Icon(Icons.no_photography_rounded, color: AppTheme.inkBlack, size: 46),
+                            const SizedBox(height: 10),
+                            Text(
+                              _loading
+                                  ? 'Starting camera...'
+                                  : 'Need camera access to practice.',
+                              style: const TextStyle(
+                                color: AppTheme.inkBlack,
+                                fontWeight: FontWeight.w900,
                               ),
+                              textAlign: TextAlign.center,
                             ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${(confidence * 100).toStringAsFixed(0)}%',
-                          style: const TextStyle(
-                            color: AppTheme.inkBlack,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        ...List.generate(
-                          _requiredMatches,
-                          (i) => Expanded(
-                            child: Container(
-                              margin: EdgeInsets.only(right: i == _requiredMatches - 1 ? 0 : 6),
-                              height: 12,
-                              decoration: BoxDecoration(
-                                color: i < _matchCount ? AppTheme.mintGreen : AppTheme.paperCream,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: AppTheme.inkBlack, width: 2),
+                            if (!_loading && !_hasPermission) ...[
+                              const SizedBox(height: 10),
+                              ElevatedButton.icon(
+                                onPressed: _requestCameraPermission,
+                                icon: const Icon(Icons.camera_alt_rounded),
+                                label: const Text('Grant Permission'),
                               ),
-                            ),
-                          ),
+                            ],
+                          ],
                         ),
-                      ],
-                    ),
-                  ],
-                ),
+                      )
+                    : Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: AppTheme.warmWhite,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppTheme.inkBlack, width: 3),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.electricBlue,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: AppTheme.inkBlack, width: 2),
+                                  ),
+                                  child: Text(
+                                    'NOW SIGN: $targetChar',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ),
+                                const Spacer(),
+                                Icon(
+                                  (_result?.handDetected ?? false)
+                                      ? Icons.front_hand
+                                      : Icons.pan_tool_alt,
+                                  color: (_result?.handDetected ?? false)
+                                      ? AppTheme.mintGreen
+                                      : AppTheme.punchRed,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  (_result?.handDetected ?? false)
+                                      ? 'Hand detected'
+                                      : 'Show hand',
+                                  style: const TextStyle(
+                                    color: AppTheme.inkBlack,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Container(
+                                    height: 12,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: AppTheme.inkBlack, width: 2),
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: LinearProgressIndicator(
+                                        value: confidence,
+                                        backgroundColor: AppTheme.paperCream,
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          confidenceColor,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '${(confidence * 100).toStringAsFixed(0)}%',
+                                  style: const TextStyle(
+                                    color: AppTheme.inkBlack,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                ...List.generate(
+                                  _requiredMatches,
+                                  (i) => Expanded(
+                                    child: Container(
+                                      margin: EdgeInsets.only(
+                                        right: i == _requiredMatches - 1 ? 0 : 6,
+                                      ),
+                                      height: 12,
+                                      decoration: BoxDecoration(
+                                        color: i < _matchCount
+                                            ? AppTheme.mintGreen
+                                            : AppTheme.paperCream,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: AppTheme.inkBlack,
+                                          width: 2,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

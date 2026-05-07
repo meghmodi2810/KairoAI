@@ -453,10 +453,12 @@ class _IssueDetailSheetState extends State<_IssueDetailSheet> {
                 ),
               ),
               const SizedBox(width: 12),
-              AdminButton(
-                label: 'Delete',
-                variant: AdminButtonVariant.ghost,
-                onTap: widget.onDelete,
+              Expanded(
+                child: AdminButton(
+                  label: 'Delete',
+                  variant: AdminButtonVariant.ghost,
+                  onTap: widget.onDelete,
+                ),
               ),
             ],
           ),

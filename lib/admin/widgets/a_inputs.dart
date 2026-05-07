@@ -171,8 +171,31 @@ class _AdminButtonState extends State<AdminButton>
         border = Border.all(color: c.border, width: 2);
     }
 
+    final labelText = Text(
+      widget.label,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      softWrap: false,
+      style: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: disabled ? fg.withValues(alpha: 0.4) : fg,
+        letterSpacing: -0.1,
+      ),
+    );
+
+    final labelWidget = widget.fullWidth
+        ? Flexible(
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.center,
+              child: labelText,
+            ),
+          )
+        : labelText;
+
     Widget content = Row(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: widget.fullWidth ? MainAxisSize.max : MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         if (!widget.isLoading && widget.icon != null) ...[
@@ -186,15 +209,7 @@ class _AdminButtonState extends State<AdminButton>
             child: CircularProgressIndicator(strokeWidth: 2, color: fg),
           )
         else
-          Text(
-            widget.label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: disabled ? fg.withValues(alpha: 0.4) : fg,
-              letterSpacing: -0.1,
-            ),
-          ),
+          labelWidget,
       ],
     );
 

@@ -86,26 +86,6 @@ class _AdminWordsScreenState extends State<AdminWordsScreen> {
           ],
         ),
       ),
-      floatingActionButton: GestureDetector(
-        onTap: () => _openGroupDetail(),
-        child: Container(
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(
-            color: c.btnPrimary,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: c.border, width: 2.5),
-            boxShadow: const [
-              BoxShadow(color: Color(0xFF111111), offset: Offset(3, 3), blurRadius: 0),
-            ],
-          ),
-          child: Icon(
-            LucideIcons.plus,
-            color: c.btnPrimaryFg,
-            size: 22,
-          ),
-        ),
-      ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('word_groups')

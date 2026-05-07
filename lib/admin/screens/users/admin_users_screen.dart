@@ -137,6 +137,14 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       appBar: AdminTopBar(
         title: 'Learners',
         onMenuTap: widget.onMenuTap,
+        action: AdminTopBarIconButton(
+          icon: LucideIcons.plus,
+          onTap: () => AdminToast.show(
+            context,
+            'Learners are added when they sign up.',
+            type: AdminToastType.info,
+          ),
+        ),
       ),
       body: Column(
         children: [

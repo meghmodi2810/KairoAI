@@ -6,6 +6,7 @@ import 'pages/onboarding_page.dart';
 import 'pages/login_page.dart';
 import 'main_navigation.dart';
 import 'package:kairo_ai/main.dart';
+import 'package:kairo_ai/services/permission_bootstrap.dart';
 import 'admin/screens/admin_shell.dart';
 import 'admin/theme/admin_theme.dart';
 import 'admin/models/admin_models.dart';
@@ -29,7 +30,16 @@ class _AuthWrapperState extends State<AuthWrapper> {
   @override
   void initState() {
     super.initState();
+    _requestInitialPermissions();
     _checkOnboardingStatus();
+  }
+
+  Future<void> _requestInitialPermissions() async {
+    try {
+      await PermissionBootstrap.requestInitialPermissions();
+    } catch (e) {
+      debugPrint('AuthWrapper: Permission bootstrap failed: $e');
+    }
   }
 
   Future<void> _checkOnboardingStatus() async {

@@ -49,7 +49,6 @@ class WordsPage extends StatelessWidget {
             sliver: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('word_groups')
-                  .where('isActive', isEqualTo: true)
                   .orderBy('order')
                   .snapshots(),
               builder: (context, snapshot) {
@@ -59,7 +58,17 @@ class WordsPage extends StatelessWidget {
                   );
                 }
 
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                final docs = snapshot.data?.docs ?? [];
+                final visibleDocs = docs.where((doc) {
+                  final data = doc.data() as Map<String, dynamic>? ?? {};
+                  final isActive = data['isActive'];
+                  final isPublished = data['isPublished'];
+                  final activeFlag = isActive is bool ? isActive : true;
+                  final publishedFlag = isPublished is bool ? isPublished : true;
+                  return activeFlag && publishedFlag;
+                }).toList();
+
+                if (visibleDocs.isEmpty) {
                   return SliverFillRemaining(
                     child: NeoEmptyState(
                       icon: Icons.text_fields,
@@ -83,7 +92,7 @@ class WordsPage extends StatelessWidget {
                       ),
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
-                          final doc = snapshot.data!.docs[index];
+                          final doc = visibleDocs[index];
                           final data = doc.data() as Map<String, dynamic>;
                           
                           final unlockCost = (data['unlockGemCost'] ?? data['gemCost'] ?? 0) as int;
@@ -101,7 +110,7 @@ class WordsPage extends StatelessWidget {
                             colorSeed: AppTheme.categoryColors[index % AppTheme.categoryColors.length],
                           );
                         },
-                        childCount: snapshot.data!.docs.length,
+                        childCount: visibleDocs.length,
                       ),
                     );
                   }
@@ -268,12 +277,22 @@ class _WordGroupCard extends StatelessWidget {
               if (uid == null) return;
               try {
                 final success = await DatabaseService().unlockWordGroup(id, gemCost);
-                if (!success) {
-                  throw Exception('Not enough gems or error unlocking pack.');
+                if (!context.mounted) return;
+                final messenger = ScaffoldMessenger.of(context);
+                if (success) {
+                  messenger.showSnackBar(
+                    const SnackBar(content: Text('Pack unlocked. Gems deducted.')),
+                  );
+                } else {
+                  messenger.showSnackBar(
+                    const SnackBar(content: Text('Not enough gems or unlock failed.')),
+                  );
                 }
               } catch (e) {
-                if (!dialogContext.mounted) return;
-                ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text('$e')));
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Unlock failed. Please try again.')),
+                );
               }
             },
             child: Text('Unlock for $gemCost'),
