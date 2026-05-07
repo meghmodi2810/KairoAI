@@ -4,6 +4,7 @@ import 'firebase_options.dart';
 import 'auth_wrapper.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_provider.dart';
+import 'services/audio_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,6 +14,8 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
   }
+
+  await AudioService().init();
 
   runApp(const MyApp());
 }

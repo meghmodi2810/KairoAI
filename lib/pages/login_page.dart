@@ -6,6 +6,7 @@ import '../main_navigation.dart';
 import '../theme/app_theme.dart';
 import '../theme/neo_brutal_widgets.dart';
 import 'signup_page.dart';
+import 'forgot_password_page.dart';
 import 'package:kairo_ai/admin/models/admin_models.dart';
 import 'package:kairo_ai/admin/screens/admin_shell.dart';
 
@@ -92,22 +93,7 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  Future<void> _forgotPassword() async {
-    final email = _emailCtrl.text.trim();
-    if (email.isEmpty) {
-      _showError('Enter your email first to reset password.');
-      return;
-    }
-    try {
-      await _auth.sendPasswordResetEmail(email: email);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password reset mail sent.')),
-      );
-    } on FirebaseAuthException {
-      _showError('Could not send reset email. Check your email and retry.');
-    }
-  }
+
 
   Future<void> _navigateAfterLogin(String uid) async {
     Widget destination = const MainNavigation();
@@ -232,7 +218,17 @@ class _LoginPageState extends State<LoginPage> {
                                 Align(
                                   alignment: Alignment.centerRight,
                                   child: TextButton(
-                                    onPressed: _loading ? null : _forgotPassword,
+                                    onPressed: _loading ? null : () {
+                                      Navigator.push(
+                                        context,
+                                        PageRouteBuilder(
+                                          pageBuilder: (_, __, ___) => const ForgotPasswordPage(),
+                                          transitionDuration: const Duration(milliseconds: 240),
+                                          transitionsBuilder: (_, animation, __, child) =>
+                                              FadeTransition(opacity: animation, child: child),
+                                        ),
+                                      );
+                                    },
                                     child: const Text('Forgot password?'),
                                   ),
                                 ),

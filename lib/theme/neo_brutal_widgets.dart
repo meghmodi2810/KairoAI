@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'app_theme.dart';
+import '../services/audio_service.dart';
 
 class NeoPanel extends StatelessWidget {
   final Widget child;
@@ -196,7 +197,12 @@ class _NeoButtonState extends State<NeoButton> {
     final double translateOffset = _isPressed ? 6 : 0;
 
     return GestureDetector(
-      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapDown: (_) {
+        setState(() => _isPressed = true);
+        if (widget.onPressed != null) {
+          AudioService().playClick();
+        }
+      },
       onTapUp: (_) => setState(() => _isPressed = false),
       onTapCancel: () => setState(() => _isPressed = false),
       onTap: widget.onPressed,

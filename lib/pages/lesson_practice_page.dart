@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../models/app_models.dart';
 import '../services/sign_image_service.dart';
 import '../services/sign_detection_service.dart';
+import '../services/audio_service.dart';
 import '../theme/app_theme.dart';
 
 class LessonPracticePage extends StatefulWidget {
@@ -150,6 +151,7 @@ class _LessonPracticePageState extends State<LessonPracticePage>
     if (_matched) return;
     setState(() => _matched = true);
     HapticFeedback.heavyImpact();
+    AudioService().playSuccess();
     Future.delayed(const Duration(milliseconds: 900), _nextSign);
   }
 

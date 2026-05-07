@@ -58,6 +58,7 @@ dependencies:
   flutter_animate: ^4.5.0
   share_plus: ^7.2.1
   connectivity_plus: ^5.0.2
+  audioplayers: ^6.6.0
 
 dev_dependencies:
   flutter_test:
@@ -90,6 +91,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/sounds/
     - assets/login_image.jpeg
     - assets/logo/
     - assets/signs/

@@ -166,6 +166,37 @@ class ProfilePage extends StatelessWidget {
                         _infoRow('Support', 'Help and FAQ available'),
                         const SizedBox(height: 8),
                         _infoRow('Language', 'English'),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              final email = FirebaseAuth.instance.currentUser?.email;
+                              if (email != null && email.isNotEmpty) {
+                                try {
+                                  await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Password reset email sent.'),
+                                      backgroundColor: AppTheme.mintGreen,
+                                    ),
+                                  );
+                                } catch (_) {
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Failed to send reset email.'),
+                                      backgroundColor: AppTheme.punchRed,
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                            icon: const Icon(Icons.lock_reset_rounded),
+                            label: const Text('Change Password'),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -194,12 +225,47 @@ class ProfilePage extends StatelessWidget {
                           height: 52,
                           child: ElevatedButton.icon(
                             onPressed: () async {
-                              await FirebaseAuth.instance.signOut();
-                              if (!context.mounted) return;
-                              Navigator.of(context).pushAndRemoveUntil(
-                                MaterialPageRoute(builder: (_) => const LoginPage()),
-                                (_) => false,
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  backgroundColor: AppTheme.paperCream,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                    side: const BorderSide(color: AppTheme.inkBlack, width: 3),
+                                  ),
+                                  title: const Text(
+                                    'Log Out',
+                                    style: TextStyle(fontWeight: FontWeight.w900, color: AppTheme.inkBlack),
+                                  ),
+                                  content: const Text(
+                                    'Are you sure you want to log out?',
+                                    style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.inkBlack),
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context, false),
+                                      child: const Text('Cancel', style: TextStyle(color: AppTheme.inkBlack, fontWeight: FontWeight.bold)),
+                                    ),
+                                    ElevatedButton(
+                                      onPressed: () => Navigator.pop(context, true),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppTheme.punchRed,
+                                        foregroundColor: Colors.white,
+                                      ),
+                                      child: const Text('Log Out', style: TextStyle(fontWeight: FontWeight.bold)),
+                                    ),
+                                  ],
+                                ),
                               );
+
+                              if (confirm == true) {
+                                await FirebaseAuth.instance.signOut();
+                                if (!context.mounted) return;
+                                Navigator.of(context).pushAndRemoveUntil(
+                                  MaterialPageRoute(builder: (_) => const LoginPage()),
+                                  (_) => false,
+                                );
+                              }
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppTheme.punchRed,
