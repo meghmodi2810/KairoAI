@@ -19,6 +19,20 @@ class _HomePageState extends State<HomePage> {
   final DatabaseService _db = DatabaseService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  // Cache variables
+  static UserModel? _cachedUser;
+  static List<CategoryModel>? _cachedCategories;
+  static LessonModel? _cachedContinueLesson;
+  static String? _cachedContinueCategoryId;
+  static DateTime? _lastCacheTime;
+  
+  static const Duration _cacheValidity = Duration(minutes: 5);
+  
+  bool get _isCacheValid {
+    if (_lastCacheTime == null) return false;
+    return DateTime.now().difference(_lastCacheTime!) < _cacheValidity;
+  }
+
   UserModel? _user;
   List<CategoryModel> _categories = [];
   LessonModel? _continueLesson;
@@ -32,15 +46,42 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _loadData() async {
+    // Use cached data immediately if valid
+    if (_isCacheValid && _cachedUser != null) {
+      setState(() {
+        _user = _cachedUser;
+        _categories = _cachedCategories ?? [];
+        _continueLesson = _cachedContinueLesson;
+        _continueCategoryId = _cachedContinueCategoryId;
+        _isLoading = false;
+      });
+      
+      // Refresh in background
+      _refreshData();
+      return;
+    }
+    
+    // Load fresh data
+    await _refreshData();
+  }
+
+  Future<void> _refreshData() async {
     try {
       final currentUser = _auth.currentUser;
       if (currentUser != null) {
         await _db.createUserDocument(currentUser);
       }
 
-      final user = await _db.getCurrentUser();
-      final categories = await _db.getCategories();
+      // Parallel data fetching
+      final results = await Future.wait([
+        _db.getCurrentUser(),
+        _db.getCategories(),
+      ]);
 
+      final user = results[0] as UserModel?;
+      final categories = results[1] as List<CategoryModel>;
+
+      // Find continue lesson (optimized)
       LessonModel? nextLesson;
       String? nextCategoryId;
 
@@ -57,6 +98,13 @@ class _HomePageState extends State<HomePage> {
         }
         if (nextLesson != null) break;
       }
+
+      // Update cache
+      _cachedUser = user;
+      _cachedCategories = categories;
+      _cachedContinueLesson = nextLesson;
+      _cachedContinueCategoryId = nextCategoryId;
+      _lastCacheTime = DateTime.now();
 
       if (!mounted) return;
       setState(() {
@@ -77,15 +125,13 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.paperCream,
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppTheme.cobaltBlue),
-            )
-          : SafeArea(
-              child: RefreshIndicator(
-                color: AppTheme.cobaltBlue,
-                onRefresh: _loadData,
-                child: SingleChildScrollView(
+      body: SafeArea(
+        child: RefreshIndicator(
+          color: AppTheme.cobaltBlue,
+          onRefresh: _refreshData,
+          child: _isLoading && _user == null
+              ? _buildSkeletonLoader()
+              : SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 30),
                   child: Column(
@@ -115,8 +161,46 @@ class _HomePageState extends State<HomePage> {
                     ],
                   ),
                 ),
-              ),
-            ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeletonLoader() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 30),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSkeletonBox(height: 60, width: double.infinity),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(child: _buildSkeletonBox(height: 100)),
+              const SizedBox(width: 8),
+              Expanded(child: _buildSkeletonBox(height: 100)),
+              const SizedBox(width: 8),
+              Expanded(child: _buildSkeletonBox(height: 100)),
+            ],
+          ),
+          const SizedBox(height: 18),
+          _buildSkeletonBox(height: 120, width: double.infinity),
+          const SizedBox(height: 18),
+          _buildSkeletonBox(height: 150, width: double.infinity),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSkeletonBox({required double height, double? width}) {
+    return Container(
+      height: height,
+      width: width,
+      decoration: BoxDecoration(
+        color: AppTheme.warmWhite.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.inkBlack.withValues(alpha: 0.1), width: 2),
+      ),
     );
   }
 

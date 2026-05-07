@@ -32,6 +32,13 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
 
   Future<void> _signIn() async {
     if (!_formKey.currentState!.validate()) return;
+    
+    // CRITICAL: Dismiss keyboard FIRST to prevent UI overflow during navigation
+    FocusScope.of(context).unfocus();
+    
+    // Small delay to let keyboard dismissal animation start
+    await Future.delayed(const Duration(milliseconds: 100));
+    
     setState(() => _isLoading = true);
 
     try {
@@ -50,6 +57,10 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
       }
 
       await _adminDbService.updateAdminLastLogin();
+      
+      // Additional delay to ensure keyboard is fully dismissed before navigation
+      await Future.delayed(const Duration(milliseconds: 150));
+      
       if (mounted) {
         final admin = AdminModel(
           id: userCredential.user!.uid,
@@ -61,6 +72,8 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
           createdAt: DateTime.now(),
           lastLoginAt: DateTime.now(),
         );
+        
+        // Navigate after keyboard is fully dismissed
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => AdminShell(admin: admin)),
@@ -92,6 +105,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(32),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 420),
               child: Column(

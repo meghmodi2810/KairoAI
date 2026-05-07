@@ -41,17 +41,51 @@ class _WordPracticePageState extends State<WordPracticePage> with WidgetsBinding
 
   static const int _requiredMatches = 3;
 
+  // Image caching
+  Widget? _cachedImageWidget;
+  final Map<String, Widget> _imageCache = {};
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _preloadImages();
     _initialize();
+  }
+
+  Future<void> _preloadImages() async {
+    for (final charModel in widget.wordModel.characters) {
+      final char = charModel.char.toUpperCase();
+      final resolvedRef = await _imageService.resolveImageRefForWord(char);
+      
+      if (resolvedRef != null && resolvedRef.isNotEmpty) {
+        _imageCache[char] = ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Image.asset(
+            resolvedRef,
+            fit: BoxFit.contain,
+            cacheWidth: 400,
+            cacheHeight: 400,
+            errorBuilder: (context, error, stackTrace) => 
+              _buildSignPlaceholder(char),
+          ),
+        );
+      }
+    }
+    
+    // Set initial cached image
+    if (mounted && widget.wordModel.characters.isNotEmpty) {
+      setState(() {
+        _cachedImageWidget = _imageCache[_currentTargetChar()];
+      });
+    }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _stopDetection();
+    _imageCache.clear(); // Clear image cache
     super.dispose();
   }
 
@@ -172,6 +206,12 @@ class _WordPracticePageState extends State<WordPracticePage> with WidgetsBinding
     setState(() {
       _matchCount = 0;
       _activeCharIndex++;
+      
+      // Update cached image for new character
+      if (_activeCharIndex < widget.wordModel.characters.length) {
+        final nextChar = widget.wordModel.characters[_activeCharIndex].char.toUpperCase();
+        _cachedImageWidget = _imageCache[nextChar];
+      }
     });
 
     if (_activeCharIndex >= widget.wordModel.characters.length) {
@@ -302,18 +342,6 @@ class _WordPracticePageState extends State<WordPracticePage> with WidgetsBinding
     return widget.wordModel.characters[_activeCharIndex].char.toUpperCase();
   }
 
-  Widget _buildSignMedia(String resolvedRef) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(10),
-      child: Image.asset(
-        resolvedRef,
-        fit: BoxFit.contain,
-        errorBuilder: (context, error, stackTrace) =>
-            _buildSignPlaceholder(_currentTargetChar()),
-      ),
-    );
-  }
-
   Widget _buildSignPlaceholder(String char) {
     return Center(
       child: Text(
@@ -323,6 +351,94 @@ class _WordPracticePageState extends State<WordPracticePage> with WidgetsBinding
           fontWeight: FontWeight.w900,
           fontSize: 96,
         ),
+      ),
+    );
+  }
+
+  Widget _buildCameraFeed() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.paperCream,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.inkBlack, width: 3),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: _detecting && _detectionService.textureId != null
+          ? Texture(textureId: _detectionService.textureId!)
+          : _buildCameraPlaceholder(),
+      ),
+    );
+  }
+
+  Widget _buildCameraPlaceholder() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.videocam_off_rounded,
+            size: 64,
+            color: AppTheme.inkBlack.withValues(alpha: 0.3),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Camera Initializing...',
+            style: TextStyle(
+              color: AppTheme.inkBlack.withValues(alpha: 0.5),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSignReference() {
+    return NeoPanel(
+      color: AppTheme.warmWhite,
+      radius: 18,
+      child: Column(
+        children: [
+          Text(
+            _currentTargetChar(),
+            style: const TextStyle(
+              color: AppTheme.inkBlack,
+              fontSize: 46,
+              height: 1,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: AppTheme.paperCream,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppTheme.inkBlack, width: 3),
+              ),
+              child: _cachedImageWidget ?? _buildSignPlaceholder(_currentTargetChar()),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppTheme.signalYellow,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppTheme.inkBlack, width: 2),
+            ),
+            child: Text(
+              'STEP ${_activeCharIndex + 1}/${widget.wordModel.characters.length}',
+              style: const TextStyle(
+                color: AppTheme.inkBlack,
+                fontWeight: FontWeight.w900,
+                fontSize: 10,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -352,15 +468,6 @@ class _WordPracticePageState extends State<WordPracticePage> with WidgetsBinding
       body: SafeArea(
         child: Column(
           children: [
-            if (_detecting && _detectionService.textureId != null)
-              SizedBox(
-                width: 1,
-                height: 1,
-                child: Opacity(
-                  opacity: 0,
-                  child: Texture(textureId: _detectionService.textureId!),
-                ),
-              ),
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
               child: Row(
@@ -444,69 +551,20 @@ class _WordPracticePageState extends State<WordPracticePage> with WidgetsBinding
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-                child: NeoPanel(
-                  color: AppTheme.warmWhite,
-                  radius: 18,
-                  child: Column(
-                    children: [
-                      Text(
-                        targetChar,
-                        style: const TextStyle(
-                          color: AppTheme.inkBlack,
-                          fontSize: 46,
-                          height: 1,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Expanded(
-                        child: Container(
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: AppTheme.paperCream,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: AppTheme.inkBlack, width: 3),
-                          ),
-                          child: FutureBuilder<String?>(
-                            future: _imageService.resolveImageRefForWord(targetChar),
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState == ConnectionState.waiting) {
-                                return const Center(
-                                  child: CircularProgressIndicator(
-                                    color: AppTheme.cobaltBlue,
-                                  ),
-                                );
-                              }
-
-                              final resolvedRef = (snapshot.data ?? '').trim();
-                              if (resolvedRef.isNotEmpty) {
-                                return _buildSignMedia(resolvedRef);
-                              }
-
-                              return _buildSignPlaceholder(targetChar);
-                            },
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppTheme.signalYellow,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppTheme.inkBlack, width: 2),
-                        ),
-                        child: Text(
-                          'STEP $stepLabel',
-                          style: const TextStyle(
-                            color: AppTheme.inkBlack,
-                            fontWeight: FontWeight.w900,
-                            fontSize: 10,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                child: Row(
+                  children: [
+                    // LEFT: Camera feed
+                    Expanded(
+                      flex: 3,
+                      child: _buildCameraFeed(),
+                    ),
+                    const SizedBox(width: 10),
+                    // RIGHT: Sign reference
+                    Expanded(
+                      flex: 2,
+                      child: _buildSignReference(),
+                    ),
+                  ],
                 ),
               ),
             ),

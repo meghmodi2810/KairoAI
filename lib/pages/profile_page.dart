@@ -272,7 +272,7 @@ class ProfilePage extends StatelessWidget {
                               foregroundColor: AppTheme.warmWhite,
                             ),
                             icon: const Icon(Icons.logout_rounded),
-                            label: const Text('Sign Out'),
+                            label: const Text('Log out'),
                           ),
                         ),
                       ],
