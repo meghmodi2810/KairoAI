@@ -517,3 +517,97 @@ class DailyInsight {
     );
   }
 }
+
+class WordGroupUnlockModel {
+  final String groupId;
+  final DateTime unlockedAt;
+  final int gemCostPaid;
+
+  WordGroupUnlockModel({
+    required this.groupId,
+    required this.unlockedAt,
+    required this.gemCostPaid,
+  });
+
+  factory WordGroupUnlockModel.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return WordGroupUnlockModel(
+      groupId: data['groupId'] ?? doc.id,
+      unlockedAt: (data['unlockedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      gemCostPaid: data['gemCostPaid'] ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toFirestore() {
+    return {
+      'groupId': groupId,
+      'unlockedAt': Timestamp.fromDate(unlockedAt),
+      'gemCostPaid': gemCostPaid,
+    };
+  }
+}
+
+class WordProgressModel {
+  final String groupId;
+  final String wordId;
+  final String status; // 'not_started', 'in_progress', 'completed'
+  final int currentCharacterIndex;
+  final List<int> completedCharacterIndexes;
+  final int attemptsCount;
+  final int timeSpentMs;
+  final int bestTimeMs;
+  final DateTime? firstCompletedAt;
+  final DateTime? lastPracticedAt;
+  final bool rewardClaimed;
+  final double lastAccuracy;
+
+  WordProgressModel({
+    required this.groupId,
+    required this.wordId,
+    this.status = 'not_started',
+    this.currentCharacterIndex = 0,
+    this.completedCharacterIndexes = const [],
+    this.attemptsCount = 0,
+    this.timeSpentMs = 0,
+    this.bestTimeMs = 0,
+    this.firstCompletedAt,
+    this.lastPracticedAt,
+    this.rewardClaimed = false,
+    this.lastAccuracy = 0.0,
+  });
+
+  factory WordProgressModel.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return WordProgressModel(
+      groupId: data['groupId'] ?? '',
+      wordId: data['wordId'] ?? doc.id,
+      status: data['status'] ?? 'not_started',
+      currentCharacterIndex: data['currentCharacterIndex'] ?? 0,
+      completedCharacterIndexes: List<int>.from(data['completedCharacterIndexes'] ?? []),
+      attemptsCount: data['attemptsCount'] ?? 0,
+      timeSpentMs: data['timeSpentMs'] ?? 0,
+      bestTimeMs: data['bestTimeMs'] ?? 0,
+      firstCompletedAt: (data['firstCompletedAt'] as Timestamp?)?.toDate(),
+      lastPracticedAt: (data['lastPracticedAt'] as Timestamp?)?.toDate(),
+      rewardClaimed: data['rewardClaimed'] ?? false,
+      lastAccuracy: (data['lastAccuracy'] ?? 0.0).toDouble(),
+    );
+  }
+
+  Map<String, dynamic> toFirestore() {
+    return {
+      'groupId': groupId,
+      'wordId': wordId,
+      'status': status,
+      'currentCharacterIndex': currentCharacterIndex,
+      'completedCharacterIndexes': completedCharacterIndexes,
+      'attemptsCount': attemptsCount,
+      'timeSpentMs': timeSpentMs,
+      'bestTimeMs': bestTimeMs,
+      'firstCompletedAt': firstCompletedAt != null ? Timestamp.fromDate(firstCompletedAt!) : null,
+      'lastPracticedAt': lastPracticedAt != null ? Timestamp.fromDate(lastPracticedAt!) : null,
+      'rewardClaimed': rewardClaimed,
+      'lastAccuracy': lastAccuracy,
+    };
+  }
+}

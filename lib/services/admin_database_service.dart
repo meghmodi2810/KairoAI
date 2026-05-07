@@ -468,6 +468,20 @@ class AdminDatabaseService {
 
   /// Create a word
   Future<String> createWord(String wordGroupId, WordModel word) async {
+    await _validateWordCharacters(word.text);
+    
+    // Check for duplicate normalizedText
+    final duplicates = await _db
+        .collection('word_groups')
+        .doc(wordGroupId)
+        .collection('words')
+        .where('normalizedText', isEqualTo: word.normalizedText)
+        .get();
+        
+    if (duplicates.docs.isNotEmpty) {
+      throw Exception('A word with this text already exists in this group.');
+    }
+
     final wordRef = _db
         .collection('word_groups')
         .doc(wordGroupId)
@@ -481,11 +495,26 @@ class AdminDatabaseService {
     };
 
     await wordRef.set(wordData);
+    await _updateWordGroupTotalWords(wordGroupId);
     return wordRef.id;
   }
 
   /// Update a word
   Future<void> updateWord(String wordGroupId, WordModel word) async {
+    await _validateWordCharacters(word.text);
+    
+    // Check for duplicate normalizedText excluding self
+    final duplicates = await _db
+        .collection('word_groups')
+        .doc(wordGroupId)
+        .collection('words')
+        .where('normalizedText', isEqualTo: word.normalizedText)
+        .get();
+        
+    if (duplicates.docs.any((doc) => doc.id != word.id)) {
+      throw Exception('A word with this text already exists in this group.');
+    }
+
     await _db
         .collection('word_groups')
         .doc(wordGroupId)
@@ -505,6 +534,99 @@ class AdminDatabaseService {
         .collection('words')
         .doc(wordId)
         .delete();
+    await _updateWordGroupTotalWords(wordGroupId);
+  }
+
+  /// Maintain totalWords
+  Future<void> _updateWordGroupTotalWords(String groupId) async {
+    final wordsSnapshot = await _db
+        .collection('word_groups')
+        .doc(groupId)
+        .collection('words')
+        .get();
+    
+    await _db.collection('word_groups').doc(groupId).update({
+      'totalWords': wordsSnapshot.docs.length,
+    });
+  }
+
+  /// Validate word characters
+  Future<void> _validateWordCharacters(String text) async {
+    final upperText = text.toUpperCase();
+    final unsupportedRegex = RegExp(r'[^A-Z0-9]');
+    if (unsupportedRegex.hasMatch(upperText)) {
+      throw Exception('Only characters A-Z and 0-9 are supported.');
+    }
+    
+    // Validate against global signs
+    final globalSignsSnapshot = await _db.collection('signs').get();
+    final validLabels = globalSignsSnapshot.docs.map((doc) {
+      final data = doc.data();
+      return (data['word'] ?? data['character'] ?? data['label'] ?? doc.id).toString().toUpperCase().trim();
+    }).toSet();
+    
+    for (int i = 0; i < upperText.length; i++) {
+      final char = upperText[i];
+      if (!validLabels.contains(char)) {
+        throw Exception('Character "$char" does not exist in the global signs collection.');
+      }
+    }
+  }
+
+  /// One-way migration from legacy wordGroups to word_groups
+  Future<void> migrateLegacyWordGroups() async {
+    final legacySnapshot = await _db.collection('wordGroups').get();
+    
+    for (final legacyDoc in legacySnapshot.docs) {
+      final legacyData = legacyDoc.data();
+      
+      final newGroup = WordGroupModel(
+        id: legacyDoc.id,
+        name: legacyData['name'] ?? '',
+        description: legacyData['description'] ?? '',
+        iconEmoji: legacyData['iconEmoji'] ?? '📝',
+        difficulty: legacyData['difficulty'] ?? 'beginner',
+        unlockGemCost: legacyData['gemCost'] ?? 0,
+        completionGemReward: 0,
+        order: legacyData['order'] ?? 0,
+        totalWords: legacyData['totalWords'] ?? 0,
+        createdAt: (legacyData['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        updatedAt: (legacyData['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        isPublished: true,
+      );
+      
+      await _db.collection('word_groups').doc(newGroup.id).set(newGroup.toFirestore());
+      
+      final legacyWordsSnapshot = await legacyDoc.reference.collection('words').get();
+      for (final legacyWordDoc in legacyWordsSnapshot.docs) {
+        final legacyWordData = legacyWordDoc.data();
+        final text = legacyWordData['text'] ?? legacyWordData['word'] ?? '';
+        final characters = (legacyWordData['characters'] as List<dynamic>?)
+            ?.map((e) => WordCharacter.fromMap(e as Map<String, dynamic>))
+            .toList() ?? [];
+            
+        final newWord = WordModel(
+          id: legacyWordDoc.id,
+          wordGroupId: newGroup.id,
+          text: text,
+          normalizedText: text.toUpperCase(),
+          characters: characters.isNotEmpty ? characters : text.toUpperCase().split('').map((c) => WordCharacter(char: c)).toList(),
+          order: legacyWordData['order'] ?? 0,
+          isPublished: true,
+          createdAt: (legacyWordData['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          updatedAt: (legacyWordData['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        );
+        
+        await _db
+            .collection('word_groups')
+            .doc(newGroup.id)
+            .collection('words')
+            .doc(newWord.id)
+            .set(newWord.toFirestore());
+      }
+      
+      await _updateWordGroupTotalWords(newGroup.id);
+    }
   }
 
   // ==================== LEARNER MANAGEMENT ====================

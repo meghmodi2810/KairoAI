@@ -616,4 +616,115 @@ class DatabaseService {
 
     return null;
   }
+
+  // ==================== WORD PRACTICE OPERATIONS ====================
+
+  Stream<List<WordGroupUnlockModel>> wordGroupUnlocksStream() {
+    if (currentUserId == null) return Stream.value([]);
+    return _db
+        .collection('users')
+        .doc(currentUserId)
+        .collection('word_group_unlocks')
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => WordGroupUnlockModel.fromFirestore(doc))
+              .toList(),
+        );
+  }
+
+  Stream<List<WordProgressModel>> wordProgressStream(String groupId) {
+    if (currentUserId == null) return Stream.value([]);
+    return _db
+        .collection('users')
+        .doc(currentUserId)
+        .collection('word_progress')
+        .where('groupId', isEqualTo: groupId)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => WordProgressModel.fromFirestore(doc))
+              .toList(),
+        );
+  }
+
+  Future<bool> unlockWordGroup(String groupId, int cost) async {
+    if (currentUserId == null) return false;
+
+    final userRef = _db.collection('users').doc(currentUserId);
+    final unlockRef = userRef.collection('word_group_unlocks').doc(groupId);
+
+    try {
+      await _db.runTransaction((tx) async {
+        final userDoc = await tx.get(userRef);
+        final userData = userDoc.data() ?? {};
+        final currentGems = userData['gems'] as int? ?? 0;
+
+        if (currentGems < cost) {
+          throw Exception('Insufficient gems to unlock this pack.');
+        }
+
+        final unlockDoc = await tx.get(unlockRef);
+        if (unlockDoc.exists) {
+          // Already unlocked
+          return;
+        }
+
+        tx.update(userRef, {
+          'gems': FieldValue.increment(-cost),
+        });
+
+        final unlockModel = WordGroupUnlockModel(
+          groupId: groupId,
+          unlockedAt: DateTime.now(),
+          gemCostPaid: cost,
+        );
+
+        tx.set(unlockRef, unlockModel.toFirestore());
+      });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<void> updateWordProgress(WordProgressModel progress) async {
+    if (currentUserId == null) return;
+    await _db
+        .collection('users')
+        .doc(currentUserId)
+        .collection('word_progress')
+        .doc(progress.wordId)
+        .set(progress.toFirestore(), SetOptions(merge: true));
+  }
+  
+  Future<void> grantWordCompletionReward({
+    required int xpEarned, 
+    required int coinsEarned, 
+    required int gemsEarned
+  }) async {
+    if (currentUserId == null) return;
+
+    final updates = <String, dynamic>{};
+    if (xpEarned > 0) updates['xp'] = FieldValue.increment(xpEarned);
+    if (coinsEarned > 0) updates['coins'] = FieldValue.increment(coinsEarned);
+    if (gemsEarned > 0) updates['gems'] = FieldValue.increment(gemsEarned);
+
+    if (updates.isNotEmpty) {
+      await _db.collection('users').doc(currentUserId).update(updates);
+    }
+  }
+
+  Future<void> saveWordPracticeLog(Map<String, dynamic> logData) async {
+    if (currentUserId == null) return;
+    
+    // Convert to SignPracticeLogModel if it exists or just push raw data.
+    // Given SignPracticeLogModel is in admin_models, we can just push raw data 
+    // structured identically.
+    await _db.collection('sign_practice_logs').add({
+      ...logData,
+      'learnerId': currentUserId,
+      'timestamp': FieldValue.serverTimestamp(),
+    });
+  }
 }

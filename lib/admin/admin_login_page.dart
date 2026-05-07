@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/admin_database_service.dart';
-import 'admin_navigation.dart';
+import 'screens/admin_shell.dart';
+import 'models/admin_models.dart';
 import '../theme/app_theme.dart';
 import '../theme/neo_brutal_widgets.dart';
 
@@ -50,9 +51,19 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
 
       await _adminDbService.updateAdminLastLogin();
       if (mounted) {
+        final admin = AdminModel(
+          id: userCredential.user!.uid,
+          email: userCredential.user!.email ?? '',
+          displayName: 'Admin',
+          role: 'admin',
+          permissions: [],
+          isActive: true,
+          createdAt: DateTime.now(),
+          lastLoginAt: DateTime.now(),
+        );
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const AdminNavigation()),
+          MaterialPageRoute(builder: (_) => AdminShell(admin: admin)),
         );
       }
     } catch (e) {

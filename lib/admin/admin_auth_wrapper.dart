@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/admin_database_service.dart';
 import 'admin_login_page.dart';
-import 'admin_navigation.dart';
+import 'screens/admin_shell.dart';
+import 'models/admin_models.dart';
 import '../theme/app_theme.dart';
 import '../theme/neo_brutal_widgets.dart';
 
@@ -53,7 +54,18 @@ class _AdminAuthWrapperState extends State<AdminAuthWrapper> {
             }
 
             if (adminSnapshot.data == true) {
-              return const AdminNavigation();
+              // Creating a dummy AdminModel since isAdmin doesn't return one
+              final admin = AdminModel(
+                id: snapshot.data!.uid,
+                email: snapshot.data!.email ?? '',
+                displayName: 'Admin',
+                role: 'admin',
+                permissions: [],
+                isActive: true,
+                createdAt: DateTime.now(),
+                lastLoginAt: DateTime.now(),
+              );
+              return AdminShell(admin: admin);
             }
 
             return _buildAccessDenied();

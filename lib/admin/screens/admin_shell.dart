@@ -6,6 +6,7 @@ import 'package:kairo_ai/main.dart';
 import 'package:kairo_ai/admin/widgets/a_overlays.dart';
 import 'package:kairo_ai/admin/screens/dashboard/admin_dashboard_screen.dart';
 import 'package:kairo_ai/admin/screens/lessons/admin_lessons_screen.dart';
+import 'package:kairo_ai/admin/screens/words/admin_words_screen.dart';
 import 'package:kairo_ai/admin/screens/users/admin_users_screen.dart';
 import 'package:kairo_ai/admin/screens/analytics/admin_analytics_screen.dart';
 import 'package:kairo_ai/admin/screens/issues/admin_issues_screen.dart';
@@ -33,7 +34,7 @@ class _AdminShellState extends State<AdminShell> {
       _selectedIndex = index;
       if (settingsTab != null) {
         _settingsTabIndex = settingsTab;
-      } else if (index != 5) {
+      } else if (index != 6) {
         _settingsTabIndex = 0;
       }
       _history.add(index);
@@ -110,6 +111,10 @@ class _AdminShellState extends State<AdminShell> {
                         admin: widget.admin,
                         onMenuTap: _openDrawer,
                       ),
+                      AdminWordsScreen(
+                        admin: widget.admin,
+                        onMenuTap: _openDrawer,
+                      ),
                       AdminUsersScreen(
                         admin: widget.admin,
                         onMenuTap: _openDrawer,
@@ -129,7 +134,7 @@ class _AdminShellState extends State<AdminShell> {
                       ),
                     ],
                   ),
-                  bottomNavigationBar: _selectedIndex < 5
+                  bottomNavigationBar: _selectedIndex < 6
                       ? AdminNavBar(
                           selectedIndex: _selectedIndex,
                           onTabSelected: _onTabSelected,
