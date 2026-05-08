@@ -1,9 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../services/database_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/neo_brutal_widgets.dart';
-import 'login_page.dart';
+import 'settings_page.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -22,12 +23,15 @@ class ProfilePage extends StatelessWidget {
 
           final name = (data?['displayName'] ?? user?.displayName ?? 'Learner') as String;
           final email = user?.email ?? '';
-          final level = (data?['level'] ?? 1) as int;
           final xp = (data?['xp'] ?? 0) as int;
+          final storedLevel = data?['currentLevel'];
+          final level = (storedLevel is int && storedLevel > 0)
+              ? storedLevel
+              : DatabaseService.computeLevel(xp);
           final streak = (data?['streakDays'] ?? 0) as int;
           final gems = (data?['gems'] ?? 0) as int;
           final signsLearned = (data?['totalSignsLearned'] ?? 0) as int;
-          final lessonsCompleted = ((data?['completedLessonIds']) as List?)?.length ?? 0;
+          final lessonsCompleted = (data?['totalLessonsCompleted'] ?? 0) as int;
 
           return CustomScrollView(
             slivers: [
@@ -166,37 +170,6 @@ class ProfilePage extends StatelessWidget {
                         _infoRow('Support', 'Help and FAQ available'),
                         const SizedBox(height: 8),
                         _infoRow('Language', 'English'),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: () async {
-                              final email = FirebaseAuth.instance.currentUser?.email;
-                              if (email != null && email.isNotEmpty) {
-                                try {
-                                  await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-                                  if (!context.mounted) return;
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Password reset email sent.'),
-                                      backgroundColor: AppTheme.mintGreen,
-                                    ),
-                                  );
-                                } catch (_) {
-                                  if (!context.mounted) return;
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Failed to send reset email.'),
-                                      backgroundColor: AppTheme.punchRed,
-                                    ),
-                                  );
-                                }
-                              }
-                            },
-                            icon: const Icon(Icons.lock_reset_rounded),
-                            label: const Text('Change Password'),
-                          ),
-                        ),
                       ],
                     ),
                   ),
@@ -208,74 +181,15 @@ class ProfilePage extends StatelessWidget {
                   child: NeoPanel(
                     color: AppTheme.warmWhite,
                     radius: 18,
-                    child: Column(
-                      children: [
-                        NeoPrimaryButton(
-                          label: 'Need Help',
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Help and support will be available soon.')),
-                            );
-                          },
-                          icon: Icons.help_outline,
-                        ),
-                        const SizedBox(height: 10),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 52,
-                          child: ElevatedButton.icon(
-                            onPressed: () async {
-                              final confirm = await showDialog<bool>(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  backgroundColor: AppTheme.paperCream,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                    side: const BorderSide(color: AppTheme.inkBlack, width: 3),
-                                  ),
-                                  title: const Text(
-                                    'Log Out',
-                                    style: TextStyle(fontWeight: FontWeight.w900, color: AppTheme.inkBlack),
-                                  ),
-                                  content: const Text(
-                                    'Are you sure you want to log out?',
-                                    style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.inkBlack),
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(context, false),
-                                      child: const Text('Cancel', style: TextStyle(color: AppTheme.inkBlack, fontWeight: FontWeight.bold)),
-                                    ),
-                                    ElevatedButton(
-                                      onPressed: () => Navigator.pop(context, true),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: AppTheme.punchRed,
-                                        foregroundColor: Colors.white,
-                                      ),
-                                      child: const Text('Log Out', style: TextStyle(fontWeight: FontWeight.bold)),
-                                    ),
-                                  ],
-                                ),
-                              );
-
-                              if (confirm == true) {
-                                await FirebaseAuth.instance.signOut();
-                                if (!context.mounted) return;
-                                Navigator.of(context).pushAndRemoveUntil(
-                                  MaterialPageRoute(builder: (_) => const LoginPage()),
-                                  (_) => false,
-                                );
-                              }
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.punchRed,
-                              foregroundColor: AppTheme.warmWhite,
-                            ),
-                            icon: const Icon(Icons.logout_rounded),
-                            label: const Text('Log out'),
-                          ),
-                        ),
-                      ],
+                    child: NeoPrimaryButton(
+                      label: 'Settings',
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const SettingsPage()),
+                        );
+                      },
+                      icon: Icons.settings_rounded,
                     ),
                   ),
                 ),

@@ -1,5 +1,6 @@
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AudioService {
   static final AudioService _instance = AudioService._internal();
@@ -10,10 +11,16 @@ class AudioService {
   final AudioPlayer _successPlayer = AudioPlayer();
   
   bool _initialized = false;
+  bool _soundEnabled = true;
+
+  bool get soundEnabled => _soundEnabled;
 
   Future<void> init() async {
     if (_initialized) return;
     try {
+      final prefs = await SharedPreferences.getInstance();
+      _soundEnabled = prefs.getBool('sound_enabled') ?? true;
+
       await _clickPlayer.setSource(AssetSource('sounds/click.mp3'));
       await _clickPlayer.setReleaseMode(ReleaseMode.stop);
       
@@ -28,7 +35,15 @@ class AudioService {
     }
   }
 
+  /// Call this when the user toggles sound in Settings.
+  Future<void> setSoundEnabled(bool enabled) async {
+    _soundEnabled = enabled;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('sound_enabled', enabled);
+  }
+
   Future<void> playClick() async {
+    if (!_soundEnabled) return;
     try {
       if (_clickPlayer.state == PlayerState.playing) {
         await _clickPlayer.stop();
@@ -42,6 +57,7 @@ class AudioService {
   }
 
   Future<void> playSuccess() async {
+    if (!_soundEnabled) return;
     try {
       if (_successPlayer.state == PlayerState.playing) {
         await _successPlayer.stop();

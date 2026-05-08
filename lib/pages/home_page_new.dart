@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/app_models.dart';
 import '../services/database_service.dart';
+import '../services/audio_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/neo_brutal_widgets.dart';
 import 'category_lessons_page.dart';
@@ -519,19 +520,25 @@ class _HomePageState extends State<HomePage> {
 
         return GestureDetector(
           onTap: category.isLocked
-              ? () => ScaffoldMessenger.of(context).showSnackBar(
+              ? () {
+                  AudioService().playClick();
+                  ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
                       'Reach level ${category.requiredLevel} to unlock ${category.name}.',
                     ),
                   ),
-                )
-              : () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => CategoryLessonsPage(category: category),
-                  ),
-                ),
+                );
+                }
+              : () {
+                  AudioService().playClick();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => CategoryLessonsPage(category: category),
+                    ),
+                  );
+                },
           child: NeoPanel(
             radius: 16,
             color: AppTheme.warmWhite,
@@ -550,10 +557,24 @@ class _HomePageState extends State<HomePage> {
                   child: Center(
                     child: category.isLocked
                         ? const Icon(Icons.lock, color: AppTheme.inkBlack)
-                        : Text(
-                            category.iconEmoji,
-                            style: const TextStyle(fontSize: 24),
-                          ),
+                        : (category.iconUrl != null && category.iconUrl!.isNotEmpty)
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(9),
+                                child: Image.network(
+                                  category.iconUrl!,
+                                  width: 50,
+                                  height: 50,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Text(
+                                    category.iconEmoji,
+                                    style: const TextStyle(fontSize: 24),
+                                  ),
+                                ),
+                              )
+                            : Text(
+                                category.iconEmoji,
+                                style: const TextStyle(fontSize: 24),
+                              ),
                   ),
                 ),
                 const SizedBox(width: 12),

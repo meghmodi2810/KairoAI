@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/app_models.dart';
@@ -7,6 +8,14 @@ class DatabaseService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   String? get currentUserId => _auth.currentUser?.uid;
+
+  /// Compute player level from XP.
+  /// Formula: level = floor(0.5 + sqrt(0.25 + xp / 50)), min 1.
+  static int computeLevel(int xp) {
+    if (xp <= 0) return 1;
+    final level = (0.5 + sqrt(0.25 + xp / 50.0)).floor();
+    return level < 1 ? 1 : level;
+  }
 
   // ==================== USER OPERATIONS ====================
 
@@ -538,6 +547,12 @@ class DatabaseService {
         updates['totalSignsLearned'] = FieldValue.increment(signsCount);
       }
 
+      // Recalculate level from new XP total
+      final userSnap = await tx.get(userRef);
+      final currentXp = (userSnap.data()?['xp'] as int?) ?? 0;
+      final newLevel = computeLevel(currentXp + safeXpEarned);
+      updates['currentLevel'] = newLevel;
+
       tx.update(userRef, updates);
     });
 
@@ -705,14 +720,22 @@ class DatabaseService {
   }) async {
     if (currentUserId == null) return;
 
-    final updates = <String, dynamic>{};
-    if (xpEarned > 0) updates['xp'] = FieldValue.increment(xpEarned);
-    if (coinsEarned > 0) updates['coins'] = FieldValue.increment(coinsEarned);
-    if (gemsEarned > 0) updates['gems'] = FieldValue.increment(gemsEarned);
+    final userRef = _db.collection('users').doc(currentUserId);
 
-    if (updates.isNotEmpty) {
-      await _db.collection('users').doc(currentUserId).update(updates);
-    }
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(userRef);
+      final currentXp = (snap.data()?['xp'] as int?) ?? 0;
+      final newLevel = computeLevel(currentXp + xpEarned);
+
+      final updates = <String, dynamic>{
+        'currentLevel': newLevel,
+      };
+      if (xpEarned > 0) updates['xp'] = FieldValue.increment(xpEarned);
+      if (coinsEarned > 0) updates['coins'] = FieldValue.increment(coinsEarned);
+      if (gemsEarned > 0) updates['gems'] = FieldValue.increment(gemsEarned);
+
+      tx.update(userRef, updates);
+    });
   }
 
   Future<void> saveWordPracticeLog(Map<String, dynamic> logData) async {

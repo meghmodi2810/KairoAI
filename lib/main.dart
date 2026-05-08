@@ -5,6 +5,7 @@ import 'auth_wrapper.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_provider.dart';
 import 'services/audio_service.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,6 +17,7 @@ void main() async {
   }
 
   await AudioService().init();
+  await NotificationService().init();
 
   runApp(const MyApp());
 }

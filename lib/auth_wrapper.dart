@@ -21,6 +21,8 @@ class AuthWrapper extends StatefulWidget {
 class _AuthWrapperState extends State<AuthWrapper> {
   bool _isLoading = true;
   bool _onboardingComplete = false;
+  Future<DocumentSnapshot?>? _adminStatusFuture;
+  String? _lastUid;
 
   static const Color ink = Color(0xFF111111);
   static const Color paper = Color(0xFFFFF7E8);
@@ -219,8 +221,13 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
         // User is logged in - check if admin or learner
         if (snapshot.hasData) {
+          final uid = snapshot.data!.uid;
+          if (_lastUid != uid) {
+            _lastUid = uid;
+            _adminStatusFuture = _checkAdminStatus(uid);
+          }
           return FutureBuilder<DocumentSnapshot?>(
-            future: _checkAdminStatus(snapshot.data!.uid),
+            future: _adminStatusFuture,
             builder: (context, adminSnapshot) {
               if (adminSnapshot.connectionState == ConnectionState.waiting) {
                 return _transitionPlaceholder();
