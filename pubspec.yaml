@@ -110,7 +110,9 @@ flutter:
     - assets/signs/6/image.png
     - assets/signs/7/image.png
     - assets/signs/8/image.png
+    - assets/signs/9/image.png
     - assets/signs/A/image.png
+    - assets/signs/B/image.png
     - assets/signs/C/image.png
     - assets/signs/D/image.png
     - assets/signs/E/image.png
@@ -118,13 +120,18 @@ flutter:
     - assets/signs/G/image.png
     - assets/signs/H/image.png
     - assets/signs/I/image.png
+    - assets/signs/J/image.png
     - assets/signs/K/image.png
     - assets/signs/L/image.png
     - assets/signs/M/image.png
     - assets/signs/N/image.png
     - assets/signs/O/image.png
     - assets/signs/P/image.png
+    - assets/signs/Q/image.png
+    - assets/signs/R/image.png
+    - assets/signs/S/image.png
     - assets/signs/T/image.png
+    - assets/signs/U/image.png
     - assets/signs/V/image.png
     - assets/signs/W/image.png
     - assets/signs/X/image.png

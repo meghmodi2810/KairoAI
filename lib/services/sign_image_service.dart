@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 /// Service to resolve local bundled sign assets from normalized labels.
@@ -95,14 +96,19 @@ class SignImageService {
   /// contract: assets/signs/<LABEL>/image.png.
   Future<String?> getBundledImageRef(String word) async {
     final folder = _mapWordToFolder(word);
+    debugPrint('[SignImageService] getBundledImageRef: word="$word" -> folder=$folder');
     if (folder == null) return null;
 
     if (_bundledImageRefCache.containsKey(folder)) {
+      debugPrint('[SignImageService] Cache hit for folder: $folder = ${_bundledImageRefCache[folder]}');
       return _bundledImageRefCache[folder];
     }
 
     final candidate = 'assets/signs/$folder/image.png';
-    if (await _assetExists(candidate)) {
+    debugPrint('[SignImageService] Checking asset existence: $candidate');
+    final exists = await _assetExists(candidate);
+    debugPrint('[SignImageService] Asset exists: $exists');
+    if (exists) {
       _bundledImageRefCache[folder] = candidate;
       return candidate;
     }
@@ -119,23 +125,38 @@ class SignImageService {
     String? lessonFallbackRef,
     String? fallbackLabel,
   }) async {
+    debugPrint('[SignImageService] Resolving image for word: "$word"');
+    debugPrint('[SignImageService] lessonImageRef: $lessonImageRef');
+    debugPrint('[SignImageService] lessonFallbackRef: $lessonFallbackRef');
+    debugPrint('[SignImageService] fallbackLabel: $fallbackLabel');
+
     final lessonPrimary = _normalizeLocalAssetRef(lessonImageRef);
     final lessonFallback = _normalizeLocalAssetRef(lessonFallbackRef);
+    debugPrint('[SignImageService] normalized lessonPrimary: $lessonPrimary');
+    debugPrint('[SignImageService] normalized lessonFallback: $lessonFallback');
 
     if (lessonPrimary != null && await _assetExists(lessonPrimary)) {
+      debugPrint('[SignImageService] Found lessonPrimary: $lessonPrimary');
       return lessonPrimary;
     }
     if (lessonFallback != null && await _assetExists(lessonFallback)) {
+      debugPrint('[SignImageService] Found lessonFallback: $lessonFallback');
       return lessonFallback;
     }
 
+    final folder = _mapWordToFolder(word);
+    debugPrint('[SignImageService] Mapped word "$word" to folder: $folder');
+
     final bundled = await getBundledImageRef(word);
+    debugPrint('[SignImageService] Bundled ref result: $bundled');
     if (bundled != null) return bundled;
 
     // Safe same-item fallback: if caller passes a label-like id, use it.
     final bundledFallback = await getBundledImageRef(fallbackLabel ?? '');
+    debugPrint('[SignImageService] Bundled fallback result: $bundledFallback');
     if (bundledFallback != null) return bundledFallback;
 
+    debugPrint('[SignImageService] No image found for word: "$word"');
     return null;
   }
 

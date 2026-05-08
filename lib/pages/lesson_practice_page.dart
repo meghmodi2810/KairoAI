@@ -43,6 +43,8 @@ class _LessonPracticePageState extends State<LessonPracticePage>
   bool _hasPermission = false;
   int _activePracticeSeconds = 0;
   DateTime? _cameraSegmentStart;
+  String? _currentImageRef;
+  bool _imageLoading = true;
 
   SignModel get _current => widget.signs[_index];
 
@@ -82,6 +84,33 @@ class _LessonPracticePageState extends State<LessonPracticePage>
     if (granted) {
       await _startCamera();
     }
+
+    // Pre-resolve first sign image to prevent flickering
+    await _resolveCurrentImage();
+  }
+
+  Future<void> _resolveCurrentImage() async {
+    if (!mounted) return;
+    setState(() => _imageLoading = true);
+
+    debugPrint('[LessonPractice] Resolving image for sign: ${_current.word} (id: ${_current.id})');
+    debugPrint('[LessonPractice] imageUrl: ${_current.imageUrl}');
+    debugPrint('[LessonPractice] gifUrl: ${_current.gifUrl}');
+
+    final ref = await _imageService.resolveImageRefForWord(
+      _current.word,
+      lessonImageRef: _current.imageUrl,
+      lessonFallbackRef: _current.gifUrl,
+      fallbackLabel: _current.id,
+    );
+
+    debugPrint('[LessonPractice] Resolved image ref: $ref');
+
+    if (!mounted) return;
+    setState(() {
+      _currentImageRef = ref;
+      _imageLoading = false;
+    });
   }
 
   Future<void> _requestCameraPermission() async {
@@ -193,6 +222,7 @@ class _LessonPracticePageState extends State<LessonPracticePage>
       _matched = false;
     });
     _detection.resetPrediction().catchError((_) {});
+    _resolveCurrentImage();
   }
 
   void _nextSign() {
@@ -208,6 +238,7 @@ class _LessonPracticePageState extends State<LessonPracticePage>
       _matched = false;
     });
     _detection.resetPrediction().catchError((_) {});
+    _resolveCurrentImage();
   }
 
   Future<void> _finish() async {
@@ -446,31 +477,16 @@ class _LessonPracticePageState extends State<LessonPracticePage>
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: AppTheme.inkBlack, width: 3),
               ),
-              child: FutureBuilder<String?>(
-                future: _imageService.resolveImageRefForWord(
-                  _current.word,
-                  lessonImageRef: _current.imageUrl,
-                  lessonFallbackRef: _current.gifUrl,
-                  fallbackLabel: _current.id,
-                ),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(
+              child: _imageLoading
+                  ? const Center(
                       child: CircularProgressIndicator(
                         color: AppTheme.cobaltBlue,
                         strokeWidth: 2,
                       ),
-                    );
-                  }
-
-                  final ref = (snapshot.data ?? '').trim();
-                  if (ref.isNotEmpty) {
-                    return _buildReferenceMedia(ref);
-                  }
-
-                  return _buildReferenceFallback();
-                },
-              ),
+                    )
+                  : (_currentImageRef?.trim().isNotEmpty ?? false)
+                      ? _buildReferenceMedia(_currentImageRef!)
+                      : _buildReferenceFallback(),
             ),
           ),
           if (_matched)
