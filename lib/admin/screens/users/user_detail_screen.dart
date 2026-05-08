@@ -240,14 +240,14 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
   Future<void> _deleteUser() async {
     final confirmed = await AdminConfirmModal.show(
       context,
-      title: 'Delete account permanently?',
-      body: 'All user data including progress, gems, and notes will be deleted forever.',
-      confirmLabel: 'Delete account',
+      title: 'Hide learner account?',
+      body: 'The learner will be hidden and deactivated. Data stays in Firestore.',
+      confirmLabel: 'Hide learner',
     );
     if (!confirmed || !mounted) return;
 
     setState(() => _actionLoading = true);
-    final result = await _db.deleteLearnerCompletely(widget.userId);
+    final result = await _db.hideLearner(widget.userId);
     if (!mounted) return;
     setState(() => _actionLoading = false);
     if (result.success) {

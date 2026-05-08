@@ -41,12 +41,22 @@ class ProfilePage extends StatelessWidget {
               : DatabaseService.computeLevel(xp);
           final streak = (data?['streakDays'] ?? 0) as int;
           final gems = (data?['gems'] ?? 0) as int;
-          final signsLearned = (data?['totalSignsLearned'] ?? 0) as int;
-          final lessonsCompleted = (data?['totalLessonsCompleted'] ?? 0) as int;
           final completedSignCharacters = normalizeSignCharacters(
             (data?['completedSignCharacters'] as List<dynamic>? ?? const [])
                 .map((value) => value.toString()),
           );
+            final lessonsCompleted = (data?['totalLessonsCompleted'] ?? 0) as int;
+            final uniqueSigns = completedSignCharacters.length;
+            final rawTotalSigns = data?['totalSignsLearned'];
+            final totalSigns = rawTotalSigns is num
+              ? rawTotalSigns.toInt()
+              : (rawTotalSigns is String
+                ? int.tryParse(rawTotalSigns)
+                : null) ??
+                0;
+            final signsLearned = totalSigns >= uniqueSigns
+              ? totalSigns
+              : uniqueSigns;
 
           return CustomScrollView(
             slivers: [

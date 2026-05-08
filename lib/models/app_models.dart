@@ -29,6 +29,7 @@ class UserModel {
   final int currentLevel;
   final int xp;
   final bool isActive;
+  final bool isHidden;
   final List<String> completedSignCharacters;
   final ExperienceState postLoginExperienceV1;
 
@@ -53,6 +54,7 @@ class UserModel {
     this.currentLevel = 1,
     this.xp = 0,
     this.isActive = true,
+    this.isHidden = false,
     this.completedSignCharacters = const [],
     this.postLoginExperienceV1 = const ExperienceState(),
   });
@@ -82,6 +84,7 @@ class UserModel {
       currentLevel: data['currentLevel'] ?? 1,
       xp: data['xp'] ?? 0,
       isActive: data['isActive'] ?? true,
+      isHidden: data['isHidden'] ?? false,
       completedSignCharacters: List<String>.from(
         data['completedSignCharacters'] ?? [],
       ),
@@ -118,6 +121,7 @@ class UserModel {
       'currentLevel': currentLevel,
       'xp': xp,
       'isActive': isActive,
+      'isHidden': isHidden,
       'completedSignCharacters': completedSignCharacters,
       'postLoginExperienceV1': postLoginExperienceV1.toFirestore(),
     };
@@ -144,6 +148,7 @@ class UserModel {
     int? currentLevel,
     int? xp,
     bool? isActive,
+    bool? isHidden,
     List<String>? completedSignCharacters,
     ExperienceState? postLoginExperienceV1,
   }) {
@@ -171,6 +176,7 @@ class UserModel {
       currentLevel: currentLevel ?? this.currentLevel,
       xp: xp ?? this.xp,
       isActive: isActive ?? this.isActive,
+        isHidden: isHidden ?? this.isHidden,
       completedSignCharacters:
           completedSignCharacters ?? this.completedSignCharacters,
       postLoginExperienceV1:

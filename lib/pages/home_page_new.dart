@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -69,7 +70,7 @@ class _HomePageState extends State<HomePage> {
     try {
       final currentUser = _auth.currentUser;
       if (currentUser != null) {
-        await _db.createUserDocument(currentUser);
+        unawaited(_db.createUserDocument(currentUser));
       }
 
       // Parallel data fetching
@@ -81,15 +82,48 @@ class _HomePageState extends State<HomePage> {
       final user = results[0] as UserModel?;
       final categories = results[1] as List<CategoryModel>;
 
-      // Find continue lesson (optimized)
+      // Update cache
+      _cachedUser = user;
+      _cachedCategories = categories;
+      _lastCacheTime = DateTime.now();
+
+      if (!mounted) return;
+      setState(() {
+        _user = user;
+        _categories = categories;
+        _isLoading = false;
+      });
+
+      unawaited(_resolveContinueLesson(user, categories));
+    } catch (e) {
+      debugPrint('Error loading home data: $e');
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _resolveContinueLesson(
+    UserModel? user,
+    List<CategoryModel> categories,
+  ) async {
+    try {
       LessonModel? nextLesson;
       String? nextCategoryId;
+      final progressIndex = await _db.getLessonProgressIndex();
 
       for (final category in categories) {
         if (_isCategoryLockedForUser(category, user)) continue;
         final lessons = await _db.getLessons(category.id);
         for (final lesson in lessons) {
-          final progress = await _db.getLessonProgress(lesson.id);
+          if (lesson.isLocked) continue;
+          if (lesson.requiredLessonId != null &&
+              lesson.requiredLessonId!.trim().isNotEmpty) {
+            final required = progressIndex[lesson.requiredLessonId!];
+            if (required == null || required.status != 'completed') {
+              continue;
+            }
+          }
+          final progress = progressIndex[lesson.id];
           if (progress == null || progress.status != 'completed') {
             nextLesson = lesson;
             nextCategoryId = category.id;
@@ -99,26 +133,24 @@ class _HomePageState extends State<HomePage> {
         if (nextLesson != null) break;
       }
 
-      // Update cache
-      _cachedUser = user;
-      _cachedCategories = categories;
       _cachedContinueLesson = nextLesson;
       _cachedContinueCategoryId = nextCategoryId;
       _lastCacheTime = DateTime.now();
 
       if (!mounted) return;
       setState(() {
-        _user = user;
-        _categories = categories;
         _continueLesson = nextLesson;
         _continueCategoryId = nextCategoryId;
-        _isLoading = false;
       });
     } catch (e) {
-      debugPrint('Error loading home data: $e');
-      if (!mounted) return;
-      setState(() => _isLoading = false);
+      debugPrint('Error resolving continue lesson: $e');
     }
+  }
+
+  int _displayedSigns(UserModel? user) {
+    final total = user?.totalSignsLearned ?? 0;
+    final unique = user?.completedSignCharacters.length ?? 0;
+    return total >= unique ? total : unique;
   }
 
   @override
@@ -421,6 +453,7 @@ class _HomePageState extends State<HomePage> {
     final practiceMinutes = _todayLessonMinutes(user);
     final progress = goal <= 0 ? 0.0 : (practiceMinutes / goal).clamp(0.0, 1.0);
     final remaining = (goal - practiceMinutes).clamp(0, goal);
+    final signCount = _displayedSigns(user);
 
     return NeoPanel(
       color: AppTheme.softPeach,
@@ -477,7 +510,7 @@ class _HomePageState extends State<HomePage> {
           ),
           const SizedBox(height: 6),
           Text(
-            '${user?.totalLessonsCompleted ?? 0} lessons • ${user?.totalSignsLearned ?? 0} signs',
+            '${user?.totalLessonsCompleted ?? 0} lessons • $signCount signs',
             style: const TextStyle(
               color: AppTheme.inkBlack,
               fontWeight: FontWeight.w700,

@@ -502,12 +502,47 @@ class AdminDatabaseService {
   }
 
   /// Legacy bool wrapper used by older code paths.
+  /// Soft-hides the learner without deleting data.
   Future<bool> deleteLearner(String learnerId) async {
-    final result = await deleteLearnerCompletely(learnerId);
+    final result = await hideLearner(learnerId);
     return result.success;
   }
 
+  /// Soft-hide learner without deleting data.
+  Future<AdminActionResult> hideLearner(String learnerId) async {
+    try {
+      await _db.collection('users').doc(learnerId).update({
+        'isActive': false,
+        'isHidden': true,
+        'statusUpdatedAt': FieldValue.serverTimestamp(),
+        'hiddenAt': FieldValue.serverTimestamp(),
+      });
+
+      await _logAuditAction(
+        action: 'hide',
+        entityType: 'learner',
+        entityId: learnerId,
+        changes: <String, dynamic>{
+          'isActive': false,
+          'isHidden': true,
+        },
+      );
+
+      return const AdminActionResult(
+        success: true,
+        message: 'Learner hidden. Data stays in place.',
+      );
+    } catch (e) {
+      debugPrint('Error hiding learner: $e');
+      return const AdminActionResult(
+        success: false,
+        message: 'Could not hide learner. Please try again.',
+      );
+    }
+  }
+
   /// Delete learner firestore + auth account through an admin-only backend function.
+  /// Prefer hideLearner for soft deletion.
   Future<AdminActionResult> deleteLearnerCompletely(String learnerId) async {
     try {
       final callable = _functions.httpsCallable('deleteLearnerAccount');

@@ -120,7 +120,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   }
 
   List<UserModel> get _filteredLearners {
-    var items = _users;
+    var items = _users.where((u) => !u.isHidden).toList();
     switch (_statusFilter) {
       case 'Active':
         return items.where((u) => u.isActive).toList();

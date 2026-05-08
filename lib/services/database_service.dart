@@ -478,6 +478,7 @@ class DatabaseService {
     final user = await getCurrentUser();
     final currentLevel = user?.currentLevel ?? 1;
     final categories = await getCategories();
+    final progressIndex = await getLessonProgressIndex();
 
     for (final category in categories) {
       final categoryLocked =
@@ -490,8 +491,8 @@ class DatabaseService {
 
         if (lesson.requiredLessonId != null &&
             lesson.requiredLessonId!.trim().isNotEmpty) {
-          final required = await getLessonProgress(lesson.requiredLessonId!);
-          if (required?.status != 'completed') continue;
+          final required = progressIndex[lesson.requiredLessonId!];
+          if (required == null || required.status != 'completed') continue;
         }
 
         return ActivationLessonRef(
@@ -567,6 +568,20 @@ class DatabaseService {
       return LessonProgress.fromFirestore(doc);
     }
     return null;
+  }
+
+  Future<Map<String, LessonProgress>> getLessonProgressIndex() async {
+    if (currentUserId == null) return <String, LessonProgress>{};
+    final snapshot = await _db
+        .collection('users')
+        .doc(currentUserId)
+        .collection('progress')
+        .get();
+    final index = <String, LessonProgress>{};
+    for (final doc in snapshot.docs) {
+      index[doc.id] = LessonProgress.fromFirestore(doc);
+    }
+    return index;
   }
 
   Future<void> startLesson(String lessonId, String categoryId) async {

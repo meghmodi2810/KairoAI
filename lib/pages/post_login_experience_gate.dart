@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../main_navigation.dart';
 import '../models/experience_models.dart';
@@ -29,7 +30,9 @@ class _PostLoginExperienceGateState extends State<PostLoginExperienceGate> {
   int _tourIndex = 0;
   bool _activationRouteOpen = false;
   bool _resolvingActivation = false;
+  bool _showActivationBanner = false;
   String? _lastPushedActivationKey;
+  Timer? _activationBannerTimer;
 
   static const List<_TourCopy> _tour = [
     _TourCopy(
@@ -147,6 +150,14 @@ class _PostLoginExperienceGateState extends State<PostLoginExperienceGate> {
   Future<void> _startActivation(ExperienceState state) async {
     if (_activationRouteOpen || _resolvingActivation) return;
     _resolvingActivation = true;
+    _activationBannerTimer?.cancel();
+    if (mounted) {
+      setState(() => _showActivationBanner = false);
+    }
+    _activationBannerTimer = Timer(const Duration(milliseconds: 500), () {
+      if (!mounted || !_resolvingActivation) return;
+      setState(() => _showActivationBanner = true);
+    });
 
     try {
       var categoryId = state.activationCategoryId;
@@ -199,6 +210,11 @@ class _PostLoginExperienceGateState extends State<PostLoginExperienceGate> {
         ),
       );
     } finally {
+      _activationBannerTimer?.cancel();
+      _activationBannerTimer = null;
+      if (mounted) {
+        setState(() => _showActivationBanner = false);
+      }
       _activationRouteOpen = false;
       _resolvingActivation = false;
     }
@@ -206,6 +222,7 @@ class _PostLoginExperienceGateState extends State<PostLoginExperienceGate> {
 
   @override
   void dispose() {
+    _activationBannerTimer?.cancel();
     _navigationController.dispose();
     super.dispose();
   }
@@ -255,7 +272,7 @@ class _PostLoginExperienceGateState extends State<PostLoginExperienceGate> {
           child: Stack(
             children: [
               appChild,
-              if (!showTour && _resolvingActivation)
+              if (!showTour && _showActivationBanner)
                 const _ResolvingActivationBanner(),
             ],
           ),
@@ -271,34 +288,41 @@ class _ResolvingActivationBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      left: 16,
-      right: 16,
+      left: 0,
+      right: 0,
       top: MediaQuery.of(context).padding.top + 12,
-      child: NeoPanel(
-        color: AppTheme.signalYellow,
-        radius: 16,
-        shadowOffset: 4,
-        child: const Row(
-          children: [
-            SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(
-                color: AppTheme.inkBlack,
-                strokeWidth: 2,
-              ),
-            ),
-            SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                'Preparing your first lesson...',
-                style: TextStyle(
-                  color: AppTheme.inkBlack,
-                  fontWeight: FontWeight.w900,
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 340),
+          child: NeoPanel(
+            color: AppTheme.signalYellow,
+            radius: 14,
+            shadowOffset: 4,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: const Row(
+              children: [
+                SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    color: AppTheme.inkBlack,
+                    strokeWidth: 2,
+                  ),
                 ),
-              ),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Starting your first lesson...',
+                    style: TextStyle(
+                      color: AppTheme.inkBlack,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
