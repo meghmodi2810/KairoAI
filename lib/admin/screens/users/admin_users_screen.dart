@@ -120,7 +120,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   }
 
   List<UserModel> get _filteredLearners {
-    var items = _users.where((u) => !u.isHidden).toList();
+    final items = List<UserModel>.from(_users);
     switch (_statusFilter) {
       case 'Active':
         return items.where((u) => u.isActive).toList();
@@ -152,168 +152,22 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   }
 
   Future<void> _openCreateUserDialog() async {
-    final hostContext = context;
-    final nameCtrl = TextEditingController(text: 'Lisa Jisaheb');
-    final emailCtrl = TextEditingController();
-    final passwordCtrl = TextEditingController();
-    var role = _scope == 'Admins' ? _CreateUserRole.admin : _CreateUserRole.learner;
-    var submitting = false;
-
+    final initialRole = _scope == 'Admins'
+        ? _CreateUserRole.admin
+        : _CreateUserRole.learner;
     final dialogResult = await showDialog<_CreateUserDialogResult>(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (localContext, setLocalState) {
-            final c = ac(localContext);
-            return AlertDialog(
-              title: const Text('Create new user'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    AdminInput(
-                      label: 'Display name',
-                      hint: 'Ayesha Khan',
-                      controller: nameCtrl,
-                    ),
-                    const SizedBox(height: 12),
-                    AdminInput(
-                      label: 'Email',
-                      hint: 'user@example.com',
-                      controller: emailCtrl,
-                      keyboardType: TextInputType.emailAddress,
-                    ),
-                    const SizedBox(height: 12),
-                    AdminInput(
-                      label: 'Temporary password',
-                      hint: 'At least 6 characters',
-                      controller: passwordCtrl,
-                      obscureText: true,
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<_CreateUserRole>(
-                      initialValue: role,
-                      decoration: const InputDecoration(labelText: 'Account type'),
-                      items: const [
-                        DropdownMenuItem(
-                          value: _CreateUserRole.learner,
-                          child: Text('Learner'),
-                        ),
-                        DropdownMenuItem(
-                          value: _CreateUserRole.admin,
-                          child: Text('Admin'),
-                        ),
-                      ],
-                      onChanged: submitting
-                          ? null
-                          : (nextRole) {
-                              if (nextRole == null) return;
-                              setLocalState(() => role = nextRole);
-                            },
-                    ),
-                    const SizedBox(height: 10),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        role == _CreateUserRole.admin
-                            ? 'Admins get full governance access.'
-                            : 'Learners can access lessons and assessments only.',
-                        style: adminMeta(c.textMuted),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: submitting
-                      ? null
-                      : () => Navigator.of(dialogContext, rootNavigator: true).pop(),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: submitting
-                      ? null
-                      : () async {
-                          final displayName = nameCtrl.text.trim();
-                          final email = emailCtrl.text.trim();
-                          final tempPassword = passwordCtrl.text.trim();
-
-                          if (displayName.isEmpty || email.isEmpty || tempPassword.isEmpty) {
-                            AdminToast.show(
-                              hostContext,
-                              'Name, email, and password are required.',
-                              type: AdminToastType.error,
-                            );
-                            return;
-                          }
-
-                          setLocalState(() => submitting = true);
-                          if (mounted) setState(() => _creatingUser = true);
-
-                          try {
-                            final result = await _db.createManagedUser(
-                              email: email,
-                              displayName: displayName,
-                              temporaryPassword: tempPassword,
-                              createAsAdmin: role == _CreateUserRole.admin,
-                              actingAdminId: widget.admin.id,
-                            );
-
-                            if (!mounted || !dialogContext.mounted) return;
-
-                            if (!result.success) {
-                              setLocalState(() => submitting = false);
-                              AdminToast.show(
-                                hostContext,
-                                result.message,
-                                type: AdminToastType.error,
-                              );
-                              return;
-                            }
-
-                            Navigator.of(dialogContext, rootNavigator: true).pop(
-                              _CreateUserDialogResult(result: result, role: role),
-                            );
-                          } catch (_) {
-                            if (dialogContext.mounted) {
-                              setLocalState(() => submitting = false);
-                            }
-                            if (mounted) {
-                              AdminToast.show(
-                                hostContext,
-                                'Could not create user account right now.',
-                                type: AdminToastType.error,
-                              );
-                            }
-                          } finally {
-                            if (mounted) setState(() => _creatingUser = false);
-                          }
-                        },
-                  child: submitting
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Create user'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (dialogContext) => _CreateUserDialog(
+        actingAdmin: widget.admin,
+        initialRole: initialRole,
+      ),
     );
 
-    nameCtrl.dispose();
-    emailCtrl.dispose();
-    passwordCtrl.dispose();
+    if (!mounted || dialogResult == null) return;
 
-    if (!mounted || dialogResult == null) {
-      return;
-    }
-
+    final result = dialogResult.result;
+    final role = dialogResult.role;
     AdminToast.show(
       context,
       dialogResult.result.message,
@@ -505,14 +359,22 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       appBar: AdminTopBar(
         title: 'Users',
         onMenuTap: widget.onMenuTap,
-        action: AdminTopBarIconButton(
-          icon: LucideIcons.plus,
-          onTap: () => AdminToast.show(
-            context,
-            'Learners are added when they sign up.',
-            type: AdminToastType.info,
-          ),
-        ),
+        action: _creatingUser
+            ? const SizedBox(
+                width: 42,
+                height: 42,
+                child: Center(
+                  child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              )
+            : AdminTopBarIconButton(
+                icon: LucideIcons.plus,
+                onTap: _openCreateUserDialog,
+              ),
       ),
       body: Column(
         children: [
@@ -599,7 +461,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                     : 'No learners yet',
                                 body: _search.isNotEmpty
                                     ? 'We couldn\'t find any learners named "$_search"'
-                                    : 'Active learners will appear here.',
+                                    : 'Learners will appear here. Use the plus button to add one.',
                               )
                             : RefreshIndicator(
                                 onRefresh: _loadFirst,
@@ -771,8 +633,14 @@ class _UserRow extends StatelessWidget {
             children: [
               Icon(LucideIcons.zap, size: 10, color: c.accent),
               const SizedBox(width: 4),
-              Text('${user.xp} XP · Lv ${user.currentLevel}',
-                   style: adminMeta(c.textSecondary)),
+              Text(
+                '${user.xp} XP - Lv ${user.currentLevel}',
+                style: adminMeta(c.textSecondary),
+              ),
+              if (user.isHidden) ...[
+                const SizedBox(width: 6),
+                Text('Hidden', style: adminMeta(c.textMuted)),
+              ],
             ],
           ),
         ],
@@ -785,6 +653,202 @@ class _UserRow extends StatelessWidget {
       isLast: isLast,
       onTap: onTap,
       minHeight: 68,
+    );
+  }
+}
+
+class _CreateUserDialog extends StatefulWidget {
+  final AdminModel actingAdmin;
+  final _CreateUserRole initialRole;
+
+  const _CreateUserDialog({
+    required this.actingAdmin,
+    required this.initialRole,
+  });
+
+  @override
+  State<_CreateUserDialog> createState() => _CreateUserDialogState();
+}
+
+class _CreateUserDialogState extends State<_CreateUserDialog> {
+  final _db = AdminDatabaseService();
+  final _nameCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  late _CreateUserRole _role;
+  bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _role = widget.initialRole;
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _emailCtrl.dispose();
+    _passwordCtrl.dispose();
+    super.dispose();
+  }
+
+  void _close() {
+    FocusScope.of(context).unfocus();
+    Navigator.of(context).maybePop();
+  }
+
+  Future<void> _submit() async {
+    final displayName = _nameCtrl.text.trim();
+    final email = _emailCtrl.text.trim();
+    final tempPassword = _passwordCtrl.text.trim();
+
+    if (displayName.isEmpty || email.isEmpty || tempPassword.isEmpty) {
+      AdminToast.show(
+        context,
+        'Name, email, and password are required.',
+        type: AdminToastType.error,
+      );
+      return;
+    }
+    if (tempPassword.length < 8) {
+      AdminToast.show(
+        context,
+        'Temporary password must be at least 8 characters.',
+        type: AdminToastType.error,
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() => _submitting = true);
+
+    try {
+      final result = await _db.createManagedUser(
+        email: email,
+        displayName: displayName,
+        temporaryPassword: tempPassword,
+        createAsAdmin: _role == _CreateUserRole.admin,
+        actingAdminId: widget.actingAdmin.id,
+      );
+
+      if (!mounted) return;
+
+      if (!result.success) {
+        setState(() => _submitting = false);
+        AdminToast.show(
+          context,
+          result.message,
+          type: AdminToastType.error,
+        );
+        return;
+      }
+
+      Navigator.of(context).pop(
+        _CreateUserDialogResult(
+          result: result,
+          role: _role,
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() => _submitting = false);
+        AdminToast.show(
+          context,
+          'Could not create user account right now.',
+          type: AdminToastType.error,
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ac(context);
+
+    return PopScope(
+      canPop: !_submitting,
+      child: AlertDialog(
+        title: const Text('Create new user'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AdminInput(
+                label: 'Display name',
+                hint: 'Lisa Jisaheb',
+                controller: _nameCtrl,
+                enabled: !_submitting,
+              ),
+              const SizedBox(height: 12),
+              AdminInput(
+                label: 'Email',
+                hint: 'user@example.com',
+                controller: _emailCtrl,
+                keyboardType: TextInputType.emailAddress,
+                enabled: !_submitting,
+              ),
+              const SizedBox(height: 12),
+              AdminInput(
+                label: 'Temporary password',
+                hint: 'At least 8 characters',
+                controller: _passwordCtrl,
+                obscureText: true,
+                enabled: !_submitting,
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<_CreateUserRole>(
+                value: _role,
+                decoration: const InputDecoration(
+                  labelText: 'Account type',
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: _CreateUserRole.learner,
+                    child: Text('Learner'),
+                  ),
+                  DropdownMenuItem(
+                    value: _CreateUserRole.admin,
+                    child: Text('Admin'),
+                  ),
+                ],
+                onChanged: _submitting
+                    ? null
+                    : (nextRole) {
+                        if (nextRole != null) {
+                          setState(() => _role = nextRole);
+                        }
+                      },
+              ),
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  _role == _CreateUserRole.admin
+                      ? 'Admins get full governance access.'
+                      : 'Learners can access lessons and assessments only.',
+                  style: adminMeta(c.textMuted),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: _submitting ? null : _close,
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: _submitting ? null : _submit,
+            child: _submitting
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Create user'),
+          ),
+        ],
+      ),
     );
   }
 }

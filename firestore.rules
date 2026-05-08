@@ -21,6 +21,16 @@ service cloud.firestore {
         get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.isActive == true;
     }
 
+    function hasDeletedBackup(userId) {
+      return exists(/databases/$(database)/documents/deleted_users_backup/$(userId));
+    }
+
+    function ownerCanUpdateOwnUser(userId) {
+      let changedKeys = request.resource.data.diff(resource.data).affectedKeys();
+      return isOwner(userId) &&
+        !changedKeys.hasAny(['isActive', 'isHidden']);
+    }
+
     // ==================== ADMINS COLLECTION ====================
     match /admins/{adminId} {
       // Admins can read their own document; active admins can read all
@@ -33,8 +43,11 @@ service cloud.firestore {
     match /users/{userId} {
       // Users can read/write their own doc; admins can read/write all
       allow read: if isOwner(userId) || isAdmin();
-      allow create: if isAuthenticated();
-      allow update, delete: if isOwner(userId) || isAdmin();
+      allow create: if (isAdmin() ||
+        (isOwner(userId) && request.auth.token.email_verified == true)) &&
+        !hasDeletedBackup(userId);
+      allow update: if isAdmin() || ownerCanUpdateOwnUser(userId);
+      allow delete: if isAdmin();
 
       // Progress subcollection
       match /progress/{progressId} {
@@ -154,14 +167,27 @@ service cloud.firestore {
     }
 
     // ==================== OTP VERIFICATIONS ====================
+    // OTP records are written and consumed only by trusted Cloud Functions.
     match /otp_verifications/{email} {
-      allow create, read, update: if true;
+      allow read, write: if false;
     }
 
     // ==================== DELETED USERS BACKUP ====================
+    // Backups are created only by trusted Cloud Functions; admins can inspect.
+    match /deleted_users_backup/{userId} {
+      allow read: if isAdmin();
+      allow write: if false;
+
+      match /{document=**} {
+        allow read: if isAdmin();
+        allow write: if false;
+      }
+    }
+
+    // Legacy backup path retained as admin-readable only.
     match /deleted_users/{userId} {
-      allow create: if isAdmin();
-      allow read, update, delete: if isAdmin();
+      allow read: if isAdmin();
+      allow write: if false;
     }
   }
 }

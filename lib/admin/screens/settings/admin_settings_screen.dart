@@ -318,7 +318,6 @@ class _AdminManagementTabState extends State<_AdminManagementTab> {
   final _db = AdminDatabaseService();
   String? _busyAdminId;
 
-  @override
   Future<void> _toggleAdminStatus(AdminModel target, bool toActive) async {
     final title = toActive ? 'Reactivate admin?' : 'Deactivate admin?';
     final body = toActive

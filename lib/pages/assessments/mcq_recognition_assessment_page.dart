@@ -4,6 +4,7 @@ import '../../models/app_models.dart';
 import '../../models/lesson_assessment_models.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/neo_brutal_widgets.dart';
+import '../../widgets/kairo_coach_overlay.dart';
 
 enum McqQuestionScope { oneRandom, allSigns }
 
@@ -12,6 +13,7 @@ class McqRecognitionAssessmentPage extends StatefulWidget {
   final Map<String, String> imageRefsBySignId;
   final List<String> globalDistractorPool;
   final McqQuestionScope questionScope;
+  final bool showIntroCoach;
 
   const McqRecognitionAssessmentPage({
     super.key,
@@ -19,6 +21,7 @@ class McqRecognitionAssessmentPage extends StatefulWidget {
     required this.imageRefsBySignId,
     required this.globalDistractorPool,
     this.questionScope = McqQuestionScope.allSigns,
+    this.showIntroCoach = false,
   });
 
   @override
@@ -39,8 +42,10 @@ class _McqRecognitionAssessmentPageState
   int _attemptCount = 0;
   int _index = 0;
   bool _lockedQuestion = false;
+  late bool _showIntroCoach;
   String? _feedback;
   String? _contentError;
+  final GlobalKey _questionPanelKey = GlobalKey();
 
   _McqQuestionData get _currentQuestion => _questions[_index];
 
@@ -69,6 +74,7 @@ class _McqRecognitionAssessmentPageState
   @override
   void initState() {
     super.initState();
+    _showIntroCoach = widget.showIntroCoach;
     _setupQuestions();
   }
 
@@ -472,7 +478,7 @@ class _McqRecognitionAssessmentPageState
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
+    final page = WillPopScope(
       onWillPop: _onWillPop,
       child: Scaffold(
         backgroundColor: AppTheme.paperCream,
@@ -529,6 +535,7 @@ class _McqRecognitionAssessmentPageState
                       const SizedBox(height: 10),
                       Expanded(
                         child: NeoPanel(
+                          key: _questionPanelKey,
                           color: AppTheme.warmWhite,
                           radius: 16,
                           child: Column(
@@ -539,7 +546,9 @@ class _McqRecognitionAssessmentPageState
                                   aspectRatio: 4 / 3,
                                   child: SizedBox(
                                     width: double.infinity,
-                                    child: _buildQuestionImage(_currentQuestion),
+                                    child: _buildQuestionImage(
+                                      _currentQuestion,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -640,6 +649,22 @@ class _McqRecognitionAssessmentPageState
                 ),
               ),
       ),
+    );
+
+    return KairoCoachOverlay(
+      visible:
+          widget.showIntroCoach &&
+          _showIntroCoach &&
+          _contentError == null &&
+          _questions.isNotEmpty,
+      targetKey: _questionPanelKey,
+      title: 'Recognition check',
+      message:
+          'Look at the sign image, then choose the matching letter or number. You can skip a question if the content looks wrong.',
+      primaryLabel: 'Start',
+      onPrimary: () => setState(() => _showIntroCoach = false),
+      pose: KairoCoachPose.thinking,
+      child: page,
     );
   }
 }

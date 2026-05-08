@@ -131,38 +131,63 @@ class _CoachLayer extends StatefulWidget {
 
 class _CoachLayerState extends State<_CoachLayer> {
   Rect? _targetRect;
+  int _measureRetries = 0;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _measureTarget());
+    _queueMeasure(resetRetries: true);
   }
 
   @override
   void didUpdateWidget(covariant _CoachLayer oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.targetKey != widget.targetKey) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _measureTarget());
+      _queueMeasure(resetRetries: true);
     }
+  }
+
+  void _queueMeasure({bool resetRetries = false}) {
+    if (resetRetries) {
+      _measureRetries = 0;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measureTarget());
+  }
+
+  void _retryMeasure() {
+    if (widget.targetKey == null || _measureRetries >= 12) return;
+    _measureRetries += 1;
+    Future<void>.delayed(const Duration(milliseconds: 80), () {
+      if (mounted) {
+        _measureTarget();
+      }
+    });
   }
 
   void _measureTarget() {
     final targetContext = widget.targetKey?.currentContext;
     if (targetContext == null || !mounted) {
-      setState(() => _targetRect = null);
+      if (_targetRect != null) {
+        setState(() => _targetRect = null);
+      }
+      _retryMeasure();
       return;
     }
 
     final box = targetContext.findRenderObject() as RenderBox?;
     if (box == null || !box.hasSize) {
-      setState(() => _targetRect = null);
+      if (_targetRect != null) {
+        setState(() => _targetRect = null);
+      }
+      _retryMeasure();
       return;
     }
 
     final offset = box.localToGlobal(Offset.zero);
-    setState(() {
-      _targetRect = offset & box.size;
-    });
+    final nextRect = offset & box.size;
+    _measureRetries = 0;
+    if (_targetRect == nextRect) return;
+    setState(() => _targetRect = nextRect);
   }
 
   @override
@@ -416,7 +441,7 @@ class _FallbackMascot extends StatelessWidget {
               child: Image.asset(
                 'assets/logo/main_logo.png',
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) =>
+                errorBuilder: (context, error, stackTrace) =>
                     Icon(icon, color: AppTheme.inkBlack, size: 34),
               ),
             ),

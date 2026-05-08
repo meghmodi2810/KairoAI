@@ -94,7 +94,7 @@ class _LoginPageState extends State<LoginPage> {
 
   void _goToAuthGate() {
     if (!mounted) return;
-    Navigator.pushReplacement(
+    Navigator.pushAndRemoveUntil(
       context,
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) =>
@@ -103,6 +103,7 @@ class _LoginPageState extends State<LoginPage> {
         transitionsBuilder: (context, animation, secondaryAnimation, child) =>
             FadeTransition(opacity: animation, child: child),
       ),
+      (_) => false,
     );
   }
 
@@ -215,14 +216,24 @@ class _LoginPageState extends State<LoginPage> {
                                           Navigator.push(
                                             context,
                                             PageRouteBuilder(
-                                              pageBuilder: (_, __, ___) =>
-                                                  const ForgotPasswordPage(),
+                                              pageBuilder:
+                                                  (
+                                                    context,
+                                                    animation,
+                                                    secondaryAnimation,
+                                                  ) =>
+                                                      const ForgotPasswordPage(),
                                               transitionDuration:
                                                   const Duration(
                                                     milliseconds: 240,
                                                   ),
                                               transitionsBuilder:
-                                                  (_, animation, __, child) =>
+                                                  (
+                                                    context,
+                                                    animation,
+                                                    secondaryAnimation,
+                                                    child,
+                                                  ) =>
                                                       FadeTransition(
                                                         opacity: animation,
                                                         child: child,

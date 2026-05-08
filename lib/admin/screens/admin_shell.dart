@@ -67,7 +67,7 @@ class _AdminShellState extends State<AdminShell> {
 
     if (confirm && mounted) {
       // Use system pop to exit to the student side or logout depending on app flow
-      Navigator.of(context).pop();
+      Navigator.of(context).maybePop();
     }
   }
 

@@ -26,6 +26,7 @@ class MainNavigationTourTargets {
   static final learnTab = GlobalKey(debugLabel: 'tour_learn_tab');
   static final wordsTab = GlobalKey(debugLabel: 'tour_words_tab');
   static final profileTab = GlobalKey(debugLabel: 'tour_profile_tab');
+  static final profileIcon = GlobalKey(debugLabel: 'tour_profile_icon');
 
   static GlobalKey keyForIndex(int index) {
     return switch (index) {
@@ -182,6 +183,9 @@ class _FloatingNavBar extends StatelessWidget {
                   children: [
                     Icon(
                       items[i].icon,
+                      key: i == 3
+                          ? MainNavigationTourTargets.profileIcon
+                          : null,
                       size: 22,
                       color: selected ? AppTheme.warmWhite : context.textMuted,
                     ),

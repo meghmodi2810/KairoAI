@@ -127,6 +127,7 @@ class DatabaseService {
     String? activationLessonId,
     bool clearActivationLesson = false,
     ActivationStage? activationStage,
+    bool? lessonTourCompleted,
     DateTime? completedAt,
     bool clearCompletedAt = false,
   }) async {
@@ -151,6 +152,7 @@ class DatabaseService {
         activationLessonId: activationLessonId,
         clearActivationLesson: clearActivationLesson,
         activationStage: activationStage,
+        lessonTourCompleted: lessonTourCompleted,
         updatedAt: DateTime.now(),
         completedAt: completedAt,
         clearCompletedAt: clearCompletedAt,

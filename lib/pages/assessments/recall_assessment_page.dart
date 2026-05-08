@@ -6,11 +6,17 @@ import '../../models/lesson_assessment_models.dart';
 import '../../services/sign_detection_service.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/neo_brutal_widgets.dart';
+import '../../widgets/kairo_coach_overlay.dart';
 
 class RecallAssessmentPage extends StatefulWidget {
   final List<SignModel> signs;
+  final bool showIntroCoach;
 
-  const RecallAssessmentPage({super.key, required this.signs});
+  const RecallAssessmentPage({
+    super.key,
+    required this.signs,
+    this.showIntroCoach = false,
+  });
 
   @override
   State<RecallAssessmentPage> createState() => _RecallAssessmentPageState();
@@ -37,7 +43,9 @@ class _RecallAssessmentPageState extends State<RecallAssessmentPage>
   bool _cameraOn = false;
   bool _loading = true;
   bool _hasPermission = false;
+  late bool _showIntroCoach;
   bool _lastFrameHadHand = false;
+  final GlobalKey _targetPromptKey = GlobalKey();
   bool get _hasPrompts => _promptOrder.isNotEmpty;
 
   SignModel get _currentPrompt => _promptOrder[_index];
@@ -46,6 +54,7 @@ class _RecallAssessmentPageState extends State<RecallAssessmentPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _showIntroCoach = widget.showIntroCoach;
     _promptOrder = _selectPromptOrder(widget.signs);
     _initCamera();
   }
@@ -323,7 +332,7 @@ class _RecallAssessmentPageState extends State<RecallAssessmentPage>
               : '--')
         : '--';
 
-    return WillPopScope(
+    final page = WillPopScope(
       onWillPop: _onWillPop,
       child: Scaffold(
         backgroundColor: AppTheme.charcoalNight,
@@ -454,6 +463,7 @@ class _RecallAssessmentPageState extends State<RecallAssessmentPage>
               top: 130,
               right: 14,
               child: Container(
+                key: _targetPromptKey,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 10,
@@ -624,6 +634,18 @@ class _RecallAssessmentPageState extends State<RecallAssessmentPage>
           ],
         ),
       ),
+    );
+
+    return KairoCoachOverlay(
+      visible: widget.showIntroCoach && _showIntroCoach && _hasPrompts,
+      targetKey: _targetPromptKey,
+      title: 'Recall test',
+      message:
+          'I will show a target sign name. Perform it from memory with your camera until the match meter fills.',
+      primaryLabel: 'Start recall',
+      onPrimary: () => setState(() => _showIntroCoach = false),
+      pose: KairoCoachPose.point,
+      child: page,
     );
   }
 

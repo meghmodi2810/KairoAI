@@ -34,7 +34,6 @@ class WordsPage extends StatelessWidget {
                   trailing: uid == null
                       ? null
                       : StreamBuilder<DocumentSnapshot>(
-                          key: WordsTourTargets.gems,
                           stream: FirebaseFirestore.instance
                               .collection('users')
                               .doc(uid)
@@ -43,10 +42,13 @@ class WordsPage extends StatelessWidget {
                             final data =
                                 snapshot.data?.data() as Map<String, dynamic>?;
                             final gems = (data?['gems'] ?? 0) as int;
-                            return NeoSticker(
-                              label: '$gems GEMS',
-                              icon: Icons.diamond,
-                              color: AppTheme.signalYellow,
+                            return KeyedSubtree(
+                              key: WordsTourTargets.gems,
+                              child: NeoSticker(
+                                label: '$gems GEMS',
+                                icon: Icons.diamond,
+                                color: AppTheme.signalYellow,
+                              ),
                             );
                           },
                         ),

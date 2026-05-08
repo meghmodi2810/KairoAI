@@ -46,6 +46,7 @@ class ExperienceState {
   final String? activationCategoryId;
   final String? activationLessonId;
   final ActivationStage activationStage;
+  final bool lessonTourCompleted;
   final DateTime? updatedAt;
   final DateTime? completedAt;
 
@@ -57,6 +58,7 @@ class ExperienceState {
     this.activationCategoryId,
     this.activationLessonId,
     this.activationStage = ActivationStage.done,
+    this.lessonTourCompleted = true,
     this.updatedAt,
     this.completedAt,
   });
@@ -69,6 +71,7 @@ class ExperienceState {
       activationCategoryId = null,
       activationLessonId = null,
       activationStage = ActivationStage.openLesson,
+      lessonTourCompleted = false,
       updatedAt = null,
       completedAt = null;
 
@@ -81,25 +84,34 @@ class ExperienceState {
       tourStatus == ExperienceStatus.skipped;
 
   bool get needsActivation =>
-      activationRequired && activationStatus != ExperienceStatus.completed;
+      activationRequired &&
+      activationStatus != ExperienceStatus.completed &&
+      !lessonTourCompleted;
 
   factory ExperienceState.fromMap(Map<String, dynamic>? data) {
     if (data == null) {
       return const ExperienceState();
     }
+    final activationRequired = data['activationRequired'] == true;
+    final activationStatus = ExperienceStatus.fromValue(
+      data['activationStatus']?.toString(),
+    );
+    final rawLessonTourCompleted = data['lessonTourCompleted'];
+    final lessonTourCompleted = rawLessonTourCompleted is bool
+        ? rawLessonTourCompleted
+        : !activationRequired || activationStatus == ExperienceStatus.completed;
 
     return ExperienceState(
       tourStatus: ExperienceStatus.fromValue(data['tourStatus']?.toString()),
       tourStep: _stringOrNull(data['tourStep']),
-      activationRequired: data['activationRequired'] == true,
-      activationStatus: ExperienceStatus.fromValue(
-        data['activationStatus']?.toString(),
-      ),
+      activationRequired: activationRequired,
+      activationStatus: activationStatus,
       activationCategoryId: _stringOrNull(data['activationCategoryId']),
       activationLessonId: _stringOrNull(data['activationLessonId']),
       activationStage: ActivationStage.fromValue(
         data['activationStage']?.toString(),
       ),
+      lessonTourCompleted: lessonTourCompleted,
       updatedAt: _dateOrNull(data['updatedAt']),
       completedAt: _dateOrNull(data['completedAt']),
     );
@@ -114,6 +126,7 @@ class ExperienceState {
       'activationCategoryId': activationCategoryId,
       'activationLessonId': activationLessonId,
       'activationStage': activationStage.value,
+      'lessonTourCompleted': lessonTourCompleted,
       'updatedAt': updatedAt == null
           ? FieldValue.serverTimestamp()
           : Timestamp.fromDate(updatedAt!),
@@ -133,6 +146,7 @@ class ExperienceState {
     String? activationLessonId,
     bool clearActivationLesson = false,
     ActivationStage? activationStage,
+    bool? lessonTourCompleted,
     DateTime? updatedAt,
     DateTime? completedAt,
     bool clearCompletedAt = false,
@@ -149,6 +163,7 @@ class ExperienceState {
           ? null
           : activationLessonId ?? this.activationLessonId,
       activationStage: activationStage ?? this.activationStage,
+      lessonTourCompleted: lessonTourCompleted ?? this.lessonTourCompleted,
       updatedAt: updatedAt ?? this.updatedAt,
       completedAt: clearCompletedAt ? null : completedAt ?? this.completedAt,
     );

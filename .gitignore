@@ -45,9 +45,7 @@ app.*.map.json
 # Android Studio will place build artifacts here
 /android/app/debug
 /android/app/profile
-<<<<<<< HEAD
 /android/app/release
-=======
 /android/app/release
 
 
@@ -56,4 +54,7 @@ firebase.json
 upload_to_firebase.py
 firestore.rules
 **/google-services.json
->>>>>>> c16ebaed9c17ac9f88508a8bb88af34e99505c53
+
+# Add env to gitignore
+functions/.env
+functions/.env.*

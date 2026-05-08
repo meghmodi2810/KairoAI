@@ -7,7 +7,6 @@ import '../theme/app_theme.dart';
 import '../theme/neo_brutal_widgets.dart';
 import '../widgets/kairo_coach_overlay.dart';
 import 'learn_page.dart';
-import 'profile_page.dart';
 import 'sign_learning_page.dart';
 import 'words_page.dart';
 
@@ -116,7 +115,7 @@ class _PostLoginExperienceGateState extends State<PostLoginExperienceGate> {
       'lesson_characters' => LearnTourTargets.firstCategory,
       'gems' => WordsTourTargets.gems,
       'word_prerequisites' => WordsTourTargets.firstWordGroup,
-      'profile' => ProfileTourTargets.completedSigns,
+      'profile' => MainNavigationTourTargets.profileIcon,
       _ => null,
     };
   }
@@ -170,6 +169,7 @@ class _PostLoginExperienceGateState extends State<PostLoginExperienceGate> {
             activationRequired: false,
             activationStatus: ExperienceStatus.completed,
             activationStage: ActivationStage.done,
+            lessonTourCompleted: true,
             completedAt: DateTime.now(),
           );
           return;
@@ -186,6 +186,7 @@ class _PostLoginExperienceGateState extends State<PostLoginExperienceGate> {
           activationRequired: false,
           activationStatus: ExperienceStatus.completed,
           activationStage: ActivationStage.done,
+          lessonTourCompleted: true,
           completedAt: DateTime.now(),
         );
         return;
@@ -198,6 +199,7 @@ class _PostLoginExperienceGateState extends State<PostLoginExperienceGate> {
         activationStage: ActivationStage.openLesson,
         clearCompletedAt: true,
       );
+      if (!mounted) return;
 
       _activationRouteOpen = true;
       await Navigator.of(context).push(

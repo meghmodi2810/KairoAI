@@ -5,7 +5,7 @@ import '../theme/app_theme.dart';
 import '../theme/neo_brutal_widgets.dart';
 import '../services/notification_service.dart';
 import '../services/audio_service.dart';
-import 'login_page.dart';
+import '../auth_wrapper.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -28,6 +28,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     setState(() {
       _soundEnabled = AudioService().soundEnabled;
       _verbosity = NotificationService().verbosity;
@@ -75,20 +76,30 @@ class _SettingsPageState extends State<SettingsPage> {
     );
 
     if (picked != null) {
-      await NotificationService().setCustomReminderTime(picked.hour, picked.minute);
+      await NotificationService().setCustomReminderTime(
+        picked.hour,
+        picked.minute,
+      );
+      if (!mounted) return;
       setState(() {
         _reminderHour = picked.hour;
         _reminderMinute = picked.minute;
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Reminder set for ${picked.format(context)}'),
-            backgroundColor: AppTheme.mintGreen,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Reminder set for ${picked.format(context)}'),
+          backgroundColor: AppTheme.mintGreen,
+        ),
+      );
     }
+  }
+
+  Future<void> _returnToAuthGate() async {
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const AuthWrapper()),
+      (_) => false,
+    );
   }
 
   @override
@@ -136,7 +147,10 @@ class _SettingsPageState extends State<SettingsPage> {
                     child: NeoPanel(
                       color: AppTheme.signalYellow,
                       radius: 14,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
                       shadow: false,
                       child: const Text(
                         'SETTINGS',
@@ -184,14 +198,20 @@ class _SettingsPageState extends State<SettingsPage> {
                             Switch(
                               value: _soundEnabled,
                               onChanged: _toggleSound,
-                              activeColor: AppTheme.mintGreen,
+                              activeThumbColor: AppTheme.mintGreen,
                               activeTrackColor: AppTheme.inkBlack,
                               inactiveThumbColor: AppTheme.paperCream,
-                              inactiveTrackColor: AppTheme.inkBlack.withValues(alpha: 0.5),
+                              inactiveTrackColor: AppTheme.inkBlack.withValues(
+                                alpha: 0.5,
+                              ),
                             ),
                           ],
                         ),
-                        const Divider(color: AppTheme.inkBlack, thickness: 2, height: 24),
+                        const Divider(
+                          color: AppTheme.inkBlack,
+                          thickness: 2,
+                          height: 24,
+                        ),
                         const Text(
                           'Notifications',
                           style: TextStyle(
@@ -206,25 +226,46 @@ class _SettingsPageState extends State<SettingsPage> {
                           decoration: BoxDecoration(
                             color: AppTheme.paperCream,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppTheme.inkBlack, width: 2),
+                            border: Border.all(
+                              color: AppTheme.inkBlack,
+                              width: 2,
+                            ),
                           ),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<NotificationVerbosity>(
                               value: _verbosity,
                               isExpanded: true,
-                              icon: const Icon(Icons.keyboard_arrow_down, color: AppTheme.inkBlack),
+                              icon: const Icon(
+                                Icons.keyboard_arrow_down,
+                                color: AppTheme.inkBlack,
+                              ),
                               items: const [
                                 DropdownMenuItem(
                                   value: NotificationVerbosity.off,
-                                  child: Text('Turn off all', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  child: Text(
+                                    'Turn off all',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                 ),
                                 DropdownMenuItem(
                                   value: NotificationVerbosity.minimal,
-                                  child: Text('Minimal notifications', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  child: Text(
+                                    'Minimal notifications',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                 ),
                                 DropdownMenuItem(
                                   value: NotificationVerbosity.all,
-                                  child: Text('All notifications', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  child: Text(
+                                    'All notifications',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                                 ),
                               ],
                               onChanged: _updateVerbosity,
@@ -250,30 +291,43 @@ class _SettingsPageState extends State<SettingsPage> {
                                 foregroundColor: AppTheme.warmWhite,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(8),
-                                  side: const BorderSide(color: AppTheme.inkBlack, width: 2),
+                                  side: const BorderSide(
+                                    color: AppTheme.inkBlack,
+                                    width: 2,
+                                  ),
                                 ),
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
                               ),
                               child: Text(
                                 reminderText,
-                                style: const TextStyle(fontWeight: FontWeight.bold),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ],
                         ),
-                        const Divider(color: AppTheme.inkBlack, thickness: 2, height: 24),
+                        const Divider(
+                          color: AppTheme.inkBlack,
+                          thickness: 2,
+                          height: 24,
+                        ),
                         NeoSecondaryButton(
                           label: 'Send Test Notification',
                           onPressed: () async {
                             await NotificationService().sendTestNotification();
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Test notification will appear in ~3 seconds.'),
-                                  backgroundColor: AppTheme.mintGreen,
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Test notification will appear in ~3 seconds.',
                                 ),
-                              );
-                            }
+                                backgroundColor: AppTheme.mintGreen,
+                              ),
+                            );
                           },
                           icon: Icons.notifications_active_rounded,
                         ),
@@ -300,7 +354,11 @@ class _SettingsPageState extends State<SettingsPage> {
                           label: 'Need Help',
                           onPressed: () {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Help and support will be available soon.')),
+                              const SnackBar(
+                                content: Text(
+                                  'Help and support will be available soon.',
+                                ),
+                              ),
                             );
                           },
                           icon: Icons.help_outline,
@@ -328,14 +386,18 @@ class _SettingsPageState extends State<SettingsPage> {
                           width: double.infinity,
                           child: OutlinedButton.icon(
                             onPressed: () async {
-                              final email = FirebaseAuth.instance.currentUser?.email;
+                              final email =
+                                  FirebaseAuth.instance.currentUser?.email;
                               if (email != null && email.isNotEmpty) {
                                 try {
-                                  await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+                                  await FirebaseAuth.instance
+                                      .sendPasswordResetEmail(email: email);
                                   if (!context.mounted) return;
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('Password reset email sent.'),
+                                      content: Text(
+                                        'Password reset email sent.',
+                                      ),
                                       backgroundColor: AppTheme.mintGreen,
                                     ),
                                   );
@@ -343,7 +405,9 @@ class _SettingsPageState extends State<SettingsPage> {
                                   if (!context.mounted) return;
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('Failed to send reset email.'),
+                                      content: Text(
+                                        'Failed to send reset email.',
+                                      ),
                                       backgroundColor: AppTheme.punchRed,
                                     ),
                                   );
@@ -351,10 +415,16 @@ class _SettingsPageState extends State<SettingsPage> {
                               }
                             },
                             icon: const Icon(Icons.lock_reset_rounded),
-                            label: const Text('Change Password', style: TextStyle(fontWeight: FontWeight.bold)),
+                            label: const Text(
+                              'Change Password',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 14),
-                              side: const BorderSide(color: AppTheme.inkBlack, width: 2),
+                              side: const BorderSide(
+                                color: AppTheme.inkBlack,
+                                width: 2,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -373,28 +443,50 @@ class _SettingsPageState extends State<SettingsPage> {
                                   backgroundColor: AppTheme.paperCream,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16),
-                                    side: const BorderSide(color: AppTheme.inkBlack, width: 3),
+                                    side: const BorderSide(
+                                      color: AppTheme.inkBlack,
+                                      width: 3,
+                                    ),
                                   ),
                                   title: const Text(
                                     'Log Out',
-                                    style: TextStyle(fontWeight: FontWeight.w900, color: AppTheme.inkBlack),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      color: AppTheme.inkBlack,
+                                    ),
                                   ),
                                   content: const Text(
                                     'Are you sure you want to log out?',
-                                    style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.inkBlack),
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.inkBlack,
+                                    ),
                                   ),
                                   actions: [
                                     TextButton(
-                                      onPressed: () => Navigator.pop(context, false),
-                                      child: const Text('Cancel', style: TextStyle(color: AppTheme.inkBlack, fontWeight: FontWeight.bold)),
+                                      onPressed: () =>
+                                          Navigator.pop(context, false),
+                                      child: const Text(
+                                        'Cancel',
+                                        style: TextStyle(
+                                          color: AppTheme.inkBlack,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                                     ),
                                     ElevatedButton(
-                                      onPressed: () => Navigator.pop(context, true),
+                                      onPressed: () =>
+                                          Navigator.pop(context, true),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: AppTheme.punchRed,
                                         foregroundColor: Colors.white,
                                       ),
-                                      child: const Text('Log Out', style: TextStyle(fontWeight: FontWeight.bold)),
+                                      child: const Text(
+                                        'Log Out',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -403,10 +495,7 @@ class _SettingsPageState extends State<SettingsPage> {
                               if (confirm == true) {
                                 await FirebaseAuth.instance.signOut();
                                 if (!context.mounted) return;
-                                Navigator.of(context).pushAndRemoveUntil(
-                                  MaterialPageRoute(builder: (_) => const LoginPage()),
-                                  (_) => false,
-                                );
+                                await _returnToAuthGate();
                               }
                             },
                             style: ElevatedButton.styleFrom(
@@ -414,11 +503,20 @@ class _SettingsPageState extends State<SettingsPage> {
                               foregroundColor: AppTheme.warmWhite,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                side: const BorderSide(color: AppTheme.inkBlack, width: 2),
+                                side: const BorderSide(
+                                  color: AppTheme.inkBlack,
+                                  width: 2,
+                                ),
                               ),
                             ),
                             icon: const Icon(Icons.logout_rounded),
-                            label: const Text('Log out', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            label: const Text(
+                              'Log out',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
                           ),
                         ),
                       ],

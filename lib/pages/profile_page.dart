@@ -17,8 +17,16 @@ class ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final uid = FirebaseAuth.instance.currentUser?.uid;
     final user = FirebaseAuth.instance.currentUser;
+    if (uid == null || uid.isEmpty) {
+      return const Scaffold(
+        backgroundColor: AppTheme.paperCream,
+        body: Center(
+          child: CircularProgressIndicator(color: AppTheme.cobaltBlue),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: AppTheme.paperCream,
@@ -30,31 +38,31 @@ class ProfilePage extends StatelessWidget {
         builder: (context, snapshot) {
           final data = snapshot.data?.data() as Map<String, dynamic>?;
 
-          final name =
-              (data?['displayName'] ?? user?.displayName ?? 'Learner')
-                  as String;
+          final name = (data?['displayName'] ?? user?.displayName ?? 'Learner')
+              .toString();
           final email = user?.email ?? '';
-          final xp = (data?['xp'] ?? 0) as int;
+          final xp = (data?['xp'] as num?)?.toInt() ?? 0;
           final storedLevel = data?['currentLevel'];
           final level = (storedLevel is int && storedLevel > 0)
               ? storedLevel
               : DatabaseService.computeLevel(xp);
-          final streak = (data?['streakDays'] ?? 0) as int;
-          final gems = (data?['gems'] ?? 0) as int;
+          final streak = (data?['streakDays'] as num?)?.toInt() ?? 0;
+          final gems = (data?['gems'] as num?)?.toInt() ?? 0;
           final completedSignCharacters = normalizeSignCharacters(
             (data?['completedSignCharacters'] as List<dynamic>? ?? const [])
                 .map((value) => value.toString()),
           );
-            final lessonsCompleted = (data?['totalLessonsCompleted'] ?? 0) as int;
-            final uniqueSigns = completedSignCharacters.length;
-            final rawTotalSigns = data?['totalSignsLearned'];
-            final totalSigns = rawTotalSigns is num
+          final lessonsCompleted =
+              (data?['totalLessonsCompleted'] as num?)?.toInt() ?? 0;
+          final uniqueSigns = completedSignCharacters.length;
+          final rawTotalSigns = data?['totalSignsLearned'];
+          final totalSigns = rawTotalSigns is num
               ? rawTotalSigns.toInt()
               : (rawTotalSigns is String
-                ? int.tryParse(rawTotalSigns)
-                : null) ??
-                0;
-            final signsLearned = totalSigns >= uniqueSigns
+                        ? int.tryParse(rawTotalSigns)
+                        : null) ??
+                    0;
+          final signsLearned = totalSigns >= uniqueSigns
               ? totalSigns
               : uniqueSigns;
 
@@ -417,6 +425,7 @@ class _CompletedSignWrap extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 Future<void> _showIssueReportDialog(
   BuildContext context, {
   required String reporterUid,

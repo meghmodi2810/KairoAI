@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -12,7 +11,6 @@ import 'package:kairo_ai/models/app_models.dart';
 class AdminDatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
-  final FirebaseFunctions _functions = FirebaseFunctions.instance;
 
   String _normalizeIssueStatus(String status) {
     final normalized = status.trim().toLowerCase();
@@ -33,7 +31,10 @@ class AdminDatabaseService {
   }
 
   /// Get lesson by ID
-  Future<AdminLessonModel?> getLesson(String categoryId, String lessonId) async {
+  Future<AdminLessonModel?> getLesson(
+    String categoryId,
+    String lessonId,
+  ) async {
     final doc = await _db
         .collection('categories')
         .doc(categoryId)
@@ -54,15 +55,18 @@ class AdminDatabaseService {
           .doc(lesson.categoryId)
           .collection('lessons')
           .add({
-        ...lesson.toFirestore(),
-        'totalSigns': lesson.signs.length,
-        'subtitle': lesson.description,
-      });
+            ...lesson.toFirestore(),
+            'totalSigns': lesson.signs.length,
+            'subtitle': lesson.description,
+          });
 
       // Sync embedded signs to the signs subcollection for learner access
       if (lesson.signs.isNotEmpty) {
         await _syncSignsToSubcollection(
-            lesson.categoryId, docRef.id, lesson.signs);
+          lesson.categoryId,
+          docRef.id,
+          lesson.signs,
+        );
       }
 
       await _logAuditAction(
@@ -80,7 +84,10 @@ class AdminDatabaseService {
 
   /// Update lesson — updates in categories/{categoryId}/lessons
   Future<bool> updateLesson(
-      String categoryId, String lessonId, Map<String, dynamic> updates) async {
+    String categoryId,
+    String lessonId,
+    Map<String, dynamic> updates,
+  ) async {
     try {
       updates['updatedAt'] = FieldValue.serverTimestamp();
       await _db
@@ -219,7 +226,11 @@ class AdminDatabaseService {
         .collection('word_groups')
         .orderBy('order')
         .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => WordGroupModel.fromFirestore(doc)).toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => WordGroupModel.fromFirestore(doc))
+              .toList(),
+        );
   }
 
   /// Get word group by ID
@@ -234,7 +245,9 @@ class AdminDatabaseService {
   /// Create word group
   Future<String?> createWordGroup(WordGroupModel group) async {
     try {
-      final docRef = await _db.collection('word_groups').add(group.toFirestore());
+      final docRef = await _db
+          .collection('word_groups')
+          .add(group.toFirestore());
       await _logAuditAction(
         action: 'create',
         entityType: 'word_group',
@@ -249,7 +262,10 @@ class AdminDatabaseService {
   }
 
   /// Update word group
-  Future<bool> updateWordGroup(String groupId, Map<String, dynamic> updates) async {
+  Future<bool> updateWordGroup(
+    String groupId,
+    Map<String, dynamic> updates,
+  ) async {
     try {
       updates['updatedAt'] = FieldValue.serverTimestamp();
       await _db.collection('word_groups').doc(groupId).update(updates);
@@ -275,11 +291,11 @@ class AdminDatabaseService {
           .doc(groupId)
           .collection('words')
           .get();
-      
+
       for (final doc in wordsSnapshot.docs) {
         await doc.reference.delete();
       }
-      
+
       await _db.collection('word_groups').doc(groupId).delete();
       await _logAuditAction(
         action: 'delete',
@@ -300,7 +316,7 @@ class AdminDatabaseService {
         .doc(groupId)
         .collection('words')
         .get();
-    
+
     await _db.collection('word_groups').doc(groupId).update({
       'totalWords': wordsSnapshot.docs.length,
     });
@@ -328,13 +344,16 @@ class AdminDatabaseService {
         .collection('words')
         .orderBy('order')
         .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => WordModel.fromFirestore(doc)).toList());
+        .map(
+          (snapshot) =>
+              snapshot.docs.map((doc) => WordModel.fromFirestore(doc)).toList(),
+        );
   }
 
   /// Add word to group
   Future<String> addWord(String groupId, WordModel word) async {
     _validateWordCharacters(word.text);
-    
+
     // Check for duplicate normalizedText
     final duplicates = await _db
         .collection('word_groups')
@@ -342,7 +361,7 @@ class AdminDatabaseService {
         .collection('words')
         .where('normalizedText', isEqualTo: word.normalizedText)
         .get();
-        
+
     if (duplicates.docs.isNotEmpty) {
       throw Exception('A word with this text already exists in this group.');
     }
@@ -352,9 +371,9 @@ class AdminDatabaseService {
         .doc(groupId)
         .collection('words')
         .add(word.toFirestore());
-        
+
     await _updateWordGroupTotalWords(groupId);
-        
+
     await _logAuditAction(
       action: 'create',
       entityType: 'word',
@@ -365,12 +384,16 @@ class AdminDatabaseService {
   }
 
   /// Update word
-  Future<bool> updateWord(String groupId, String wordId, Map<String, dynamic> updates) async {
+  Future<bool> updateWord(
+    String groupId,
+    String wordId,
+    Map<String, dynamic> updates,
+  ) async {
     try {
       if (updates.containsKey('text')) {
         _validateWordCharacters(updates['text']);
         final normalizedText = (updates['text'] as String).toUpperCase();
-        
+
         // Check for duplicate
         final duplicates = await _db
             .collection('word_groups')
@@ -378,9 +401,11 @@ class AdminDatabaseService {
             .collection('words')
             .where('normalizedText', isEqualTo: normalizedText)
             .get();
-            
+
         if (duplicates.docs.any((doc) => doc.id != wordId)) {
-          throw Exception('A word with this text already exists in this group.');
+          throw Exception(
+            'A word with this text already exists in this group.',
+          );
         }
       }
 
@@ -412,9 +437,9 @@ class AdminDatabaseService {
           .collection('words')
           .doc(wordId)
           .delete();
-          
+
       await _updateWordGroupTotalWords(groupId);
-          
+
       await _logAuditAction(
         action: 'delete',
         entityType: 'word',
@@ -428,8 +453,6 @@ class AdminDatabaseService {
   }
 
   // ==================== LEARNER OPERATIONS ====================
-
-
 
   /// Get learner by ID
   Future<UserModel?> getLearner(String learnerId) async {
@@ -446,7 +469,10 @@ class AdminDatabaseService {
   }
 
   /// Update learner
-  Future<bool> updateLearner(String learnerId, Map<String, dynamic> updates) async {
+  Future<bool> updateLearner(
+    String learnerId,
+    Map<String, dynamic> updates,
+  ) async {
     try {
       await _db.collection('users').doc(learnerId).update(updates);
       await _logAuditAction(
@@ -471,11 +497,11 @@ class AdminDatabaseService {
           .doc(learnerId)
           .collection('progress')
           .get();
-      
+
       for (final doc in progressSnapshot.docs) {
         await doc.reference.delete();
       }
-      
+
       // Reset canonical learner stats
       await _db.collection('users').doc(learnerId).update({
         'xp': 0,
@@ -488,7 +514,7 @@ class AdminDatabaseService {
         'streakDays': 0,
         'lastStreakDate': null,
       });
-      
+
       await _logAuditAction(
         action: 'reset_progress',
         entityType: 'learner',
@@ -501,98 +527,6 @@ class AdminDatabaseService {
     }
   }
 
-  /// Legacy bool wrapper used by older code paths.
-  /// Soft-hides the learner without deleting data.
-  Future<bool> deleteLearner(String learnerId) async {
-    final result = await hideLearner(learnerId);
-    return result.success;
-  }
-
-  /// Soft-hide learner without deleting data.
-  Future<AdminActionResult> hideLearner(String learnerId) async {
-    try {
-      await _db.collection('users').doc(learnerId).update({
-        'isActive': false,
-        'isHidden': true,
-        'statusUpdatedAt': FieldValue.serverTimestamp(),
-        'hiddenAt': FieldValue.serverTimestamp(),
-      });
-
-      await _logAuditAction(
-        action: 'hide',
-        entityType: 'learner',
-        entityId: learnerId,
-        changes: <String, dynamic>{
-          'isActive': false,
-          'isHidden': true,
-        },
-      );
-
-      return const AdminActionResult(
-        success: true,
-        message: 'Learner hidden. Data stays in place.',
-      );
-    } catch (e) {
-      debugPrint('Error hiding learner: $e');
-      return const AdminActionResult(
-        success: false,
-        message: 'Could not hide learner. Please try again.',
-      );
-    }
-  }
-
-  /// Delete learner firestore + auth account through an admin-only backend function.
-  /// Prefer hideLearner for soft deletion.
-  Future<AdminActionResult> deleteLearnerCompletely(String learnerId) async {
-    try {
-      final callable = _functions.httpsCallable('deleteLearnerAccount');
-      final response = await callable.call(<String, dynamic>{
-        'learnerId': learnerId,
-      });
-
-      final payload = (response.data is Map)
-          ? Map<String, dynamic>.from(response.data as Map)
-          : <String, dynamic>{};
-      final success = payload['success'] == true;
-
-      if (!success) {
-        final backendMessage = (payload['message'] ?? '').toString().trim();
-        return AdminActionResult(
-          success: false,
-          message: backendMessage.isNotEmpty
-              ? backendMessage
-              : 'Deletion could not be completed on the backend.',
-        );
-      }
-
-      await _logAuditAction(
-        action: 'delete',
-        entityType: 'learner',
-        entityId: learnerId,
-        changes: <String, dynamic>{'fullDelete': true},
-      );
-
-      return const AdminActionResult(
-        success: true,
-        message: 'Learner removed from Authentication and Firestore.',
-      );
-    } on FirebaseFunctionsException catch (e) {
-      final backendMessage = (e.message ?? '').trim();
-      return AdminActionResult(
-        success: false,
-        message: backendMessage.isNotEmpty
-            ? backendMessage
-            : 'Secure deletion endpoint is unavailable right now.',
-      );
-    } catch (e) {
-      debugPrint('Error deleting learner: $e');
-      return const AdminActionResult(
-        success: false,
-        message: 'Delete failed before completion. Nothing was removed in UI.',
-      );
-    }
-  }
-
   /// Get learners with pagination
   Future<LearnerQueryResult> getLearners({
     int limit = 25,
@@ -600,7 +534,9 @@ class AdminDatabaseService {
     String? searchQuery,
   }) async {
     try {
-      Query query = _db.collection('users').orderBy('createdAt', descending: true);
+      Query query = _db
+          .collection('users')
+          .orderBy('createdAt', descending: true);
 
       if (searchQuery != null && searchQuery.isNotEmpty) {
         // Simple prefix search
@@ -616,7 +552,9 @@ class AdminDatabaseService {
       }
 
       final snapshot = await query.limit(limit).get();
-      final learners = snapshot.docs.map((doc) => UserModel.fromFirestore(doc)).toList();
+      final learners = snapshot.docs
+          .map((doc) => UserModel.fromFirestore(doc))
+          .toList();
 
       return LearnerQueryResult(
         learners: learners,
@@ -634,12 +572,17 @@ class AdminDatabaseService {
     try {
       await _db.collection('users').doc(learnerId).update({
         'isActive': isActive,
+        'isHidden': false,
         'statusUpdatedAt': FieldValue.serverTimestamp(),
       });
       await _logAuditAction(
         action: isActive ? 'activate' : 'deactivate',
         entityType: 'learner',
         entityId: learnerId,
+        changes: <String, dynamic>{
+          'isActive': isActive,
+          'isHidden': false,
+        },
       );
       return true;
     } catch (e) {
@@ -656,7 +599,9 @@ class AdminDatabaseService {
           .doc(learnerId)
           .collection('progress')
           .get();
-      return snapshot.docs.map((doc) => LessonProgress.fromFirestore(doc)).toList();
+      return snapshot.docs
+          .map((doc) => LessonProgress.fromFirestore(doc))
+          .toList();
     } catch (e) {
       debugPrint('Error getting learner progress: $e');
       return [];
@@ -668,13 +613,16 @@ class AdminDatabaseService {
   /// Get all issues
   Stream<List<IssueModel>> issuesStream({String? status, String? priority}) {
     Query query = _db.collection('issues');
-    
+
     if (status != null) {
       final normalizedStatus = _normalizeIssueStatus(status);
       if (normalizedStatus == 'open') {
         query = query.where('status', whereIn: <String>['open', 'new']);
       } else if (normalizedStatus == 'in-progress') {
-        query = query.where('status', whereIn: <String>['in-progress', 'in_progress']);
+        query = query.where(
+          'status',
+          whereIn: <String>['in-progress', 'in_progress'],
+        );
       } else {
         query = query.where('status', isEqualTo: normalizedStatus);
       }
@@ -682,9 +630,11 @@ class AdminDatabaseService {
     if (priority != null) {
       query = query.where('priority', isEqualTo: priority);
     }
-    
+
     return query.snapshots().map((snapshot) {
-      final list = snapshot.docs.map((doc) => IssueModel.fromFirestore(doc)).toList();
+      final list = snapshot.docs
+          .map((doc) => IssueModel.fromFirestore(doc))
+          .toList();
       list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return list;
     });
@@ -708,14 +658,12 @@ class AdminDatabaseService {
   Future<bool> updateIssueStatus(String issueId, String status) async {
     try {
       final normalizedStatus = _normalizeIssueStatus(status);
-      final updates = <String, dynamic>{
-        'status': normalizedStatus,
-      };
-      
+      final updates = <String, dynamic>{'status': normalizedStatus};
+
       if (normalizedStatus == 'resolved' || normalizedStatus == 'closed') {
         updates['resolvedAt'] = FieldValue.serverTimestamp();
       }
-      
+
       await _db.collection('issues').doc(issueId).update(updates);
       await _logAuditAction(
         action: 'status_change',
@@ -733,7 +681,9 @@ class AdminDatabaseService {
   /// Update issue priority
   Future<bool> updateIssuePriority(String issueId, String priority) async {
     try {
-      await _db.collection('issues').doc(issueId).update({'priority': priority});
+      await _db.collection('issues').doc(issueId).update({
+        'priority': priority,
+      });
       await _logAuditAction(
         action: 'priority_change',
         entityType: 'issue',
@@ -813,7 +763,10 @@ class AdminDatabaseService {
   /// Update maintenance mode
   Future<bool> updateMaintenanceMode(MaintenanceModeModel mode) async {
     try {
-      await _db.collection('settings').doc('maintenance').set(mode.toFirestore());
+      await _db
+          .collection('settings')
+          .doc('maintenance')
+          .set(mode.toFirestore());
       await _logAuditAction(
         action: mode.isEnabled ? 'enable_maintenance' : 'disable_maintenance',
         entityType: 'settings',
@@ -849,7 +802,9 @@ class AdminDatabaseService {
   // ==================== LEVEL CONFIG OPERATIONS ====================
 
   Stream<LevelConfigModel> levelConfigStream() {
-    return _db.collection('settings').doc('level_config').snapshots().map((doc) {
+    return _db.collection('settings').doc('level_config').snapshots().map((
+      doc,
+    ) {
       if (doc.exists) {
         return LevelConfigModel.fromFirestore(doc);
       }
@@ -869,16 +824,24 @@ class AdminDatabaseService {
     return const LevelConfigModel();
   }
 
-  Future<bool> updateLevelConfig(LevelConfigModel config, {String? updatedBy}) async {
+  Future<bool> updateLevelConfig(
+    LevelConfigModel config, {
+    String? updatedBy,
+  }) async {
     try {
-      final normalized = LevelConfigModel.normalizeThresholds(config.xpThresholds);
+      final normalized = LevelConfigModel.normalizeThresholds(
+        config.xpThresholds,
+      );
       final payload = config.copyWith(
         xpThresholds: normalized,
         updatedAt: DateTime.now(),
         updatedBy: updatedBy,
       );
 
-      await _db.collection('settings').doc('level_config').set(payload.toFirestore());
+      await _db
+          .collection('settings')
+          .doc('level_config')
+          .set(payload.toFirestore());
       await _logAuditAction(
         action: 'update_level_config',
         entityType: 'settings',
@@ -955,7 +918,11 @@ class AdminDatabaseService {
         .collection('admins')
         .orderBy('createdAt', descending: false)
         .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => AdminModel.fromFirestore(doc)).toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => AdminModel.fromFirestore(doc))
+              .toList(),
+        );
   }
 
   Future<int> getActiveAdminCount() async {
@@ -1066,56 +1033,92 @@ class AdminDatabaseService {
   }
 
   Future<AdminActionResult> promoteAdminByEmail(String email) async {
+    final normalizedEmail = email.trim().toLowerCase();
+    if (normalizedEmail.isEmpty) {
+      return const AdminActionResult(
+        success: false,
+        message: 'Email is required.',
+      );
+    }
+
     try {
-      final callable = _functions.httpsCallable('promoteAdminByEmail');
-      final response = await callable.call(<String, dynamic>{'email': email.trim()});
+      final existingAdmin = await _db
+          .collection('admins')
+          .where('email', isEqualTo: normalizedEmail)
+          .limit(1)
+          .get();
+      if (existingAdmin.docs.isNotEmpty) {
+        final adminDoc = existingAdmin.docs.first;
+        await adminDoc.reference.set(<String, dynamic>{
+          'isActive': true,
+          'statusUpdatedAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
 
-      final payload = (response.data is Map)
-          ? Map<String, dynamic>.from(response.data as Map)
-          : <String, dynamic>{};
-      final success = payload['success'] == true;
+        await _logAuditAction(
+          action: 'reactivate_admin',
+          entityType: 'admin',
+          entityId: adminDoc.id,
+          changes: <String, dynamic>{'email': normalizedEmail},
+        );
 
-      if (!success) {
-        final backendMessage = (payload['message'] ?? '').toString().trim();
-        return AdminActionResult(
-          success: false,
-          message: backendMessage.isNotEmpty
-              ? backendMessage
-              : 'Promotion request could not be completed.',
+        return const AdminActionResult(
+          success: true,
+          message: 'Existing admin account reactivated.',
         );
       }
 
-      final promotedUid = (payload['uid'] ?? '').toString().trim();
-      if (promotedUid.isNotEmpty) {
-        await _db.collection('admins').doc(promotedUid).set(<String, dynamic>{
-          'email': (payload['email'] ?? email).toString().trim().toLowerCase(),
-          'displayName': (payload['displayName'] ?? '').toString().trim(),
-          'isActive': true,
-          'role': 'admin',
-          'permissions': <String>[],
-          'createdAt': FieldValue.serverTimestamp(),
-          'lastLoginAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+      var learnerQuery = await _db
+          .collection('users')
+          .where('email', isEqualTo: normalizedEmail)
+          .limit(1)
+          .get();
+
+      if (learnerQuery.docs.isEmpty && email.trim() != normalizedEmail) {
+        learnerQuery = await _db
+            .collection('users')
+            .where('email', isEqualTo: email.trim())
+            .limit(1)
+            .get();
       }
+
+      if (learnerQuery.docs.isEmpty) {
+        return const AdminActionResult(
+          success: false,
+          message:
+              'This email is already in Auth, but no learner profile was found to promote. Use a new email or create the profile first.',
+        );
+      }
+
+      final learnerDoc = learnerQuery.docs.first;
+      final data = learnerDoc.data();
+      final displayName = (data['displayName'] ?? '').toString().trim();
+      await _db.collection('admins').doc(learnerDoc.id).set(<String, dynamic>{
+        'email': normalizedEmail,
+        'displayName': displayName,
+        'isActive': true,
+        'role': 'admin',
+        'permissions': <String>[],
+        'createdAt': FieldValue.serverTimestamp(),
+        'lastLoginAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      await learnerDoc.reference.update(<String, dynamic>{
+        'isActive': true,
+        'isHidden': false,
+        'statusUpdatedAt': FieldValue.serverTimestamp(),
+      });
 
       await _logAuditAction(
         action: 'promote_admin',
         entityType: 'admin',
-        entityId: promotedUid.isNotEmpty ? promotedUid : null,
-        changes: <String, dynamic>{'email': email.trim().toLowerCase()},
+        entityId: learnerDoc.id,
+        changes: <String, dynamic>{'email': normalizedEmail},
       );
 
       return const AdminActionResult(
         success: true,
         message: 'Admin access granted successfully.',
-      );
-    } on FirebaseFunctionsException catch (e) {
-      final backendMessage = (e.message ?? '').trim();
-      return AdminActionResult(
-        success: false,
-        message: backendMessage.isNotEmpty
-            ? backendMessage
-            : 'Secure promotion endpoint is unavailable.',
       );
     } catch (e) {
       debugPrint('Error promoting admin: $e');
@@ -1149,16 +1152,17 @@ class AdminDatabaseService {
         message: 'Display name is required.',
       );
     }
-    if (password.length < 6) {
+    if (password.length < 8) {
       return const AdminActionResult(
         success: false,
-        message: 'Temporary password must be at least 6 characters.',
+        message: 'Temporary password must be at least 8 characters.',
       );
     }
 
     FirebaseApp? secondaryApp;
     try {
-      final appName = 'admin-create-user-${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(9999)}';
+      final appName =
+          'admin-create-user-${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(9999)}';
       secondaryApp = await Firebase.initializeApp(
         name: appName,
         options: DefaultFirebaseOptions.currentPlatform,
@@ -1183,16 +1187,23 @@ class AdminDatabaseService {
 
       final now = DateTime.now();
       if (createAsAdmin) {
-        await _db.collection('users').doc(createdUser.uid).delete().catchError((_) {});
-        await _db.collection('admins').doc(createdUser.uid).set(<String, dynamic>{
-          'email': normalizedEmail,
-          'displayName': normalizedName,
-          'isActive': true,
-          'role': 'admin',
-          'permissions': <String>[],
-          'createdAt': FieldValue.serverTimestamp(),
-          'lastLoginAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+        await _db
+            .collection('users')
+            .doc(createdUser.uid)
+            .delete()
+            .catchError((_) {});
+        await _db
+            .collection('admins')
+            .doc(createdUser.uid)
+            .set(<String, dynamic>{
+              'email': normalizedEmail,
+              'displayName': normalizedName,
+              'isActive': true,
+              'role': 'admin',
+              'permissions': <String>[],
+              'createdAt': FieldValue.serverTimestamp(),
+              'lastLoginAt': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
 
         await _logAuditAction(
           action: 'create_admin',
@@ -1210,7 +1221,11 @@ class AdminDatabaseService {
         );
       }
 
-      await _db.collection('admins').doc(createdUser.uid).delete().catchError((_) {});
+      await _db
+          .collection('admins')
+          .doc(createdUser.uid)
+          .delete()
+          .catchError((_) {});
       final learner = UserModel(
         uid: createdUser.uid,
         email: normalizedEmail,
@@ -1227,10 +1242,10 @@ class AdminDatabaseService {
         xp: 0,
         isActive: true,
       );
-      await _db.collection('users').doc(createdUser.uid).set(
-            learner.toFirestore(),
-            SetOptions(merge: true),
-          );
+      await _db
+          .collection('users')
+          .doc(createdUser.uid)
+          .set(learner.toFirestore(), SetOptions(merge: true));
 
       await _logAuditAction(
         action: 'create_learner',
@@ -1388,7 +1403,7 @@ class AdminDatabaseService {
     try {
       final totalLearners = await getTotalLearnerCount();
       final activeLearners = await getActiveLearnerCount();
-      
+
       // Get new learners this week
       final weekAgo = DateTime.now().subtract(const Duration(days: 7));
       final newLearnersSnapshot = await _db
@@ -1396,14 +1411,17 @@ class AdminDatabaseService {
           .where('createdAt', isGreaterThan: Timestamp.fromDate(weekAgo))
           .count()
           .get();
-      
+
       // Get total issues
       final openIssuesSnapshot = await _db
           .collection('issues')
-          .where('status', whereIn: <String>['new', 'open', 'in-progress', 'in_progress'])
+          .where(
+            'status',
+            whereIn: <String>['new', 'open', 'in-progress', 'in_progress'],
+          )
           .count()
           .get();
-      
+
       return {
         'totalLearners': totalLearners,
         'activeLearners': activeLearners,
@@ -1456,6 +1474,7 @@ class AdminDatabaseService {
       return [0, 0, 0, 0, 0, 0, 0];
     }
   }
+
   Future<List<SignPracticeLogModel>> getSignPracticeLogs({
     String? learnerId,
     String? lessonId,
@@ -1465,7 +1484,7 @@ class AdminDatabaseService {
   }) async {
     try {
       Query query = _db.collection('sign_practice_logs');
-      
+
       if (learnerId != null) {
         query = query.where('learnerId', isEqualTo: learnerId);
       }
@@ -1473,16 +1492,24 @@ class AdminDatabaseService {
         query = query.where('lessonId', isEqualTo: lessonId);
       }
       if (startDate != null) {
-        query = query.where('timestamp', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
+        query = query.where(
+          'timestamp',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
+        );
       }
       if (endDate != null) {
-        query = query.where('timestamp', isLessThanOrEqualTo: Timestamp.fromDate(endDate));
+        query = query.where(
+          'timestamp',
+          isLessThanOrEqualTo: Timestamp.fromDate(endDate),
+        );
       }
-      
+
       query = query.orderBy('timestamp', descending: true).limit(limit);
-      
+
       final snapshot = await query.get();
-      return snapshot.docs.map((doc) => SignPracticeLogModel.fromFirestore(doc)).toList();
+      return snapshot.docs
+          .map((doc) => SignPracticeLogModel.fromFirestore(doc))
+          .toList();
     } catch (e) {
       debugPrint('Error getting sign practice logs: $e');
       return [];
@@ -1502,17 +1529,20 @@ class AdminDatabaseService {
         labels[normalizedKey] = normalizedValue;
       }
 
-      Future<void> absorbSnapshot(QuerySnapshot<Map<String, dynamic>> snapshot) async {
+      Future<void> absorbSnapshot(
+        QuerySnapshot<Map<String, dynamic>> snapshot,
+      ) async {
         for (final doc in snapshot.docs) {
           final data = doc.data();
-          final label = (data['word'] ??
-                  data['signCharacter'] ??
-                  data['character'] ??
-                  data['label'] ??
-                  data['text'] ??
-                  '')
-              .toString()
-              .trim();
+          final label =
+              (data['word'] ??
+                      data['signCharacter'] ??
+                      data['character'] ??
+                      data['label'] ??
+                      data['text'] ??
+                      '')
+                  .toString()
+                  .trim();
 
           if (label.isNotEmpty) {
             absorbLabel(doc.id, label);
@@ -1571,7 +1601,11 @@ class AdminDatabaseService {
         .orderBy('timestamp', descending: true)
         .limit(limit)
         .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => AuditLogModel.fromFirestore(doc)).toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => AuditLogModel.fromFirestore(doc))
+              .toList(),
+        );
   }
 
   /// Alias for auditLogsStream for backward compatibility
@@ -1634,7 +1668,11 @@ class AdminDatabaseService {
         .collection('categories')
         .orderBy('order')
         .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => CategoryModel.fromFirestore(doc)).toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => CategoryModel.fromFirestore(doc))
+              .toList(),
+        );
   }
 
   /// Create category
@@ -1656,7 +1694,10 @@ class AdminDatabaseService {
   }
 
   /// Update category
-  Future<bool> updateCategory(String categoryId, Map<String, dynamic> updates) async {
+  Future<bool> updateCategory(
+    String categoryId,
+    Map<String, dynamic> updates,
+  ) async {
     try {
       await _db.collection('categories').doc(categoryId).update(updates);
       await _logAuditAction(
@@ -1681,16 +1722,18 @@ class AdminDatabaseService {
           .doc(categoryId)
           .collection('lessons')
           .get();
-      
+
       for (final lessonDoc in lessonsSnapshot.docs) {
         // Delete signs in each lesson
-        final signsSnapshot = await lessonDoc.reference.collection('signs').get();
+        final signsSnapshot = await lessonDoc.reference
+            .collection('signs')
+            .get();
         for (final signDoc in signsSnapshot.docs) {
           await signDoc.reference.delete();
         }
         await lessonDoc.reference.delete();
       }
-      
+
       await _db.collection('categories').doc(categoryId).delete();
       await _logAuditAction(
         action: 'delete',
@@ -1712,8 +1755,11 @@ class AdminDatabaseService {
         .collection('signs')
         .orderBy('order')
         .snapshots()
-        .map((snapshot) =>
-            snapshot.docs.map((doc) => AdminSignModel.fromFirestore(doc)).toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => AdminSignModel.fromFirestore(doc))
+              .toList(),
+        );
   }
 
   /// Get signs by type (alphabet or number)
@@ -1723,19 +1769,18 @@ class AdminDatabaseService {
         .where('type', isEqualTo: type)
         .snapshots()
         .map((snapshot) {
-      final list = snapshot.docs
-          .map((doc) => AdminSignModel.fromFirestore(doc))
-          .toList();
-      list.sort((a, b) => a.order.compareTo(b.order));
-      return list;
-    });
+          final list = snapshot.docs
+              .map((doc) => AdminSignModel.fromFirestore(doc))
+              .toList();
+          list.sort((a, b) => a.order.compareTo(b.order));
+          return list;
+        });
   }
 
   /// Get all signs as a one-time fetch
   Future<List<AdminSignModel>> getAllSigns() async {
     try {
-      final snapshot =
-          await _db.collection('signs').orderBy('order').get();
+      final snapshot = await _db.collection('signs').orderBy('order').get();
       return snapshot.docs
           .map((doc) => AdminSignModel.fromFirestore(doc))
           .toList();
@@ -1820,13 +1865,14 @@ class AdminDatabaseService {
 
   /// Upload a sign image/video to Firebase Storage
   Future<String?> uploadSignMedia(
-      String word, List<int> fileBytes, String fileName) async {
+    String word,
+    List<int> fileBytes,
+    String fileName,
+  ) async {
     try {
       final ext = fileName.split('.').last;
       final ref = _storage.ref('signs/$word.$ext');
-      final metadata = SettableMetadata(
-        contentType: _getContentType(ext),
-      );
+      final metadata = SettableMetadata(contentType: _getContentType(ext));
       await ref.putData(Uint8List.fromList(fileBytes), metadata);
       return await ref.getDownloadURL();
     } catch (e) {
@@ -1837,7 +1883,10 @@ class AdminDatabaseService {
 
   /// Simple upload that takes raw bytes
   Future<String?> uploadSignFile(
-      String word, dynamic fileData, String extension) async {
+    String word,
+    dynamic fileData,
+    String extension,
+  ) async {
     try {
       final ref = _storage.ref('signs/$word.$extension');
       final metadata = SettableMetadata(
@@ -1886,7 +1935,9 @@ class AdminDatabaseService {
           .toList();
 
       if (candidates.length < 3) {
-        debugPrint('Not enough signs to generate MCQ (need at least 3 distractors)');
+        debugPrint(
+          'Not enough signs to generate MCQ (need at least 3 distractors)',
+        );
         return null;
       }
 
@@ -1901,8 +1952,7 @@ class AdminDatabaseService {
       return MCQQuestion(
         correctSign: correctSign,
         options: allOptions,
-        questionText:
-            'Which sign represents "${correctSign.word}"?',
+        questionText: 'Which sign represents "${correctSign.word}"?',
       );
     } catch (e) {
       debugPrint('Error generating MCQ: $e');
@@ -1912,7 +1962,8 @@ class AdminDatabaseService {
 
   /// Generate multiple MCQ questions for a lesson's signs
   Future<List<MCQQuestion>> generateMCQsForLesson(
-      List<AdminSignItem> lessonSigns) async {
+    List<AdminSignItem> lessonSigns,
+  ) async {
     final questions = <MCQQuestion>[];
     final allSigns = await getAllSigns();
 
@@ -1942,12 +1993,13 @@ class AdminDatabaseService {
       final allOptions = [fullSign, ...wrongOptions];
       allOptions.shuffle(Random());
 
-      questions.add(MCQQuestion(
-        correctSign: fullSign,
-        options: allOptions,
-        questionText:
-            'Which sign represents "${fullSign.word}"?',
-      ));
+      questions.add(
+        MCQQuestion(
+          correctSign: fullSign,
+          options: allOptions,
+          questionText: 'Which sign represents "${fullSign.word}"?',
+        ),
+      );
     }
 
     return questions;
@@ -1968,8 +2020,7 @@ class AdminDatabaseService {
       int totalSigns = 0;
       for (final doc in lessonsSnapshot.docs) {
         // Count signs in subcollection
-        final signsSnapshot =
-            await doc.reference.collection('signs').get();
+        final signsSnapshot = await doc.reference.collection('signs').get();
         if (signsSnapshot.docs.isNotEmpty) {
           totalSigns += signsSnapshot.docs.length;
         } else {
@@ -2021,10 +2072,12 @@ class AdminDatabaseService {
         ),
       );
 
-      characters.add(WordCharacter(
-        char: char,
-        signReference: matchingSign.id.isNotEmpty ? matchingSign.id : null,
-      ));
+      characters.add(
+        WordCharacter(
+          char: char,
+          signReference: matchingSign.id.isNotEmpty ? matchingSign.id : null,
+        ),
+      );
     }
 
     return characters;
@@ -2038,9 +2091,11 @@ class AdminDatabaseService {
         .collection('lessons')
         .orderBy('order')
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => AdminLessonModel.fromFirestore(doc))
-            .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => AdminLessonModel.fromFirestore(doc))
+              .toList(),
+        );
   }
 }
 

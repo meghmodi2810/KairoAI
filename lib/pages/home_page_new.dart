@@ -26,9 +26,9 @@ class _HomePageState extends State<HomePage> {
   static LessonModel? _cachedContinueLesson;
   static String? _cachedContinueCategoryId;
   static DateTime? _lastCacheTime;
-  
+
   static const Duration _cacheValidity = Duration(minutes: 5);
-  
+
   bool get _isCacheValid {
     if (_lastCacheTime == null) return false;
     return DateTime.now().difference(_lastCacheTime!) < _cacheValidity;
@@ -56,12 +56,12 @@ class _HomePageState extends State<HomePage> {
         _continueCategoryId = _cachedContinueCategoryId;
         _isLoading = false;
       });
-      
+
       // Refresh in background
       _refreshData();
       return;
     }
-    
+
     // Load fresh data
     await _refreshData();
   }
@@ -70,7 +70,11 @@ class _HomePageState extends State<HomePage> {
     try {
       final currentUser = _auth.currentUser;
       if (currentUser != null) {
-        unawaited(_db.createUserDocument(currentUser));
+        unawaited(
+          _db.createUserDocument(currentUser).catchError((Object error) {
+            debugPrint('HomePage: learner bootstrap skipped: $error');
+          }),
+        );
       }
 
       // Parallel data fetching
@@ -145,12 +149,6 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       debugPrint('Error resolving continue lesson: $e');
     }
-  }
-
-  int _displayedSigns(UserModel? user) {
-    final total = user?.totalSignsLearned ?? 0;
-    final unique = user?.completedSignCharacters.length ?? 0;
-    return total >= unique ? total : unique;
   }
 
   @override
@@ -231,7 +229,10 @@ class _HomePageState extends State<HomePage> {
       decoration: BoxDecoration(
         color: AppTheme.warmWhite.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.inkBlack.withValues(alpha: 0.1), width: 2),
+        border: Border.all(
+          color: AppTheme.inkBlack.withValues(alpha: 0.1),
+          width: 2,
+        ),
       ),
     );
   }
@@ -453,7 +454,6 @@ class _HomePageState extends State<HomePage> {
     final practiceMinutes = _todayLessonMinutes(user);
     final progress = goal <= 0 ? 0.0 : (practiceMinutes / goal).clamp(0.0, 1.0);
     final remaining = (goal - practiceMinutes).clamp(0, goal);
-    final signCount = _displayedSigns(user);
 
     return NeoPanel(
       color: AppTheme.softPeach,
@@ -506,14 +506,6 @@ class _HomePageState extends State<HomePage> {
             style: const TextStyle(
               color: AppTheme.inkBlack,
               fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '${user?.totalLessonsCompleted ?? 0} lessons • $signCount signs',
-            style: const TextStyle(
-              color: AppTheme.inkBlack,
-              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -573,10 +565,8 @@ class _HomePageState extends State<HomePage> {
               ? () {
                   AudioService().playClick();
                   ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(_categoryLockMessage(category)),
-                  ),
-                );
+                    SnackBar(content: Text(_categoryLockMessage(category))),
+                  );
                 }
               : () {
                   AudioService().playClick();
@@ -605,24 +595,26 @@ class _HomePageState extends State<HomePage> {
                   child: Center(
                     child: locked
                         ? const Icon(Icons.lock, color: AppTheme.inkBlack)
-                        : (category.iconUrl != null && category.iconUrl!.isNotEmpty)
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(9),
-                                child: Image.network(
-                                  category.iconUrl!,
-                                  width: 50,
-                                  height: 50,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Text(
+                        : (category.iconUrl != null &&
+                              category.iconUrl!.isNotEmpty)
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(9),
+                            child: Image.network(
+                              category.iconUrl!,
+                              width: 50,
+                              height: 50,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Text(
                                     category.iconEmoji,
                                     style: const TextStyle(fontSize: 24),
                                   ),
-                                ),
-                              )
-                            : Text(
-                                category.iconEmoji,
-                                style: const TextStyle(fontSize: 24),
-                              ),
+                            ),
+                          )
+                        : Text(
+                            category.iconEmoji,
+                            style: const TextStyle(fontSize: 24),
+                          ),
                   ),
                 ),
                 const SizedBox(width: 12),

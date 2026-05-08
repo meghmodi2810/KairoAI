@@ -60,8 +60,14 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
       }
 
       progress.sort((a, b) {
-        final aTimestamp = a.completedAt ?? a.startedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-        final bTimestamp = b.completedAt ?? b.startedAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final aTimestamp =
+            a.completedAt ??
+            a.startedAt ??
+            DateTime.fromMillisecondsSinceEpoch(0);
+        final bTimestamp =
+            b.completedAt ??
+            b.startedAt ??
+            DateTime.fromMillisecondsSinceEpoch(0);
         return bTimestamp.compareTo(aTimestamp);
       });
 
@@ -139,12 +145,15 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
             .get();
         if (lessonDoc.exists) {
           final lessonData = lessonDoc.data() ?? <String, dynamic>{};
-          final lessonTitle = (lessonData['title'] ?? lessonId).toString().trim();
+          final lessonTitle = (lessonData['title'] ?? lessonId)
+              .toString()
+              .trim();
           if (lessonTitle.isNotEmpty) {
             lessonTitlesByKey[lessonKey] = lessonTitle;
           }
 
-          final explicitTotalSigns = (lessonData['totalSigns'] as num?)?.toInt();
+          final explicitTotalSigns = (lessonData['totalSigns'] as num?)
+              ?.toInt();
           if (explicitTotalSigns != null && explicitTotalSigns > 0) {
             lessonSignCountsByKey[lessonKey] = explicitTotalSigns;
           }
@@ -159,7 +168,8 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
     );
   }
 
-  String _lessonKey(LessonProgress p) => '${p.categoryId.trim()}/${p.lessonId.trim()}';
+  String _lessonKey(LessonProgress p) =>
+      '${p.categoryId.trim()}/${p.lessonId.trim()}';
 
   String _normalizeStatus(String status) {
     final normalized = status.trim().toLowerCase();
@@ -186,11 +196,11 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
     final newActive = !_user!.isActive;
     final confirmed = await AdminConfirmModal.show(
       context,
-      title: '${newActive ? 'Activate' : 'Deactivate'} this account?',
+      title: '${newActive ? 'Enable' : 'Disable'} learner login?',
       body: newActive
-          ? 'This user will regain access to the app.'
-          : 'This user will be blocked from using the app.',
-      confirmLabel: newActive ? 'Activate' : 'Deactivate',
+          ? 'This learner will regain access to the app.'
+          : 'This learner will be blocked from using the app, but their profile will stay visible here.',
+      confirmLabel: newActive ? 'Enable login' : 'Disable login',
     );
     if (!confirmed || !mounted) return;
 
@@ -203,7 +213,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
       if (!mounted) return;
       AdminToast.show(
         context,
-        'Account ${newActive ? 'activated' : 'deactivated'}.',
+        'Learner login ${newActive ? 'enabled' : 'disabled'}.',
         type: AdminToastType.success,
       );
     } else {
@@ -219,7 +229,8 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
     final confirmed = await AdminConfirmModal.show(
       context,
       title: 'Reset all progress?',
-      body: 'This will delete all lesson completions, XP, gems, and streaks. This cannot be undone.',
+      body:
+          'This will delete all lesson completions, XP, gems, and streaks. This cannot be undone.',
       confirmLabel: 'Reset progress',
     );
     if (!confirmed || !mounted) return;
@@ -234,30 +245,6 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
       AdminToast.show(context, 'Progress reset.', type: AdminToastType.success);
     } else {
       AdminToast.show(context, 'Reset failed.', type: AdminToastType.error);
-    }
-  }
-
-  Future<void> _deleteUser() async {
-    final confirmed = await AdminConfirmModal.show(
-      context,
-      title: 'Hide learner account?',
-      body: 'The learner will be hidden and deactivated. Data stays in Firestore.',
-      confirmLabel: 'Hide learner',
-    );
-    if (!confirmed || !mounted) return;
-
-    setState(() => _actionLoading = true);
-    final result = await _db.hideLearner(widget.userId);
-    if (!mounted) return;
-    setState(() => _actionLoading = false);
-    if (result.success) {
-      AdminToast.show(context, result.message, type: AdminToastType.success);
-      Navigator.of(context).pop(<String, dynamic>{
-        'deleted': true,
-        'userId': widget.userId,
-      });
-    } else {
-      AdminToast.show(context, result.message, type: AdminToastType.error);
     }
   }
 
@@ -323,7 +310,11 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
           type: AdminToastType.success,
         );
       } else {
-        AdminToast.show(context, 'Failed to add gems.', type: AdminToastType.error);
+        AdminToast.show(
+          context,
+          'Failed to add gems.',
+          type: AdminToastType.error,
+        );
       }
     } finally {
       if (mounted) setState(() => _actionLoading = false);
@@ -373,7 +364,9 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
     }
 
     final user = _user!;
-    final completedCount = _progress.where((p) => p.status == 'completed').length;
+    final completedCount = _progress
+        .where((p) => p.status == 'completed')
+        .length;
 
     return Scaffold(
       backgroundColor: c.bgBase,
@@ -386,16 +379,14 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
             ? const SizedBox(
                 width: 48,
                 child: Center(
-                    child: SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )),
+                  child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
               )
-            : AdminTopBarIconButton(
-                icon: LucideIcons.gem,
-                onTap: _addGems,
-              ),
+            : AdminTopBarIconButton(icon: LucideIcons.gem, onTap: _addGems),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.only(bottom: bottomBuf),
@@ -458,8 +449,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                 AdminStat(label: 'XP', value: '${user.xp}'),
                 AdminStat(label: 'Gems', value: '${user.gems}'),
                 AdminStat(label: 'Streak', value: '${user.streakDays}d'),
-                AdminStat(
-                    label: 'Level', value: '${user.currentLevel}'),
+                AdminStat(label: 'Level', value: '${user.currentLevel}'),
               ],
             ),
             const _Divider(),
@@ -467,14 +457,24 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
             // Progress
             AdminSectionHeader(title: 'Overview stats'),
             AdminRow(
-              leading: Icon(LucideIcons.bookMarked, size: 14, color: c.textMuted),
+              leading: Icon(
+                LucideIcons.bookMarked,
+                size: 14,
+                color: c.textMuted,
+              ),
               title: Text('Completed lessons', style: adminH3(c.textPrimary)),
-              trailing: Text('$completedCount / ${_progress.length}', style: adminBody(c.textSecondary)),
+              trailing: Text(
+                '$completedCount / ${_progress.length}',
+                style: adminBody(c.textSecondary),
+              ),
             ),
             AdminRow(
               leading: Icon(LucideIcons.clock, size: 14, color: c.textMuted),
               title: Text('Total practice time', style: adminH3(c.textPrimary)),
-              trailing: Text('${user.totalPracticeMinutes}m', style: adminBody(c.textSecondary)),
+              trailing: Text(
+                '${user.totalPracticeMinutes}m',
+                style: adminBody(c.textSecondary),
+              ),
               isLast: true,
             ),
             const _Divider(),
@@ -485,15 +485,19 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
               const AdminEmptyState(
                 icon: LucideIcons.book,
                 title: 'No lesson activity yet',
-                body: 'Progress cards will appear here once this learner starts lessons.',
+                body:
+                    'Progress cards will appear here once this learner starts lessons.',
               ),
             ..._progress.asMap().entries.map((e) {
               final p = e.value;
               final isDone = p.status == 'completed';
               final lessonKey = _lessonKey(p);
-              final lessonTitle = _lessonTitlesByKey[lessonKey] ?? 'Lesson ${p.lessonId}';
-              final categoryTitle = _categoryNamesById[p.categoryId] ?? p.categoryId;
-              final trackedTotalSigns = _lessonSignCountsByKey[lessonKey] ??
+              final lessonTitle =
+                  _lessonTitlesByKey[lessonKey] ?? 'Lesson ${p.lessonId}';
+              final categoryTitle =
+                  _categoryNamesById[p.categoryId] ?? p.categoryId;
+              final trackedTotalSigns =
+                  _lessonSignCountsByKey[lessonKey] ??
                   (p.signsCompleted.length + p.signsSkipped.length);
               final completedSigns = p.signsCompleted.length;
 
@@ -507,9 +511,12 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
               } else {
                 progressVal = 0.0;
               }
-              
+
               return AdminCard(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 radius: 0,
                 showBorder: false,
                 showShadow: false,
@@ -546,8 +553,8 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                           variant: isDone
                               ? AdminTagVariant.active
                               : (p.status == 'in_progress'
-                                  ? AdminTagVariant.pending
-                                  : AdminTagVariant.draft),
+                                    ? AdminTagVariant.pending
+                                    : AdminTagVariant.draft),
                         ),
                       ],
                     ),
@@ -595,7 +602,7 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                 color: user.isActive ? c.error : c.success,
               ),
               title: Text(
-                user.isActive ? 'Deactivate account' : 'Activate account',
+                user.isActive ? 'Disable login' : 'Enable login',
                 style: adminH3(user.isActive ? c.error : c.success),
               ),
               showChevron: true,
@@ -611,14 +618,8 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
               leading: Icon(LucideIcons.rotateCcw, size: 14, color: c.warning),
               title: Text('Reset progress', style: adminH3(c.warning)),
               showChevron: true,
-              onTap: _resetProgress,
-            ),
-            AdminRow(
-              leading: Icon(LucideIcons.trash2, size: 14, color: c.error),
-              title: Text('Delete account', style: adminH3(c.error)),
-              showChevron: true,
               isLast: true,
-              onTap: _deleteUser,
+              onTap: _resetProgress,
             ),
           ],
         ),
@@ -632,10 +633,7 @@ class _Divider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 8,
-      color: ac(context).bgBase,
-    );
+    return Container(height: 8, color: ac(context).bgBase);
   }
 }
 

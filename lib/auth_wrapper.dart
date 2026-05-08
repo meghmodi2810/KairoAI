@@ -11,12 +11,16 @@ import 'admin/screens/admin_shell.dart';
 import 'admin/theme/admin_theme.dart';
 import 'admin/models/admin_models.dart';
 import 'services/database_service.dart';
+import 'theme/app_theme.dart';
+import 'theme/neo_brutal_widgets.dart';
 
 enum _AuthDestination {
   admin,
   learner,
+  emailVerification,
   inactiveAdmin,
   inactiveLearner,
+  setupError,
   maintenance,
 }
 
@@ -43,6 +47,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
   final DatabaseService _db = DatabaseService();
   bool _isLoading = true;
   bool _onboardingComplete = false;
+  bool _verificationActionLoading = false;
 
   static const Color ink = Color(0xFF111111);
   static const Color paper = Color(0xFFFFF7E8);
@@ -123,53 +128,170 @@ class _AuthWrapperState extends State<AuthWrapper> {
       }
     }
 
+    DocumentSnapshot<Map<String, dynamic>>? learnerDoc;
+    try {
+      learnerDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get();
+    } catch (e) {
+      debugPrint('AuthWrapper: Could not read learner profile: $e');
+      return const _AuthDecision(
+        destination: _AuthDestination.setupError,
+        message:
+            'We could not load your learner profile. Check your connection and try again.',
+      );
+    }
+
+    if (learnerDoc.exists) {
+      final learnerIsActive = (learnerDoc.data()?['isActive'] ?? true) == true;
+      if (!learnerIsActive) {
+        return const _AuthDecision(
+          destination: _AuthDestination.inactiveLearner,
+          message:
+              'This learner account has been deactivated. Please contact support.',
+        );
+      }
+      final maintenanceDecision = await _maintenanceDecision();
+      return maintenanceDecision ??
+          const _AuthDecision(destination: _AuthDestination.learner);
+    }
+
+    if (_needsEmailVerification(user)) {
+      return const _AuthDecision(
+        destination: _AuthDestination.emailVerification,
+      );
+    }
+
     try {
       await _db.createUserDocument(user);
     } catch (e) {
       debugPrint('AuthWrapper: Learner bootstrap failed: $e');
-    }
-
-    var learnerIsActive = true;
-    try {
-      final learnerDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .get();
-      learnerIsActive = (learnerDoc.data()?['isActive'] ?? true) == true;
-    } catch (e) {
-      debugPrint('AuthWrapper: Could not resolve learner status: $e');
-    }
-
-    if (!learnerIsActive) {
       return const _AuthDecision(
-        destination: _AuthDestination.inactiveLearner,
+        destination: _AuthDestination.setupError,
         message:
-            'This learner account has been deactivated. Please contact support.',
+            'We could not finish setting up your learner profile. Please try again.',
       );
     }
 
+    try {
+      learnerDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get();
+      if (!learnerDoc.exists) {
+        return const _AuthDecision(
+          destination: _AuthDestination.setupError,
+          message:
+              'Your learner profile was not created yet. Please try again.',
+        );
+      }
+    } catch (e) {
+      debugPrint('AuthWrapper: Could not verify learner bootstrap: $e');
+      return const _AuthDecision(
+        destination: _AuthDestination.setupError,
+        message:
+            'We could not confirm your learner profile. Please try again.',
+      );
+    }
+
+    final maintenanceDecision = await _maintenanceDecision();
+    return maintenanceDecision ??
+        const _AuthDecision(destination: _AuthDestination.learner);
+  }
+
+  Future<_AuthDecision?> _maintenanceDecision() async {
     try {
       final maintenanceDoc = await FirebaseFirestore.instance
           .collection('settings')
           .doc('maintenance')
           .get();
-      if (maintenanceDoc.exists) {
-        final data = maintenanceDoc.data() ?? <String, dynamic>{};
-        if ((data['isEnabled'] ?? false) == true) {
-          return _AuthDecision(
-            destination: _AuthDestination.maintenance,
-            message:
-                (data['message'] ??
-                        'KairoAI is currently under maintenance. Please check back soon.')
-                    .toString(),
-          );
-        }
-      }
+      if (!maintenanceDoc.exists) return null;
+      final data = maintenanceDoc.data() ?? <String, dynamic>{};
+      if ((data['isEnabled'] ?? false) != true) return null;
+      return _AuthDecision(
+        destination: _AuthDestination.maintenance,
+        message:
+            (data['message'] ??
+                    'KairoAI is currently under maintenance. Please check back soon.')
+                .toString(),
+      );
     } catch (e) {
       debugPrint('AuthWrapper: Could not resolve maintenance mode: $e');
+      return null;
     }
+  }
 
-    return const _AuthDecision(destination: _AuthDestination.learner);
+  bool _needsEmailVerification(User user) {
+    final hasPasswordProvider = user.providerData.any(
+      (provider) => provider.providerId == 'password',
+    );
+    return hasPasswordProvider && !user.emailVerified;
+  }
+
+  Future<void> _resendVerificationEmail(User user) async {
+    setState(() => _verificationActionLoading = true);
+    try {
+      await user.sendEmailVerification();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Verification email sent to ${user.email ?? 'your email'}.',
+          ),
+          backgroundColor: AppTheme.mintGreen,
+        ),
+      );
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      final message = e.code == 'too-many-requests'
+          ? 'Please wait a little before requesting another email.'
+          : 'Could not send verification email. Please retry.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: AppTheme.punchRed),
+      );
+    } finally {
+      if (mounted) setState(() => _verificationActionLoading = false);
+    }
+  }
+
+  Future<void> _refreshVerificationStatus(User user) async {
+    setState(() => _verificationActionLoading = true);
+    try {
+      await user.reload();
+      await FirebaseAuth.instance.currentUser?.getIdToken(true);
+      if (!mounted) return;
+      final refreshedUser = FirebaseAuth.instance.currentUser;
+      if (refreshedUser?.emailVerified != true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Email is not verified yet. Please open the link first.',
+            ),
+            backgroundColor: AppTheme.punchRed,
+          ),
+        );
+      }
+      setState(() {});
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      final message = e.code == 'network-request-failed'
+          ? 'Network error. Please check your connection and retry.'
+          : 'Could not refresh verification status. Please retry.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: AppTheme.punchRed),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not refresh verification status. Please retry.'),
+          backgroundColor: AppTheme.punchRed,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _verificationActionLoading = false);
+    }
   }
 
   Widget _blockedAccessScreen({
@@ -246,6 +368,95 @@ class _AuthWrapperState extends State<AuthWrapper> {
                   ),
                 ),
               ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _emailVerificationScreen(User user) {
+    final email = user.email ?? 'your email';
+
+    return Scaffold(
+      backgroundColor: paper,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: NeoPanel(
+              color: AppTheme.warmWhite,
+              radius: 20,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    width: 86,
+                    height: 86,
+                    decoration: BoxDecoration(
+                      color: yellow,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: ink, width: 4),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: ink,
+                          blurRadius: 0,
+                          offset: Offset(6, 6),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.mark_email_read_rounded,
+                      color: ink,
+                      size: 44,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  const Text(
+                    'VERIFY YOUR EMAIL',
+                    style: TextStyle(
+                      color: ink,
+                      fontSize: 26,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'We sent a verification link to $email. Open that link, then come back and tap the button below.',
+                    style: const TextStyle(
+                      color: ink,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  NeoPrimaryButton(
+                    label: 'I Verified My Email',
+                    loading: _verificationActionLoading,
+                    onPressed: _verificationActionLoading
+                        ? null
+                        : () => _refreshVerificationStatus(user),
+                    icon: Icons.verified_rounded,
+                  ),
+                  const SizedBox(height: 10),
+                  NeoSecondaryButton(
+                    label: 'Resend Email',
+                    onPressed: _verificationActionLoading
+                        ? null
+                        : () => _resendVerificationEmail(user),
+                    icon: Icons.outgoing_mail,
+                  ),
+                  const SizedBox(height: 10),
+                  TextButton.icon(
+                    onPressed: _verificationActionLoading
+                        ? null
+                        : () => FirebaseAuth.instance.signOut(),
+                    icon: const Icon(Icons.logout_rounded),
+                    label: const Text('Use another account'),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -399,8 +610,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
         // User is logged in - check if admin or learner
         if (snapshot.hasData) {
+          final user = FirebaseAuth.instance.currentUser ?? snapshot.data!;
           return FutureBuilder<_AuthDecision>(
-            future: _resolveAuthDecision(snapshot.data!),
+            future: _resolveAuthDecision(user),
             builder: (context, decisionSnapshot) {
               if (decisionSnapshot.connectionState == ConnectionState.waiting) {
                 return _transitionPlaceholder();
@@ -427,11 +639,24 @@ class _AuthWrapperState extends State<AuthWrapper> {
                 );
               }
 
+              if (decision.destination == _AuthDestination.emailVerification) {
+                return _emailVerificationScreen(user);
+              }
+
               if (decision.destination == _AuthDestination.inactiveLearner) {
                 return _blockedAccessScreen(
                   title: 'Account Deactivated',
                   body: decision.message,
                   accent: const Color(0xFFFF9A76),
+                );
+              }
+
+              if (decision.destination == _AuthDestination.setupError) {
+                return _blockedAccessScreen(
+                  title: 'Setup Needs Retry',
+                  body: decision.message,
+                  accent: yellow,
+                  showRefresh: true,
                 );
               }
 

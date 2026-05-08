@@ -696,6 +696,7 @@ class _SignLearningPageState extends State<SignLearningPage> {
           activationRequired: false,
           activationStatus: ExperienceStatus.completed,
           activationStage: ActivationStage.done,
+          lessonTourCompleted: true,
           completedAt: DateTime.now(),
         );
       }
@@ -1070,7 +1071,10 @@ class _SignLearningPageState extends State<SignLearningPage> {
             final recallResult = await Navigator.push<RecallAssessmentResult>(
               context,
               MaterialPageRoute(
-                builder: (_) => RecallAssessmentPage(signs: _signs),
+                builder: (_) => RecallAssessmentPage(
+                  signs: _signs,
+                  showIntroCoach: widget.activationMode,
+                ),
               ),
             );
 
@@ -1115,6 +1119,7 @@ class _SignLearningPageState extends State<SignLearningPage> {
                   imageRefsBySignId: mediaBundle.imageRefsBySignId,
                   globalDistractorPool: mediaBundle.globalDistractorPool,
                   questionScope: _mcqQuestionScope,
+                  showIntroCoach: widget.activationMode,
                 ),
               ),
             );
@@ -1336,6 +1341,32 @@ class _SignLearningPageState extends State<SignLearningPage> {
         primaryLabel: 'Start checks',
         onPrimary: primaryCta.onPressed,
         pose: KairoCoachPose.thinking,
+      );
+    }
+
+    final currentSignNeedsWork = !_practicedSignIds.contains(_current.id);
+
+    if (_index == 1 && currentSignNeedsWork) {
+      return (
+        visible: true,
+        targetKey: _primaryActionKey,
+        title: 'Keep going',
+        message: 'Now do the same for these signs too.',
+        primaryLabel: primaryCta.label,
+        onPrimary: primaryCta.onPressed,
+        pose: KairoCoachPose.nudge,
+      );
+    }
+
+    if (_index > 0) {
+      return (
+        visible: false,
+        targetKey: null,
+        title: '',
+        message: '',
+        primaryLabel: '',
+        onPrimary: () {},
+        pose: KairoCoachPose.idle,
       );
     }
 

@@ -16,7 +16,15 @@ class LearnPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null || uid.isEmpty) {
+      return const Scaffold(
+        backgroundColor: AppTheme.paperCream,
+        body: Center(
+          child: CircularProgressIndicator(color: AppTheme.cobaltBlue),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: AppTheme.paperCream,
@@ -254,7 +262,7 @@ class _CategoryNode extends StatelessWidget {
                           width: 54,
                           height: 54,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Text(
+                          errorBuilder: (context, error, stackTrace) => Text(
                             category.iconEmoji,
                             style: const TextStyle(fontSize: 28),
                           ),
