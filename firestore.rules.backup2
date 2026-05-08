@@ -152,16 +152,6 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
     }
-
-    // ==================== OTP VERIFICATIONS ====================
-    match /otp_verifications/{email} {
-      allow create, read, update: if true;
-    }
-
-    // ==================== DELETED USERS BACKUP ====================
-    match /deleted_users/{userId} {
-      allow create: if isAdmin();
-      allow read, update, delete: if isAdmin();
-    }
   }
 }
+
