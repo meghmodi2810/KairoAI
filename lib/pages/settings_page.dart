@@ -6,6 +6,7 @@ import '../theme/neo_brutal_widgets.dart';
 import '../services/notification_service.dart';
 import '../services/audio_service.dart';
 import '../auth_wrapper.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -352,14 +353,25 @@ class _SettingsPageState extends State<SettingsPage> {
                         const SizedBox(height: 16),
                         NeoPrimaryButton(
                           label: 'Need Help',
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Help and support will be available soon.',
-                                ),
-                              ),
+                          onPressed: () async {
+                            final uri = Uri.parse(
+                              'https://kairo-ai-website-nu.vercel.app/',
                             );
+                            if (await canLaunchUrl(uri)) {
+                              await launchUrl(
+                                uri,
+                                mode: LaunchMode.externalApplication,
+                              );
+                            } else {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Could not open the website.',
+                                  ),
+                                ),
+                              );
+                            }
                           },
                           icon: Icons.help_outline,
                         ),
