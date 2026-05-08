@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:kairo_ai/main.dart';
 import 'package:kairo_ai/admin/models/admin_models.dart';
 import 'package:kairo_ai/admin/services/admin_auth_service.dart';
 import 'package:kairo_ai/admin/theme/admin_theme.dart';
@@ -41,7 +42,7 @@ class _AdminShellState extends State<AdminShell> {
   }
 
   Future<void> _handleBack() async {
-    // 1. If we have sub-navigation items or we're not on Dashboard, 
+    // 1. If we have sub-navigation items or we're not on Dashboard,
     // go back to the previous tab in history or the Dashboard.
     if (_selectedIndex != 0) {
       if (_history.length > 1) {
@@ -63,7 +64,7 @@ class _AdminShellState extends State<AdminShell> {
       body: 'Are you sure you want to leave the admin panel?',
       confirmLabel: 'Exit',
     );
-    
+
     if (confirm && mounted) {
       // Use system pop to exit to the student side or logout depending on app flow
       Navigator.of(context).pop();
@@ -142,58 +143,9 @@ class _AdminShellState extends State<AdminShell> {
                 ),
               );
             },
-            child: Scaffold(
-              key: _scaffoldKey,
-              backgroundColor: c2.bgBase,
-              drawer: AdminDrawer(
-                adminName: widget.admin.displayName,
-                adminEmail: widget.admin.email,
-                selectedIndex: _selectedIndex,
-                onTabSelected: _onTabSelected,
-                onSignOut: _handleSignOut,
-              ),
-              body: IndexedStack(
-                index: _selectedIndex,
-                children: [
-                  AdminDashboardScreen(
-                    admin: widget.admin,
-                    onMenuTap: _openDrawer,
-                    onTabChange: (idx, {subIndex}) =>
-                        _onTabSelected(idx, settingsTab: subIndex),
-                  ),
-                  AdminLessonsScreen(
-                    admin: widget.admin,
-                    onMenuTap: _openDrawer,
-                  ),
-                  AdminUsersScreen(
-                    admin: widget.admin,
-                    onMenuTap: _openDrawer,
-                  ),
-                  AdminAnalyticsScreen(
-                    admin: widget.admin,
-                    onMenuTap: _openDrawer,
-                  ),
-                  AdminIssuesScreen(
-                    admin: widget.admin,
-                    onMenuTap: _openDrawer,
-                  ),
-                  AdminSettingsScreen(
-                    admin: widget.admin,
-                    onMenuTap: _openDrawer,
-                    initialTabIndex: _settingsTabIndex,
-                  ),
-                ],
-              ),
-              bottomNavigationBar: _selectedIndex < 5
-                  ? AdminNavBar(
-                      selectedIndex: _selectedIndex,
-                      onTabSelected: _onTabSelected,
-                    )
-                  : null,
-            ),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 

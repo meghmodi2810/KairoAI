@@ -2,12 +2,21 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/app_models.dart';
+import '../models/experience_models.dart';
+import '../models/lesson_character_models.dart';
 
 class DatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  static const List<int> _defaultXpThresholds = <int>[0, 120, 280, 520, 860, 1300];
+  static const List<int> _defaultXpThresholds = <int>[
+    0,
+    120,
+    280,
+    520,
+    860,
+    1300,
+  ];
 
   String? get currentUserId => _auth.currentUser?.uid;
 
@@ -48,6 +57,8 @@ class DatabaseService {
         learningGoal: learningGoal,
         dailyGoalMinutes: dailyGoalMinutes ?? 10,
         currentLevel: 1,
+        completedSignCharacters: const <String>[],
+        postLoginExperienceV1: const ExperienceState.newLearner(),
       );
       await userDoc.set(newUser.toFirestore());
     } else {
@@ -72,6 +83,79 @@ class DatabaseService {
       }
       return null;
     });
+  }
+
+  Stream<ExperienceState> experienceStateStream() {
+    if (currentUserId == null) return Stream.value(const ExperienceState());
+    return _db.collection('users').doc(currentUserId).snapshots().map((doc) {
+      final data = doc.data();
+      if (data == null || data['postLoginExperienceV1'] is! Map) {
+        return const ExperienceState();
+      }
+      return ExperienceState.fromMap(
+        Map<String, dynamic>.from(data['postLoginExperienceV1'] as Map),
+      );
+    });
+  }
+
+  Stream<List<String>> completedSignCharactersStream() {
+    if (currentUserId == null) return Stream.value(const <String>[]);
+    return _db.collection('users').doc(currentUserId).snapshots().map((doc) {
+      final data = doc.data() ?? <String, dynamic>{};
+      return normalizeSignCharacters(
+        (data['completedSignCharacters'] as List<dynamic>? ?? const []).map(
+          (value) => value.toString(),
+        ),
+      );
+    });
+  }
+
+  Future<void> saveExperienceState(ExperienceState state) async {
+    if (currentUserId == null) return;
+    await _db.collection('users').doc(currentUserId).set({
+      'postLoginExperienceV1': state.toFirestore(),
+    }, SetOptions(merge: true));
+  }
+
+  Future<void> updateExperience({
+    ExperienceStatus? tourStatus,
+    String? tourStep,
+    bool clearTourStep = false,
+    bool? activationRequired,
+    ExperienceStatus? activationStatus,
+    String? activationCategoryId,
+    String? activationLessonId,
+    bool clearActivationLesson = false,
+    ActivationStage? activationStage,
+    DateTime? completedAt,
+    bool clearCompletedAt = false,
+  }) async {
+    if (currentUserId == null) return;
+    final userDoc = await _db.collection('users').doc(currentUserId).get();
+    final current = ExperienceState.fromMap(
+      userDoc.data()?['postLoginExperienceV1'] is Map
+          ? Map<String, dynamic>.from(
+              userDoc.data()!['postLoginExperienceV1'] as Map,
+            )
+          : null,
+    );
+
+    await saveExperienceState(
+      current.copyWith(
+        tourStatus: tourStatus,
+        tourStep: tourStep,
+        clearTourStep: clearTourStep,
+        activationRequired: activationRequired,
+        activationStatus: activationStatus,
+        activationCategoryId: activationCategoryId,
+        activationLessonId: activationLessonId,
+        clearActivationLesson: clearActivationLesson,
+        activationStage: activationStage,
+        updatedAt: DateTime.now(),
+        completedAt: completedAt,
+        clearCompletedAt: clearCompletedAt,
+      ),
+    );
   }
 
   Future<void> updateUserStats({
@@ -121,11 +205,12 @@ class DatabaseService {
       }
 
       final data = doc.data() ?? <String, dynamic>{};
-      final rawList = (data['xpThresholds'] as List<dynamic>? ?? _defaultXpThresholds)
-          .map((v) => (v as num).toInt())
-          .toSet()
-          .toList()
-        ..sort();
+      final rawList =
+          (data['xpThresholds'] as List<dynamic>? ?? _defaultXpThresholds)
+              .map((v) => (v as num).toInt())
+              .toSet()
+              .toList()
+            ..sort();
 
       if (rawList.isEmpty || rawList.first != 0) {
         rawList.insert(0, 0);
@@ -163,7 +248,9 @@ class DatabaseService {
     final storedLevel = (data['currentLevel'] as num?)?.toInt() ?? 1;
 
     if (derivedLevel != storedLevel) {
-      await userDoc.reference.update(<String, dynamic>{'currentLevel': derivedLevel});
+      await userDoc.reference.update(<String, dynamic>{
+        'currentLevel': derivedLevel,
+      });
     }
   }
 
@@ -345,16 +432,111 @@ class DatabaseService {
     return imageByLabel;
   }
 
-  String _normalizeSignLabel(
-    Map<String, dynamic> data, {
-    String? fallbackId,
-  }) {
+  String _normalizeSignLabel(Map<String, dynamic> data, {String? fallbackId}) {
     final raw =
         (data['word'] ?? data['character'] ?? data['label'] ?? fallbackId ?? '')
             .toString()
             .trim();
     if (raw.isEmpty) return '';
     return raw.toUpperCase();
+  }
+
+  Future<List<String>> getLessonCharacters(
+    String categoryId,
+    String lessonId,
+  ) async {
+    final signs = await getSigns(categoryId, lessonId);
+    return normalizeSignCharacters(signs.map((sign) => sign.word));
+  }
+
+  Future<Map<String, List<String>>> getLessonCharactersMap(
+    String categoryId,
+    Iterable<String> lessonIds,
+  ) async {
+    final result = <String, List<String>>{};
+    for (final lessonId in lessonIds) {
+      result[lessonId] = await getLessonCharacters(categoryId, lessonId);
+    }
+    return result;
+  }
+
+  Future<void> markLessonCharactersCompleted(
+    Iterable<String> characters,
+  ) async {
+    if (currentUserId == null) return;
+    final normalized = normalizeSignCharacters(characters);
+    if (normalized.isEmpty) return;
+
+    await _db.collection('users').doc(currentUserId).set({
+      'completedSignCharacters': FieldValue.arrayUnion(normalized),
+    }, SetOptions(merge: true));
+  }
+
+  Future<ActivationLessonRef?> resolveFirstActivationLesson() async {
+    if (currentUserId == null) return null;
+
+    final user = await getCurrentUser();
+    final currentLevel = user?.currentLevel ?? 1;
+    final categories = await getCategories();
+
+    for (final category in categories) {
+      final categoryLocked =
+          category.isLocked || currentLevel < category.requiredLevel;
+      if (categoryLocked) continue;
+
+      final lessons = await getLessons(category.id);
+      for (final lesson in lessons) {
+        if (lesson.isLocked) continue;
+
+        if (lesson.requiredLessonId != null &&
+            lesson.requiredLessonId!.trim().isNotEmpty) {
+          final required = await getLessonProgress(lesson.requiredLessonId!);
+          if (required?.status != 'completed') continue;
+        }
+
+        return ActivationLessonRef(
+          categoryId: category.id,
+          lessonId: lesson.id,
+        );
+      }
+    }
+
+    return null;
+  }
+
+  Future<LessonCharacterIndex> buildLessonCandidatesForCharacters(
+    Set<String> characters,
+  ) async {
+    final missing = normalizeSignCharacters(characters).toSet();
+    if (missing.isEmpty) return const LessonCharacterIndex([]);
+
+    final categories = await getCategories();
+    final candidates = <LessonCharacterCandidate>[];
+
+    for (final category in categories) {
+      final lessons = await getLessons(category.id);
+      for (final lesson in lessons) {
+        final lessonCharacters = (await getLessonCharacters(
+          category.id,
+          lesson.id,
+        )).toSet();
+        if (lessonCharacters.intersection(missing).isEmpty) continue;
+
+        candidates.add(
+          LessonCharacterCandidate(
+            categoryId: category.id,
+            categoryName: category.name,
+            lessonId: lesson.id,
+            lessonTitle: lesson.title,
+            categoryOrder: category.order,
+            lessonOrder: lesson.order,
+            characters: lessonCharacters,
+          ),
+        );
+      }
+    }
+
+    return LessonCharacterIndex(candidates);
   }
 
   // ==================== PROGRESS OPERATIONS ====================
@@ -554,6 +736,7 @@ class DatabaseService {
     required int coinsEarned,
     required int xpEarned,
     required int signsCount,
+    List<String> completedCharacters = const <String>[],
     Map<String, dynamic>? assessmentResults,
   }) async {
     if (currentUserId == null) return;
@@ -565,6 +748,7 @@ class DatabaseService {
 
     await _db.runTransaction((tx) async {
       final progressSnap = await tx.get(progressRef);
+      final userSnap = await tx.get(userRef);
       final existingData = progressSnap.data();
       final wasAlreadyCompleted = existingData?['status'] == 'completed';
       final firstCompletedAt = existingData?['completedAt'] as Timestamp?;
@@ -576,6 +760,7 @@ class DatabaseService {
       final safeCoinsEarned = wasAlreadyCompleted
           ? 0
           : (coinsEarned < 0 ? 0 : coinsEarned);
+      final normalizedCharacters = normalizeSignCharacters(completedCharacters);
 
       tx.set(progressRef, {
         'categoryId': categoryId,
@@ -593,7 +778,8 @@ class DatabaseService {
         'assessmentsSkipped': <String>[],
         'assessmentResumeFrom': null,
         'assessmentSummaryReady': false,
-        'assessmentResults': assessmentResults ??
+        'assessmentResults':
+            assessmentResults ??
             (existingData?['assessmentResults'] is Map
                 ? Map<String, dynamic>.from(
                     existingData!['assessmentResults'] as Map,
@@ -606,6 +792,12 @@ class DatabaseService {
         'totalPracticeMinutes': FieldValue.increment(practiceMinutes),
       };
 
+      if (normalizedCharacters.isNotEmpty) {
+        updates['completedSignCharacters'] = FieldValue.arrayUnion(
+          normalizedCharacters,
+        );
+      }
+
       if (!wasAlreadyCompleted) {
         updates['gems'] = FieldValue.increment(safeGemsEarned);
         updates['coins'] = FieldValue.increment(safeCoinsEarned);
@@ -613,8 +805,7 @@ class DatabaseService {
         updates['totalSignsLearned'] = FieldValue.increment(signsCount);
       }
 
-      // Recalculate level from new XP total
-      final userSnap = await tx.get(userRef);
+      // Recalculate level from new XP total.
       final currentXp = (userSnap.data()?['xp'] as int?) ?? 0;
       final newLevel = computeLevel(currentXp + safeXpEarned);
       updates['currentLevel'] = newLevel;
@@ -754,9 +945,7 @@ class DatabaseService {
           return;
         }
 
-        tx.update(userRef, {
-          'gems': FieldValue.increment(-cost),
-        });
+        tx.update(userRef, {'gems': FieldValue.increment(-cost)});
 
         final unlockModel = WordGroupUnlockModel(
           groupId: groupId,
@@ -781,11 +970,11 @@ class DatabaseService {
         .doc(progress.wordId)
         .set(progress.toFirestore(), SetOptions(merge: true));
   }
-  
+
   Future<void> grantWordCompletionReward({
-    required int xpEarned, 
-    required int coinsEarned, 
-    required int gemsEarned
+    required int xpEarned,
+    required int coinsEarned,
+    required int gemsEarned,
   }) async {
     if (currentUserId == null) return;
 
@@ -796,9 +985,7 @@ class DatabaseService {
       final currentXp = (snap.data()?['xp'] as int?) ?? 0;
       final newLevel = computeLevel(currentXp + xpEarned);
 
-      final updates = <String, dynamic>{
-        'currentLevel': newLevel,
-      };
+      final updates = <String, dynamic>{'currentLevel': newLevel};
       if (xpEarned > 0) updates['xp'] = FieldValue.increment(xpEarned);
       if (coinsEarned > 0) updates['coins'] = FieldValue.increment(coinsEarned);
       if (gemsEarned > 0) updates['gems'] = FieldValue.increment(gemsEarned);
@@ -809,9 +996,9 @@ class DatabaseService {
 
   Future<void> saveWordPracticeLog(Map<String, dynamic> logData) async {
     if (currentUserId == null) return;
-    
+
     // Convert to SignPracticeLogModel if it exists or just push raw data.
-    // Given SignPracticeLogModel is in admin_models, we can just push raw data 
+    // Given SignPracticeLogModel is in admin_models, we can just push raw data
     // structured identically.
     await _db.collection('sign_practice_logs').add({
       ...logData,

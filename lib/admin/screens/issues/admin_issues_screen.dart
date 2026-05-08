@@ -73,7 +73,11 @@ class _AdminIssuesScreenState extends State<AdminIssuesScreen> {
         type: AdminToastType.success,
       );
     } else {
-      AdminToast.show(context, 'Status update failed', type: AdminToastType.error);
+      AdminToast.show(
+        context,
+        'Status update failed',
+        type: AdminToastType.error,
+      );
     }
   }
 
@@ -82,7 +86,8 @@ class _AdminIssuesScreenState extends State<AdminIssuesScreen> {
     final confirmed = await AdminConfirmModal.show(
       context,
       title: 'Delete issue?',
-      body: 'This action is permanent and will remove all associated admin notes.',
+      body:
+          'This action is permanent and will remove all associated admin notes.',
       confirmLabel: 'Delete issue',
     );
     if (!confirmed || !mounted) return;
@@ -165,9 +170,10 @@ class _AdminIssuesScreenState extends State<AdminIssuesScreen> {
           Expanded(
             child: StreamBuilder<List<IssueModel>>(
               stream: _db.issuesStream(
-                  status: (_statusFilter == 'All' || _statusFilter == 'Open') 
-                      ? null 
-                      : _statusFilter.toLowerCase()),
+                status: (_statusFilter == 'All' || _statusFilter == 'Open')
+                    ? null
+                    : _statusFilter.toLowerCase(),
+              ),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return AdminSkeletonLoader.listRows(count: 8);
@@ -175,7 +181,7 @@ class _AdminIssuesScreenState extends State<AdminIssuesScreen> {
                 if (snapshot.hasError) {
                   return AdminErrorState(onRetry: () => setState(() {}));
                 }
-                
+
                 final issues = (snapshot.data ?? [])
                     .where(_matchesIssue)
                     .toList();
@@ -183,9 +189,11 @@ class _AdminIssuesScreenState extends State<AdminIssuesScreen> {
                 if (issues.isEmpty) {
                   return AdminEmptyState(
                     icon: LucideIcons.checkCircle,
-                    title: _search.isNotEmpty ? 'No matches' : 'No active issues',
-                    body: _search.isNotEmpty 
-                        ? 'Try clearing your search filters.' 
+                    title: _search.isNotEmpty
+                        ? 'No matches'
+                        : 'No active issues',
+                    body: _search.isNotEmpty
+                        ? 'Try clearing your search filters.'
                         : 'Perfect! There are no pending reports at the moment.',
                   );
                 }
@@ -255,8 +263,8 @@ class _IssueRow extends StatelessWidget {
         ),
         child: Center(
           child: Icon(
-            isCritical ? LucideIcons.alertTriangle : LucideIcons.info, 
-            size: 16, 
+            isCritical ? LucideIcons.alertTriangle : LucideIcons.info,
+            size: 16,
             color: isCritical ? c.error : c.textMuted,
           ),
         ),
@@ -270,16 +278,31 @@ class _IssueRow extends StatelessWidget {
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(issue.description, style: adminMeta(c.textMuted), maxLines: 1, overflow: TextOverflow.ellipsis),
+          Text(
+            issue.description,
+            style: adminMeta(c.textMuted),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
           const SizedBox(height: 4),
           Text(
             'Reporter: ${issue.readableReporter}',
-            style: TextStyle(fontSize: 10, color: c.textMuted, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              fontSize: 10,
+              color: c.textMuted,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-          if (issue.sourceScreen.isNotEmpty || issue.lessonId != null || issue.signLabel != null)
+          if (issue.sourceScreen.isNotEmpty ||
+              issue.lessonId != null ||
+              issue.signLabel != null)
             Text(
               'Context: ${issue.sourceScreen.isNotEmpty ? issue.sourceScreen : 'unknown'}${issue.lessonId != null ? ' · lesson ${issue.lessonId}' : ''}${issue.signLabel != null ? ' · sign ${issue.signLabel}' : ''}',
-              style: TextStyle(fontSize: 10, color: c.textMuted, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                fontSize: 10,
+                color: c.textMuted,
+                fontWeight: FontWeight.w600,
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -289,13 +312,16 @@ class _IssueRow extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          AdminTag(label: normalizedStatus.toUpperCase(), variant: statusVariant),
+          AdminTag(
+            label: normalizedStatus.toUpperCase(),
+            variant: statusVariant,
+          ),
           const SizedBox(height: 4),
           Text(
             issue.priority.toUpperCase(),
             style: TextStyle(
-              fontSize: 9, 
-              fontWeight: FontWeight.w800, 
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
               color: isCritical ? c.error : c.textMuted,
               letterSpacing: 0.5,
             ),
@@ -363,7 +389,11 @@ class _IssueDetailSheetState extends State<_IssueDetailSheet> {
       _noteCtrl.clear();
       AdminToast.show(context, 'Internal note added');
     } else {
-      AdminToast.show(context, 'Failed to save note', type: AdminToastType.error);
+      AdminToast.show(
+        context,
+        'Failed to save note',
+        type: AdminToastType.error,
+      );
     }
   }
 
@@ -406,10 +436,17 @@ class _IssueDetailSheetState extends State<_IssueDetailSheet> {
                             children: [
                               Text(issue.title, style: adminH2(c.textPrimary)),
                               const SizedBox(height: 4),
-                              Text('Reported: ${issue.readableReporter}', style: adminMeta(c.textMuted)),
+                              Text(
+                                'Reported: ${issue.readableReporter}',
+                                style: adminMeta(c.textMuted),
+                              ),
                               if (issue.reporterEmail.isNotEmpty)
-                                Text(issue.reporterEmail, style: adminMeta(c.textMuted)),
-                              if (issue.sourceScreen.isNotEmpty || issue.contextType.isNotEmpty)
+                                Text(
+                                  issue.reporterEmail,
+                                  style: adminMeta(c.textMuted),
+                                ),
+                              if (issue.sourceScreen.isNotEmpty ||
+                                  issue.contextType.isNotEmpty)
                                 Text(
                                   'Context: ${issue.sourceScreen.isNotEmpty ? issue.sourceScreen : 'n/a'} · ${issue.contextType.isNotEmpty ? issue.contextType : 'general'}',
                                   style: adminMeta(c.textMuted),
@@ -418,7 +455,10 @@ class _IssueDetailSheetState extends State<_IssueDetailSheet> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        AdminTag(label: issue.priority, variant: AdminTagVariant.inactive),
+                        AdminTag(
+                          label: issue.priority,
+                          variant: AdminTagVariant.inactive,
+                        ),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -428,7 +468,10 @@ class _IssueDetailSheetState extends State<_IssueDetailSheet> {
                         color: c.bgBase,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text(issue.description, style: adminBody(c.textSecondary)),
+                      child: Text(
+                        issue.description,
+                        style: adminBody(c.textSecondary),
+                      ),
                     ),
                     const SizedBox(height: 20),
                     Text('WORKFLOW STATUS', style: adminLabel(c.textMuted)),
@@ -437,47 +480,63 @@ class _IssueDetailSheetState extends State<_IssueDetailSheet> {
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: ['open', 'in-progress', 'resolved', 'closed']
-                            .map((s) => Padding(
-                                  padding: const EdgeInsets.only(right: 8),
-                                  child: AdminFilterChip(
-                                    label: s.toUpperCase(),
-                                    selected: _currentStatus == s,
-                                    onTap: () {
-                                      setState(() => _currentStatus = s);
-                                      widget.onStatusChange(s);
-                                    },
-                                  ),
-                                ))
+                            .map(
+                              (s) => Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: AdminFilterChip(
+                                  label: s.toUpperCase(),
+                                  selected: _currentStatus == s,
+                                  onTap: () {
+                                    setState(() => _currentStatus = s);
+                                    widget.onStatusChange(s);
+                                  },
+                                ),
+                              ),
+                            )
                             .toList(),
                       ),
                     ),
                     const SizedBox(height: 20),
-                    Text('INTERNAL NOTES (${issue.adminNotes.length})', style: adminLabel(c.textMuted)),
+                    Text(
+                      'INTERNAL NOTES (${issue.adminNotes.length})',
+                      style: adminLabel(c.textMuted),
+                    ),
                     const SizedBox(height: 8),
                     if (issue.adminNotes.isEmpty)
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 12),
-                        child: Text('No admin notes recorded.', style: adminBodySm(c.textMuted)),
+                        child: Text(
+                          'No admin notes recorded.',
+                          style: adminBodySm(c.textMuted),
+                        ),
                       )
                     else
-                      ...issue.adminNotes.map((n) => Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: c.border),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(n.content, style: adminBodySm(c.textPrimary)),
-                                  const SizedBox(height: 4),
-                                  Text('${n.adminName} · Just now', style: adminMeta(c.textMuted)),
-                                ],
-                              ),
+                      ...issue.adminNotes.map(
+                        (n) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: c.border),
+                              borderRadius: BorderRadius.circular(6),
                             ),
-                          )),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  n.content,
+                                  style: adminBodySm(c.textPrimary),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${n.adminName} · Just now',
+                                  style: adminMeta(c.textMuted),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: 12),
                     AdminInput(
                       label: 'Resolution note',
@@ -508,36 +567,9 @@ class _IssueDetailSheetState extends State<_IssueDetailSheet> {
                   ],
                 ),
               ),
-            )),
-          const SizedBox(height: 12),
-          AdminInput(
-            label: 'Resolution note',
-            hint: 'Add a resolution note...',
-            controller: _noteCtrl,
-            maxLines: 2,
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: AdminButton(
-                  label: 'Add Note',
-                  variant: AdminButtonVariant.secondary,
-                  onTap: _addingNote ? null : _addNote,
-                  isLoading: _addingNote,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: AdminButton(
-                  label: 'Delete',
-                  variant: AdminButtonVariant.ghost,
-                  onTap: widget.onDelete,
-                ),
-              ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }

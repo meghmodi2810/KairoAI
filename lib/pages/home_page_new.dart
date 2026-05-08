@@ -86,7 +86,7 @@ class _HomePageState extends State<HomePage> {
       String? nextCategoryId;
 
       for (final category in categories) {
-        if (isCategoryLockedForUser(category)) continue;
+        if (_isCategoryLockedForUser(category, user)) continue;
         final lessons = await _db.getLessons(category.id);
         for (final lesson in lessons) {
           final progress = await _db.getLessonProgress(lesson.id);
@@ -501,6 +501,11 @@ class _HomePageState extends State<HomePage> {
 
   bool _isCategoryLocked(CategoryModel category) {
     final currentLevel = _user?.currentLevel ?? 1;
+    return category.isLocked || currentLevel < category.requiredLevel;
+  }
+
+  bool _isCategoryLockedForUser(CategoryModel category, UserModel? user) {
+    final currentLevel = user?.currentLevel ?? 1;
     return category.isLocked || currentLevel < category.requiredLevel;
   }
 

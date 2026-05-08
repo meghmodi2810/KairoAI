@@ -20,6 +20,7 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
 
   List<LessonModel> _lessons = [];
   Map<String, LessonProgress> _progress = {};
+  Map<String, List<String>> _lessonCharacters = {};
   bool _loading = true;
 
   @override
@@ -31,6 +32,10 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
   Future<void> _loadLessons() async {
     try {
       final lessons = await _db.getLessons(widget.category.id);
+      final characterMap = await _db.getLessonCharactersMap(
+        widget.category.id,
+        lessons.map((lesson) => lesson.id),
+      );
       final map = <String, LessonProgress>{};
       for (final lesson in lessons) {
         final p = await _db.getLessonProgress(lesson.id);
@@ -40,6 +45,7 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
       setState(() {
         _lessons = lessons;
         _progress = map;
+        _lessonCharacters = characterMap;
         _loading = false;
       });
     } catch (e) {
@@ -59,14 +65,18 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
 
   Color _categoryTextColor(Color background) {
     final brightness = ThemeData.estimateBrightnessForColor(background);
-    return brightness == Brightness.dark ? AppTheme.warmWhite : AppTheme.inkBlack;
+    return brightness == Brightness.dark
+        ? AppTheme.warmWhite
+        : AppTheme.inkBlack;
   }
 
   @override
   Widget build(BuildContext context) {
     final categoryColor = _categoryColor();
     final categoryTextColor = _categoryTextColor(categoryColor);
-    final completed = _progress.values.where((p) => p.status == 'completed').length;
+    final completed = _progress.values
+        .where((p) => p.status == 'completed')
+        .length;
     final ratio = _lessons.isEmpty ? 0.0 : completed / _lessons.length;
 
     return Scaffold(
@@ -88,12 +98,22 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
                         decoration: BoxDecoration(
                           color: AppTheme.warmWhite,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppTheme.inkBlack, width: 3),
+                          border: Border.all(
+                            color: AppTheme.inkBlack,
+                            width: 3,
+                          ),
                           boxShadow: const [
-                            BoxShadow(color: AppTheme.inkBlack, blurRadius: 0, offset: Offset(3, 3)),
+                            BoxShadow(
+                              color: AppTheme.inkBlack,
+                              blurRadius: 0,
+                              offset: Offset(3, 3),
+                            ),
                           ],
                         ),
-                        child: const Icon(Icons.arrow_back_rounded, color: AppTheme.inkBlack),
+                        child: const Icon(
+                          Icons.arrow_back_rounded,
+                          color: AppTheme.inkBlack,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -104,21 +124,25 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
                         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                         child: Row(
                           children: [
-                          (widget.category.iconUrl != null && widget.category.iconUrl!.isNotEmpty)
-                              ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(
-                                    widget.category.iconUrl!,
-                                    width: 30,
-                                    height: 30,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Text(
-                                      widget.category.iconEmoji,
-                                      style: const TextStyle(fontSize: 26),
+                            (widget.category.iconUrl != null &&
+                                    widget.category.iconUrl!.isNotEmpty)
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.network(
+                                      widget.category.iconUrl!,
+                                      width: 30,
+                                      height: 30,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => Text(
+                                        widget.category.iconEmoji,
+                                        style: const TextStyle(fontSize: 26),
+                                      ),
                                     ),
+                                  )
+                                : Text(
+                                    widget.category.iconEmoji,
+                                    style: const TextStyle(fontSize: 26),
                                   ),
-                                )
-                              : Text(widget.category.iconEmoji, style: const TextStyle(fontSize: 26)),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Column(
@@ -136,7 +160,9 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
                                   Text(
                                     widget.category.description,
                                     style: TextStyle(
-                                      color: categoryTextColor.withValues(alpha: 0.95),
+                                      color: categoryTextColor.withValues(
+                                        alpha: 0.95,
+                                      ),
                                       fontWeight: FontWeight.w700,
                                       fontSize: 12,
                                     ),
@@ -191,7 +217,9 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
                         value: ratio,
                         minHeight: 10,
                         backgroundColor: AppTheme.warmWhite,
-                        valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.mintGreen),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          AppTheme.mintGreen,
+                        ),
                       ),
                     ),
                   ],
@@ -201,7 +229,9 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
           ),
           if (_loading)
             const SliverFillRemaining(
-              child: Center(child: CircularProgressIndicator(color: AppTheme.cobaltBlue)),
+              child: Center(
+                child: CircularProgressIndicator(color: AppTheme.cobaltBlue),
+              ),
             )
           else if (_lessons.isEmpty)
             SliverFillRemaining(
@@ -216,7 +246,8 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
               padding: const EdgeInsets.fromLTRB(14, 12, 14, 30),
               sliver: SliverList.builder(
                 itemCount: _lessons.length,
-                itemBuilder: (context, index) => _lessonCard(_lessons[index], index, categoryColor),
+                itemBuilder: (context, index) =>
+                    _lessonCard(_lessons[index], index, categoryColor),
               ),
             ),
         ],
@@ -282,7 +313,9 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: locked ? AppTheme.paperCream : color.withValues(alpha: 0.2),
+                  color: locked
+                      ? AppTheme.paperCream
+                      : color.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: AppTheme.inkBlack, width: 2),
                 ),
@@ -296,22 +329,31 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
                     Text(
                       lesson.title,
                       style: TextStyle(
-                        color: locked ? AppTheme.inkBlack.withValues(alpha: 0.6) : AppTheme.inkBlack,
+                        color: locked
+                            ? AppTheme.inkBlack.withValues(alpha: 0.6)
+                            : AppTheme.inkBlack,
                         fontSize: 16,
                         fontWeight: FontWeight.w900,
                       ),
                     ),
+                    _lessonCharacterChips(lesson.id, locked),
                     const SizedBox(height: 6),
                     Wrap(
                       spacing: 8,
                       runSpacing: 6,
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
                           decoration: BoxDecoration(
                             color: difficultyColor,
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppTheme.inkBlack, width: 2),
+                            border: Border.all(
+                              color: AppTheme.inkBlack,
+                              width: 2,
+                            ),
                           ),
                           child: Text(
                             lesson.difficulty.toUpperCase(),
@@ -361,6 +403,61 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _lessonCharacterChips(String lessonId, bool locked) {
+    final characters = _lessonCharacters[lessonId] ?? const <String>[];
+    if (characters.isEmpty) return const SizedBox(height: 4);
+
+    final visible = characters.take(5).toList(growable: false);
+    final overflow = characters.length - visible.length;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 7),
+      child: Wrap(
+        spacing: 5,
+        runSpacing: 5,
+        children: [
+          ...visible.map(
+            (character) => Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: locked ? AppTheme.paperCream : AppTheme.signalYellow,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppTheme.inkBlack, width: 1.7),
+              ),
+              child: Text(
+                character,
+                style: TextStyle(
+                  color: locked
+                      ? AppTheme.inkBlack.withValues(alpha: 0.55)
+                      : AppTheme.inkBlack,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ),
+          if (overflow > 0)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppTheme.paperCream,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppTheme.inkBlack, width: 1.7),
+              ),
+              child: Text(
+                '+$overflow',
+                style: const TextStyle(
+                  color: AppTheme.inkBlack,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

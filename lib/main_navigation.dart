@@ -6,8 +6,41 @@ import 'pages/words_page.dart';
 import 'pages/profile_page.dart';
 import 'theme/app_theme.dart';
 
+class MainNavigationController extends ChangeNotifier {
+  int? _pendingIndex;
+
+  int? consumePendingIndex() {
+    final index = _pendingIndex;
+    _pendingIndex = null;
+    return index;
+  }
+
+  void jumpTo(int index) {
+    _pendingIndex = index;
+    notifyListeners();
+  }
+}
+
+class MainNavigationTourTargets {
+  static final homeTab = GlobalKey(debugLabel: 'tour_home_tab');
+  static final learnTab = GlobalKey(debugLabel: 'tour_learn_tab');
+  static final wordsTab = GlobalKey(debugLabel: 'tour_words_tab');
+  static final profileTab = GlobalKey(debugLabel: 'tour_profile_tab');
+
+  static GlobalKey keyForIndex(int index) {
+    return switch (index) {
+      0 => homeTab,
+      1 => learnTab,
+      2 => wordsTab,
+      _ => profileTab,
+    };
+  }
+}
+
 class MainNavigation extends StatefulWidget {
-  const MainNavigation({super.key});
+  final MainNavigationController? controller;
+
+  const MainNavigation({super.key, this.controller});
 
   @override
   State<MainNavigation> createState() => _MainNavigationState();
@@ -18,10 +51,10 @@ class _MainNavigationState extends State<MainNavigation>
   int _currentIndex = 0;
 
   final List<_NavItem> _items = const [
-    _NavItem(icon: Icons.home_rounded,        label: 'Home'),
-    _NavItem(icon: Icons.menu_book_rounded,   label: 'Learn'),
-    _NavItem(icon: Icons.style_rounded,       label: 'Words'),
-    _NavItem(icon: Icons.person_rounded,      label: 'Profile'),
+    _NavItem(icon: Icons.home_rounded, label: 'Home'),
+    _NavItem(icon: Icons.menu_book_rounded, label: 'Learn'),
+    _NavItem(icon: Icons.style_rounded, label: 'Words'),
+    _NavItem(icon: Icons.person_rounded, label: 'Profile'),
   ];
 
   // Use IndexedStack so pages stay alive between tab switches
@@ -31,6 +64,34 @@ class _MainNavigationState extends State<MainNavigation>
     WordsPage(),
     ProfilePage(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller?.addListener(_handleExternalNavigation);
+  }
+
+  @override
+  void didUpdateWidget(covariant MainNavigation oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?.removeListener(_handleExternalNavigation);
+      widget.controller?.addListener(_handleExternalNavigation);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller?.removeListener(_handleExternalNavigation);
+    super.dispose();
+  }
+
+  void _handleExternalNavigation() {
+    final nextIndex = widget.controller?.consumePendingIndex();
+    if (nextIndex == null || nextIndex == _currentIndex) return;
+    if (nextIndex < 0 || nextIndex >= _pages.length) return;
+    setState(() => _currentIndex = nextIndex);
+  }
 
   void _onTap(int index) {
     if (index == _currentIndex) return;
@@ -42,10 +103,7 @@ class _MainNavigationState extends State<MainNavigation>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.surface,
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _pages,
-      ),
+      body: IndexedStack(index: _currentIndex, children: _pages),
       bottomNavigationBar: _FloatingNavBar(
         currentIndex: _currentIndex,
         items: _items,
@@ -97,13 +155,16 @@ class _FloatingNavBar extends StatelessWidget {
               onTap: () => onTap(i),
               behavior: HitTestBehavior.opaque,
               child: AnimatedContainer(
+                key: MainNavigationTourTargets.keyForIndex(i),
                 duration: const Duration(milliseconds: 180),
                 margin: const EdgeInsets.symmetric(horizontal: 3),
                 decoration: BoxDecoration(
                   color: selected ? AppTheme.cobaltBlue : Colors.transparent,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: context.isDark ? AppTheme.warmWhite : AppTheme.inkBlack,
+                    color: context.isDark
+                        ? AppTheme.warmWhite
+                        : AppTheme.inkBlack,
                     width: selected ? 2.5 : 0,
                   ),
                   boxShadow: selected
@@ -128,7 +189,9 @@ class _FloatingNavBar extends StatelessWidget {
                     Text(
                       items[i].label,
                       style: TextStyle(
-                        color: selected ? AppTheme.warmWhite : context.textMuted,
+                        color: selected
+                            ? AppTheme.warmWhite
+                            : context.textMuted,
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 0.2,

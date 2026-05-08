@@ -12,6 +12,7 @@ class LessonPracticePage extends StatefulWidget {
   final List<SignModel> signs;
   final int? lessonSignNumber;
   final int? lessonSignTotal;
+  final bool activationMode;
 
   const LessonPracticePage({
     super.key,
@@ -19,6 +20,7 @@ class LessonPracticePage extends StatefulWidget {
     required this.signs,
     this.lessonSignNumber,
     this.lessonSignTotal,
+    this.activationMode = false,
   });
 
   @override
@@ -166,6 +168,15 @@ class _LessonPracticePageState extends State<LessonPracticePage>
   }
 
   Future<void> _skipCurrentSign() async {
+    if (widget.activationMode) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Finish this first sign to unlock the next step.'),
+        ),
+      );
+      return;
+    }
+
     HapticFeedback.selectionClick();
 
     if (_index >= widget.signs.length - 1) {
@@ -252,7 +263,7 @@ class _LessonPracticePageState extends State<LessonPracticePage>
     final displaySignNumber = widget.lessonSignNumber ?? (_index + 1);
     final displaySignTotal = widget.lessonSignTotal ?? widget.signs.length;
 
-    return Scaffold(
+    final scaffold = Scaffold(
       backgroundColor: AppTheme.charcoalNight,
       body: Stack(
         children: [
@@ -314,11 +325,23 @@ class _LessonPracticePageState extends State<LessonPracticePage>
               child: Row(
                 children: [
                   _hudCircle(
-                    icon: Icons.close_rounded,
-                    onTap: () {
-                      _stopCamera();
-                      Navigator.pop(context);
-                    },
+                    icon: widget.activationMode
+                        ? Icons.lock_rounded
+                        : Icons.close_rounded,
+                    onTap: widget.activationMode
+                        ? () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Complete this first practice to continue.',
+                                ),
+                              ),
+                            );
+                          }
+                        : () {
+                            _stopCamera();
+                            Navigator.pop(context);
+                          },
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -619,18 +642,21 @@ class _LessonPracticePageState extends State<LessonPracticePage>
                               ),
                             ),
                             const SizedBox(width: 10),
-                            OutlinedButton.icon(
-                              onPressed: _matched ? null : _skipCurrentSign,
-                              icon: const Icon(Icons.skip_next_rounded),
-                              label: const Text('Skip'),
-                            ),
+                            if (!widget.activationMode)
+                              OutlinedButton.icon(
+                                onPressed: _matched ? null : _skipCurrentSign,
+                                icon: const Icon(Icons.skip_next_rounded),
+                                label: const Text('Skip'),
+                              ),
                           ],
                         ),
                         const SizedBox(height: 2),
-                        const Align(
+                        Align(
                           alignment: Alignment.centerLeft,
                           child: Text(
-                            'Skipping moves to the next sign.',
+                            widget.activationMode
+                                ? 'Hold the target sign correctly to continue.'
+                                : 'Skipping moves to the next sign.',
                             style: TextStyle(
                               color: AppTheme.inkBlack,
                               fontWeight: FontWeight.w600,
@@ -645,6 +671,8 @@ class _LessonPracticePageState extends State<LessonPracticePage>
         ],
       ),
     );
+
+    return PopScope(canPop: !widget.activationMode, child: scaffold);
   }
 
   Widget _hudCircle({

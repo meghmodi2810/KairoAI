@@ -6,8 +6,6 @@ import '../theme/app_theme.dart';
 import '../theme/neo_brutal_widgets.dart';
 import 'signup_page.dart';
 import 'forgot_password_page.dart';
-import 'package:kairo_ai/admin/models/admin_models.dart';
-import 'package:kairo_ai/admin/screens/admin_shell.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -37,7 +35,9 @@ class _LoginPageState extends State<LoginPage> {
 
   String? _validateEmail(String? value) {
     if (value == null || value.trim().isEmpty) return 'Email is required';
-    final ok = RegExp(r'^[\w\-.]+@([\w\-]+\.)+[\w\-]{2,4}$').hasMatch(value.trim());
+    final ok = RegExp(
+      r'^[\w\-.]+@([\w\-]+\.)+[\w\-]{2,4}$',
+    ).hasMatch(value.trim());
     if (!ok) return 'Enter a valid email address';
     return null;
   }
@@ -92,14 +92,13 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-
-
   void _goToAuthGate() {
     if (!mounted) return;
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => const AuthWrapper(),
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            const AuthWrapper(),
         transitionDuration: const Duration(milliseconds: 250),
         transitionsBuilder: (context, animation, secondaryAnimation, child) =>
             FadeTransition(opacity: animation, child: child),
@@ -126,10 +125,7 @@ class _LoginPageState extends State<LoginPage> {
   void _showError(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: AppTheme.punchRed,
-      ),
+      SnackBar(content: Text(message), backgroundColor: AppTheme.punchRed),
     );
   }
 
@@ -142,141 +138,172 @@ class _LoginPageState extends State<LoginPage> {
           key: _formKey,
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final panelMinHeight =
-                  (constraints.maxHeight - 96).clamp(420.0, double.infinity).toDouble();
+              final panelMinHeight = (constraints.maxHeight - 96)
+                  .clamp(420.0, double.infinity)
+                  .toDouble();
 
               return SingleChildScrollView(
-                keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
                 child: ConstrainedBox(
                   constraints: BoxConstraints(minHeight: constraints.maxHeight),
                   child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const SizedBox(height: 8),
-                        NeoPanel(
-                          color: AppTheme.warmWhite,
-                          radius: 18,
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(minHeight: panelMinHeight),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'LOG IN',
-                                  style: TextStyle(
-                                    color: AppTheme.inkBlack,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 28,
-                                  ),
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 8),
+                      NeoPanel(
+                        color: AppTheme.warmWhite,
+                        radius: 18,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: panelMinHeight,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'LOG IN',
+                                style: TextStyle(
+                                  color: AppTheme.inkBlack,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 28,
                                 ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  'Need camera access to practice signs with AI.',
-                                  style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Need camera access to practice signs with AI.',
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                              const SizedBox(height: 14),
+                              TextFormField(
+                                controller: _emailCtrl,
+                                validator: _validateEmail,
+                                keyboardType: TextInputType.emailAddress,
+                                decoration: const InputDecoration(
+                                  labelText: 'Email',
+                                  hintText: 'you@example.com',
+                                  prefixIcon: Icon(Icons.email_outlined),
                                 ),
-                                const SizedBox(height: 14),
-                                TextFormField(
-                                  controller: _emailCtrl,
-                                  validator: _validateEmail,
-                                  keyboardType: TextInputType.emailAddress,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Email',
-                                    hintText: 'you@example.com',
-                                    prefixIcon: Icon(Icons.email_outlined),
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                TextFormField(
-                                  controller: _passCtrl,
-                                  obscureText: _obscure,
-                                  validator: _validatePassword,
-                                  decoration: InputDecoration(
-                                    labelText: 'Password',
-                                    hintText: '********',
-                                    prefixIcon: const Icon(Icons.lock_outline),
-                                    suffixIcon: IconButton(
-                                      onPressed: () => setState(() => _obscure = !_obscure),
-                                      icon: Icon(_obscure
+                              ),
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: _passCtrl,
+                                obscureText: _obscure,
+                                validator: _validatePassword,
+                                decoration: InputDecoration(
+                                  labelText: 'Password',
+                                  hintText: '********',
+                                  prefixIcon: const Icon(Icons.lock_outline),
+                                  suffixIcon: IconButton(
+                                    onPressed: () =>
+                                        setState(() => _obscure = !_obscure),
+                                    icon: Icon(
+                                      _obscure
                                           ? Icons.visibility_off_outlined
-                                          : Icons.visibility_outlined),
+                                          : Icons.visibility_outlined,
                                     ),
                                   ),
                                 ),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: TextButton(
-                                    onPressed: _loading ? null : () {
-                                      Navigator.push(
-                                        context,
-                                        PageRouteBuilder(
-                                          pageBuilder: (_, __, ___) => const ForgotPasswordPage(),
-                                          transitionDuration: const Duration(milliseconds: 240),
-                                          transitionsBuilder: (_, animation, __, child) =>
-                                              FadeTransition(opacity: animation, child: child),
-                                        ),
-                                      );
-                                    },
-                                    child: const Text('Forgot password?'),
+                              ),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton(
+                                  onPressed: _loading
+                                      ? null
+                                      : () {
+                                          Navigator.push(
+                                            context,
+                                            PageRouteBuilder(
+                                              pageBuilder: (_, __, ___) =>
+                                                  const ForgotPasswordPage(),
+                                              transitionDuration:
+                                                  const Duration(
+                                                    milliseconds: 240,
+                                                  ),
+                                              transitionsBuilder:
+                                                  (_, animation, __, child) =>
+                                                      FadeTransition(
+                                                        opacity: animation,
+                                                        child: child,
+                                                      ),
+                                            ),
+                                          );
+                                        },
+                                  child: const Text('Forgot password?'),
+                                ),
+                              ),
+                              NeoPrimaryButton(
+                                label: 'Let\'s Sign In',
+                                onPressed: _loading ? null : _signIn,
+                                loading: _loading,
+                                icon: Icons.login_rounded,
+                              ),
+                              const SizedBox(height: 12),
+                              NeoSecondaryButton(
+                                label: _googleLoading
+                                    ? 'Connecting to Google...'
+                                    : 'Continue with Google',
+                                onPressed: _googleLoading
+                                    ? null
+                                    : _signInWithGoogle,
+                                icon: Icons.g_mobiledata,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Center(
+                        child: GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              PageRouteBuilder(
+                                pageBuilder:
+                                    (context, animation, secondaryAnimation) =>
+                                        const SignUpPage(),
+                                transitionDuration: const Duration(
+                                  milliseconds: 240,
+                                ),
+                                transitionsBuilder:
+                                    (
+                                      context,
+                                      animation,
+                                      secondaryAnimation,
+                                      child,
+                                    ) => FadeTransition(
+                                      opacity: animation,
+                                      child: child,
+                                    ),
+                              ),
+                            );
+                          },
+                          child: const Text.rich(
+                            TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: 'New here? ',
+                                  style: TextStyle(
+                                    color: AppTheme.inkBlack,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                                NeoPrimaryButton(
-                                  label: 'Let\'s Sign In',
-                                  onPressed: _loading ? null : _signIn,
-                                  loading: _loading,
-                                  icon: Icons.login_rounded,
-                                ),
-                                const SizedBox(height: 12),
-                                NeoSecondaryButton(
-                                  label: _googleLoading
-                                      ? 'Connecting to Google...'
-                                      : 'Continue with Google',
-                                  onPressed: _googleLoading ? null : _signInWithGoogle,
-                                  icon: Icons.g_mobiledata,
+                                TextSpan(
+                                  text: 'Create account',
+                                  style: TextStyle(
+                                    color: AppTheme.cobaltBlue,
+                                    fontWeight: FontWeight.w900,
+                                  ),
                                 ),
                               ],
                             ),
                           ),
                         ),
-                        const SizedBox(height: 14),
-                        Center(
-                          child: GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                PageRouteBuilder(
-                                  pageBuilder: (context, animation, secondaryAnimation) => const SignUpPage(),
-                                  transitionDuration: const Duration(milliseconds: 240),
-                                  transitionsBuilder: (context, animation, secondaryAnimation, child) =>
-                                      FadeTransition(opacity: animation, child: child),
-                                ),
-                              );
-                            },
-                            child: const Text.rich(
-                              TextSpan(
-                                children: [
-                                  TextSpan(
-                                    text: 'New here? ',
-                                    style: TextStyle(
-                                      color: AppTheme.inkBlack,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  TextSpan(
-                                    text: 'Create account',
-                                    style: TextStyle(
-                                      color: AppTheme.cobaltBlue,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
+                ),
               );
             },
           ),

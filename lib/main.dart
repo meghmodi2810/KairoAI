@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:rive/rive.dart';
 import 'firebase_options.dart';
 import 'auth_wrapper.dart';
 import 'theme/app_theme.dart';
@@ -18,6 +17,7 @@ void main() async {
     );
   }
 
+  await RiveNative.init();
   await AudioService().init();
   await NotificationService().init();
 

@@ -61,6 +61,7 @@ dependencies:
   share_plus: ^7.2.1
   connectivity_plus: ^5.0.2
   audioplayers: ^6.6.0
+  rive: ^0.14.0-dev.6
   flutter_local_notifications: ^21.0.0
   timezone: ^0.11.0
   flutter_timezone: ^5.0.2
@@ -99,6 +100,7 @@ flutter:
     - assets/sounds/
     - assets/login_image.jpeg
     - assets/logo/
+    - assets/mascot/
     - assets/signs/
     - assets/signs/1/image.png
     - assets/signs/2/image.png

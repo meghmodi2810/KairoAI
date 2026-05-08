@@ -1,10 +1,16 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../models/lesson_character_models.dart';
 import '../services/database_service.dart';
+import '../services/issue_report_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/neo_brutal_widgets.dart';
 import 'settings_page.dart';
+
+class ProfileTourTargets {
+  static final completedSigns = GlobalKey(debugLabel: 'tour_completed_signs');
+}
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -17,11 +23,16 @@ class ProfilePage extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppTheme.paperCream,
       body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
+        stream: FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .snapshots(),
         builder: (context, snapshot) {
           final data = snapshot.data?.data() as Map<String, dynamic>?;
 
-          final name = (data?['displayName'] ?? user?.displayName ?? 'Learner') as String;
+          final name =
+              (data?['displayName'] ?? user?.displayName ?? 'Learner')
+                  as String;
           final email = user?.email ?? '';
           final xp = (data?['xp'] ?? 0) as int;
           final storedLevel = data?['currentLevel'];
@@ -32,6 +43,10 @@ class ProfilePage extends StatelessWidget {
           final gems = (data?['gems'] ?? 0) as int;
           final signsLearned = (data?['totalSignsLearned'] ?? 0) as int;
           final lessonsCompleted = (data?['totalLessonsCompleted'] ?? 0) as int;
+          final completedSignCharacters = normalizeSignCharacters(
+            (data?['completedSignCharacters'] as List<dynamic>? ?? const [])
+                .map((value) => value.toString()),
+          );
 
           return CustomScrollView(
             slivers: [
@@ -51,7 +66,10 @@ class ProfilePage extends StatelessWidget {
                             decoration: BoxDecoration(
                               color: AppTheme.signalYellow,
                               shape: BoxShape.circle,
-                              border: Border.all(color: AppTheme.inkBlack, width: 3),
+                              border: Border.all(
+                                color: AppTheme.inkBlack,
+                                width: 3,
+                              ),
                             ),
                             child: Center(
                               child: Text(
@@ -168,6 +186,26 @@ class ProfilePage extends StatelessWidget {
                         _infoRow('Support', 'Help and FAQ available'),
                         const SizedBox(height: 8),
                         _infoRow('Language', 'English'),
+                        const SizedBox(height: 8),
+                        _infoRow('Signs learned', '$signsLearned'),
+                        const SizedBox(height: 8),
+                        _infoRow(
+                          'Completed signs',
+                          '${completedSignCharacters.length}',
+                        ),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          key: ProfileTourTargets.completedSigns,
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () => _showCompletedSignsDialog(
+                              context,
+                              completedSignCharacters,
+                            ),
+                            icon: const Icon(Icons.front_hand_rounded),
+                            label: const Text('Completed Signs'),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -184,7 +222,9 @@ class ProfilePage extends StatelessWidget {
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => const SettingsPage()),
+                          MaterialPageRoute(
+                            builder: (_) => const SettingsPage(),
+                          ),
                         );
                       },
                       icon: Icons.settings_rounded,
@@ -275,6 +315,98 @@ class _StatTile extends StatelessWidget {
   }
 }
 
+Future<void> _showCompletedSignsDialog(
+  BuildContext context,
+  List<String> completedSignCharacters,
+) async {
+  final alphabet =
+      completedSignCharacters.where(isAlphabetSignCharacter).toList()..sort();
+  final numbers = completedSignCharacters.where(isNumberSignCharacter).toList()
+    ..sort((a, b) => int.parse(a).compareTo(int.parse(b)));
+
+  await showDialog<void>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Completed Signs'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (completedSignCharacters.isEmpty)
+                const Text(
+                  'Complete a lesson to start filling this collection.',
+                ),
+              if (alphabet.isNotEmpty) ...[
+                const Text(
+                  'Alphabet',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 8),
+                _CompletedSignWrap(characters: alphabet),
+              ],
+              if (alphabet.isNotEmpty && numbers.isNotEmpty)
+                const SizedBox(height: 16),
+              if (numbers.isNotEmpty) ...[
+                const Text(
+                  'Numbers',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 8),
+                _CompletedSignWrap(characters: numbers),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        ElevatedButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: const Text('Done'),
+        ),
+      ],
+    ),
+  );
+}
+
+class _CompletedSignWrap extends StatelessWidget {
+  final List<String> characters;
+
+  const _CompletedSignWrap({required this.characters});
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: characters
+          .map(
+            (character) => Container(
+              width: 38,
+              height: 34,
+              decoration: BoxDecoration(
+                color: AppTheme.mintGreen,
+                borderRadius: BorderRadius.circular(9),
+                border: Border.all(color: AppTheme.inkBlack, width: 2),
+              ),
+              child: Center(
+                child: Text(
+                  character,
+                  style: const TextStyle(
+                    color: AppTheme.inkBlack,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
 Future<void> _showIssueReportDialog(
   BuildContext context, {
   required String reporterUid,
@@ -315,7 +447,8 @@ Future<void> _showIssueReportDialog(
                     maxLines: 4,
                     decoration: const InputDecoration(
                       labelText: 'What happened?',
-                      hintText: 'Tell us what went wrong and what you expected.',
+                      hintText:
+                          'Tell us what went wrong and what you expected.',
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -324,8 +457,14 @@ Future<void> _showIssueReportDialog(
                     decoration: const InputDecoration(labelText: 'Type'),
                     items: const [
                       DropdownMenuItem(value: 'bug', child: Text('Bug')),
-                      DropdownMenuItem(value: 'content', child: Text('Content issue')),
-                      DropdownMenuItem(value: 'feature', child: Text('Feature request')),
+                      DropdownMenuItem(
+                        value: 'content',
+                        child: Text('Content issue'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'feature',
+                        child: Text('Feature request'),
+                      ),
                       DropdownMenuItem(value: 'other', child: Text('Other')),
                     ],
                     onChanged: (value) {
@@ -354,7 +493,10 @@ Future<void> _showIssueReportDialog(
               TextButton(
                 onPressed: submitting
                     ? null
-                    : () => Navigator.of(dialogContext, rootNavigator: true).pop(false),
+                    : () => Navigator.of(
+                        dialogContext,
+                        rootNavigator: true,
+                      ).pop(false),
                 child: const Text('Cancel'),
               ),
               ElevatedButton(
@@ -367,7 +509,11 @@ Future<void> _showIssueReportDialog(
                         if (title.isEmpty || description.isEmpty) {
                           if (!hostContext.mounted) return;
                           ScaffoldMessenger.of(hostContext).showSnackBar(
-                            const SnackBar(content: Text('Please provide both title and details.')),
+                            const SnackBar(
+                              content: Text(
+                                'Please provide both title and details.',
+                              ),
+                            ),
                           );
                           return;
                         }
@@ -390,13 +536,20 @@ Future<void> _showIssueReportDialog(
                           );
 
                           if (!dialogContext.mounted) return;
-                          Navigator.of(dialogContext, rootNavigator: true).pop(true);
+                          Navigator.of(
+                            dialogContext,
+                            rootNavigator: true,
+                          ).pop(true);
                         } catch (_) {
                           if (!localContext.mounted) return;
                           setLocalState(() => submitting = false);
                           if (!hostContext.mounted) return;
                           ScaffoldMessenger.of(hostContext).showSnackBar(
-                            const SnackBar(content: Text('Could not submit issue right now. Please try again.')),
+                            const SnackBar(
+                              content: Text(
+                                'Could not submit issue right now. Please try again.',
+                              ),
+                            ),
                           );
                         }
                       },
@@ -417,7 +570,9 @@ Future<void> _showIssueReportDialog(
 
   if (submitted == true && hostContext.mounted) {
     ScaffoldMessenger.of(hostContext).showSnackBar(
-      const SnackBar(content: Text('Issue submitted. Our team will review it soon.')),
+      const SnackBar(
+        content: Text('Issue submitted. Our team will review it soon.'),
+      ),
     );
   }
 

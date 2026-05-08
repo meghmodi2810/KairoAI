@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/app_models.dart';
+import '../models/experience_models.dart';
 import '../models/lesson_assessment_models.dart';
 import '../services/database_service.dart';
 import '../services/issue_report_service.dart';
 import '../services/sign_image_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/neo_brutal_widgets.dart';
+import '../widgets/kairo_coach_overlay.dart';
 import 'sign_learning_flow_logic.dart';
 import 'assessments/lesson_completion_summary_page.dart';
 import 'assessments/matching_assessment_page.dart';
@@ -17,11 +19,13 @@ import 'lesson_practice_page.dart';
 class SignLearningPage extends StatefulWidget {
   final LessonModel lesson;
   final String categoryId;
+  final bool activationMode;
 
   const SignLearningPage({
     super.key,
     required this.lesson,
     required this.categoryId,
+    this.activationMode = false,
   });
 
   @override
@@ -66,6 +70,9 @@ class _SignLearningPageState extends State<SignLearningPage> {
   final List<String> _skippedAssessmentTypes = <String>[];
   String? _assessmentResumeType;
   LessonAssessmentSession? _assessmentSession;
+  final GlobalKey _signReferenceKey = GlobalKey();
+  final GlobalKey _primaryActionKey = GlobalKey();
+  int _activationCoachStep = 0;
 
   SignModel get _current => _signs[_index];
   bool get _guidedSequenceFinished =>
@@ -375,7 +382,10 @@ class _SignLearningPageState extends State<SignLearningPage> {
                     decoration: const InputDecoration(labelText: 'Type'),
                     items: const [
                       DropdownMenuItem(value: 'bug', child: Text('Bug')),
-                      DropdownMenuItem(value: 'content', child: Text('Content issue')),
+                      DropdownMenuItem(
+                        value: 'content',
+                        child: Text('Content issue'),
+                      ),
                       DropdownMenuItem(value: 'other', child: Text('Other')),
                     ],
                     onChanged: (value) {
@@ -389,7 +399,10 @@ class _SignLearningPageState extends State<SignLearningPage> {
                 TextButton(
                   onPressed: submitting
                       ? null
-                      : () => Navigator.of(dialogContext, rootNavigator: true).pop(false),
+                      : () => Navigator.of(
+                          dialogContext,
+                          rootNavigator: true,
+                        ).pop(false),
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
@@ -403,7 +416,9 @@ class _SignLearningPageState extends State<SignLearningPage> {
                             if (!hostContext.mounted) return;
                             ScaffoldMessenger.of(hostContext).showSnackBar(
                               const SnackBar(
-                                content: Text('Please add both title and details.'),
+                                content: Text(
+                                  'Please add both title and details.',
+                                ),
                               ),
                             );
                             return;
@@ -436,14 +451,19 @@ class _SignLearningPageState extends State<SignLearningPage> {
                             );
 
                             if (!dialogContext.mounted) return;
-                            Navigator.of(dialogContext, rootNavigator: true).pop(true);
+                            Navigator.of(
+                              dialogContext,
+                              rootNavigator: true,
+                            ).pop(true);
                           } catch (_) {
                             if (!localContext.mounted) return;
                             setLocalState(() => submitting = false);
                             if (!hostContext.mounted) return;
                             ScaffoldMessenger.of(hostContext).showSnackBar(
                               const SnackBar(
-                                content: Text('Report failed. Please retry in a moment.'),
+                                content: Text(
+                                  'Report failed. Please retry in a moment.',
+                                ),
                               ),
                             );
                           }
@@ -668,12 +688,25 @@ class _SignLearningPageState extends State<SignLearningPage> {
         coinsEarned: widget.lesson.coinsReward,
         xpEarned: widget.lesson.xpReward,
         signsCount: _signs.length,
+        completedCharacters: _signs.map((sign) => sign.word).toList(),
         assessmentResults: _serializeAssessmentResults(session),
       );
+      if (widget.activationMode) {
+        await _db.updateExperience(
+          activationRequired: false,
+          activationStatus: ExperienceStatus.completed,
+          activationStage: ActivationStage.done,
+          completedAt: DateTime.now(),
+        );
+      }
     } catch (_) {}
   }
 
   Future<void> _practiceCurrentSign() async {
+    if (widget.activationMode) {
+      await _db.updateExperience(activationStage: ActivationStage.practicing);
+    }
+
     final result = await Navigator.push<int>(
       context,
       MaterialPageRoute(
@@ -682,6 +715,7 @@ class _SignLearningPageState extends State<SignLearningPage> {
           signs: [_current],
           lessonSignNumber: _index + 1,
           lessonSignTotal: _signs.length,
+          activationMode: widget.activationMode,
         ),
       ),
     );
@@ -689,6 +723,11 @@ class _SignLearningPageState extends State<SignLearningPage> {
     if (!mounted) return;
 
     if (result == null) {
+      if (widget.activationMode) {
+        await _db.updateExperience(
+          activationStage: ActivationStage.tapPractice,
+        );
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Complete this sign practice to unlock the next sign.'),
@@ -698,6 +737,17 @@ class _SignLearningPageState extends State<SignLearningPage> {
     }
 
     if (result < 0) {
+      if (widget.activationMode) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Finish this first lesson to unlock the app tour path.',
+            ),
+          ),
+        );
+        return;
+      }
+
       final skippedSignId = _current.id;
       final skippedWord = _current.word.toUpperCase();
       final nextIndex = _index >= _signs.length - 1
@@ -784,7 +834,12 @@ class _SignLearningPageState extends State<SignLearningPage> {
     setState(() {
       _index++;
       _showTips = false;
+      _activationCoachStep = 0;
     });
+
+    if (widget.activationMode) {
+      await _db.updateExperience(activationStage: ActivationStage.viewSign);
+    }
 
     if (nextSignWord != null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -895,6 +950,9 @@ class _SignLearningPageState extends State<SignLearningPage> {
   Future<void> _runAssessmentFlow() async {
     if (_assessmentFlowStarted) return;
     _assessmentFlowStarted = true;
+    if (widget.activationMode) {
+      await _db.updateExperience(activationStage: ActivationStage.assessments);
+    }
     final assessmentFlowStartedAt = DateTime.now();
     var assessmentTimeApplied = false;
 
@@ -1242,6 +1300,75 @@ class _SignLearningPageState extends State<SignLearningPage> {
     }
   }
 
+  ({
+    bool visible,
+    GlobalKey? targetKey,
+    String title,
+    String message,
+    String primaryLabel,
+    VoidCallback onPrimary,
+    KairoCoachPose pose,
+  })
+  _activationCoachConfig(({String label, VoidCallback onPressed}) primaryCta) {
+    if (!widget.activationMode || _assessmentFlowStarted || _completed) {
+      return (
+        visible: false,
+        targetKey: null,
+        title: '',
+        message: '',
+        primaryLabel: '',
+        onPrimary: () {},
+        pose: KairoCoachPose.idle,
+      );
+    }
+
+    final session = _assessmentSession ?? _buildAssessmentSession();
+    session.guidedPracticePassed = _guidedPracticeDone;
+    final pendingAssessments = _pendingAssessmentCountForSession(session);
+
+    if (_guidedPracticeDone && pendingAssessments > 0) {
+      return (
+        visible: true,
+        targetKey: _primaryActionKey,
+        title: 'Assessment time',
+        message:
+            'You learned every sign in this lesson. Now finish the checks so I can unlock the rest of Kairo.',
+        primaryLabel: 'Start checks',
+        onPrimary: primaryCta.onPressed,
+        pose: KairoCoachPose.thinking,
+      );
+    }
+
+    if (_activationCoachStep == 0) {
+      return (
+        visible: true,
+        targetKey: _signReferenceKey,
+        title: 'Look at the picture',
+        message:
+            'This card shows the sign you are learning. Study the hand shape, then I will take you to practice.',
+        primaryLabel: 'Show practice',
+        onPrimary: () async {
+          setState(() => _activationCoachStep = 1);
+          await _db.updateExperience(
+            activationStage: ActivationStage.tapPractice,
+          );
+        },
+        pose: KairoCoachPose.point,
+      );
+    }
+
+    return (
+      visible: true,
+      targetKey: _primaryActionKey,
+      title: 'Practice this sign',
+      message:
+          'Tap here and copy the sign with your camera. I will wait until you get it right.',
+      primaryLabel: 'Practice',
+      onPrimary: primaryCta.onPressed,
+      pose: KairoCoachPose.nudge,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -1266,8 +1393,9 @@ class _SignLearningPageState extends State<SignLearningPage> {
 
     final progress = (_index + 1) / _signs.length;
     final primaryCta = _primaryCtaConfig();
+    final activationCoach = _activationCoachConfig(primaryCta);
 
-    return Scaffold(
+    final scaffold = Scaffold(
       backgroundColor: AppTheme.paperCream,
       body: SafeArea(
         child: Column(
@@ -1276,13 +1404,12 @@ class _SignLearningPageState extends State<SignLearningPage> {
               padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
               child: Row(
                 children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
+                  if (widget.activationMode)
+                    Container(
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: AppTheme.warmWhite,
+                        color: AppTheme.signalYellow,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: AppTheme.inkBlack, width: 3),
                         boxShadow: const [
@@ -1294,11 +1421,37 @@ class _SignLearningPageState extends State<SignLearningPage> {
                         ],
                       ),
                       child: const Icon(
-                        Icons.arrow_back_rounded,
+                        Icons.lock_rounded,
                         color: AppTheme.inkBlack,
                       ),
+                    )
+                  else
+                    GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: AppTheme.warmWhite,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppTheme.inkBlack,
+                            width: 3,
+                          ),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: AppTheme.inkBlack,
+                              blurRadius: 0,
+                              offset: Offset(3, 3),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.arrow_back_rounded,
+                          color: AppTheme.inkBlack,
+                        ),
+                      ),
                     ),
-                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: NeoPanel(
@@ -1366,6 +1519,7 @@ class _SignLearningPageState extends State<SignLearningPage> {
                       const SizedBox(height: 10),
                       Expanded(
                         child: Container(
+                          key: _signReferenceKey,
                           width: double.infinity,
                           decoration: BoxDecoration(
                             color: AppTheme.paperCream,
@@ -1377,7 +1531,9 @@ class _SignLearningPageState extends State<SignLearningPage> {
                           ),
                           child: Builder(
                             builder: (context) {
-                              final resolvedRef = (_resolvedImageRefs[_current.id] ?? '').trim();
+                              final resolvedRef =
+                                  (_resolvedImageRefs[_current.id] ?? '')
+                                      .trim();
                               if (resolvedRef.isNotEmpty) {
                                 return _buildGuidedSignMedia(resolvedRef);
                               }
@@ -1492,60 +1648,68 @@ class _SignLearningPageState extends State<SignLearningPage> {
                         ),
                       ),
                     ),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton.icon(
-                          onPressed: _assessmentFlowStarted
-                              ? null
-                              : _openQuickReportDialog,
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppTheme.inkBlack,
-                            visualDensity: VisualDensity.compact,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
+                  if (!widget.activationMode)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton.icon(
+                            onPressed: _assessmentFlowStarted
+                                ? null
+                                : _openQuickReportDialog,
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppTheme.inkBlack,
+                              visualDensity: VisualDensity.compact,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                            ),
+                            icon: const Icon(
+                              Icons.bug_report_outlined,
+                              size: 18,
+                            ),
+                            label: const Text(
+                              'Report Issue',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 12,
+                              ),
                             ),
                           ),
-                          icon: const Icon(Icons.bug_report_outlined, size: 18),
-                          label: const Text(
-                            'Report Issue',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 12,
+                          TextButton.icon(
+                            onPressed: _assessmentFlowStarted
+                                ? null
+                                : _restartLessonFromStart,
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppTheme.inkBlack,
+                              visualDensity: VisualDensity.compact,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                            ),
+                            icon: const Icon(
+                              Icons.restart_alt_rounded,
+                              size: 18,
+                            ),
+                            label: const Text(
+                              'Restart Lesson',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 12,
+                              ),
                             ),
                           ),
-                        ),
-                        TextButton.icon(
-                          onPressed: _assessmentFlowStarted
-                              ? null
-                              : _restartLessonFromStart,
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppTheme.inkBlack,
-                            visualDensity: VisualDensity.compact,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                          ),
-                          icon: const Icon(Icons.restart_alt_rounded, size: 18),
-                          label: const Text(
-                            'Restart Lesson',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
                   const SizedBox(height: 6),
                   SizedBox(
+                    key: _primaryActionKey,
                     width: double.infinity,
                     child: NeoPrimaryButton(
                       label: primaryCta.label,
@@ -1560,6 +1724,20 @@ class _SignLearningPageState extends State<SignLearningPage> {
             ),
           ],
         ),
+      ),
+    );
+
+    return PopScope(
+      canPop: !widget.activationMode,
+      child: KairoCoachOverlay(
+        visible: activationCoach.visible,
+        targetKey: activationCoach.targetKey,
+        title: activationCoach.title,
+        message: activationCoach.message,
+        primaryLabel: activationCoach.primaryLabel,
+        onPrimary: activationCoach.onPrimary,
+        pose: activationCoach.pose,
+        child: scaffold,
       ),
     );
   }

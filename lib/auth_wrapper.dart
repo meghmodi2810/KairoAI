@@ -5,8 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'pages/onboarding_page.dart';
 import 'pages/login_page.dart';
 import 'main_navigation.dart';
-import 'package:kairo_ai/main.dart';
 import 'package:kairo_ai/services/permission_bootstrap.dart';
+import 'pages/post_login_experience_gate.dart';
 import 'admin/screens/admin_shell.dart';
 import 'admin/theme/admin_theme.dart';
 import 'admin/models/admin_models.dart';
@@ -43,8 +43,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
   final DatabaseService _db = DatabaseService();
   bool _isLoading = true;
   bool _onboardingComplete = false;
-  Future<DocumentSnapshot?>? _adminStatusFuture;
-  String? _lastUid;
 
   static const Color ink = Color(0xFF111111);
   static const Color paper = Color(0xFFFFF7E8);
@@ -95,17 +93,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
   }
 
   Widget _withAdminTheme(BuildContext context, Widget child) {
-    return Theme(
-      data: adminThemeLight(),
-      child: child,
-    );
+    return Theme(data: adminThemeLight(), child: child);
   }
 
   Widget _transitionPlaceholder() {
-    return const Scaffold(
-      backgroundColor: paper,
-      body: SizedBox.expand(),
-    );
+    return const Scaffold(backgroundColor: paper, body: SizedBox.expand());
   }
 
   Future<_AuthDecision> _resolveAuthDecision(User user) async {
@@ -116,11 +108,15 @@ class _AuthWrapperState extends State<AuthWrapper> {
       try {
         final admin = AdminModel.fromFirestore(adminDoc);
         if (admin.isActive) {
-          return _AuthDecision(destination: _AuthDestination.admin, admin: admin);
+          return _AuthDecision(
+            destination: _AuthDestination.admin,
+            admin: admin,
+          );
         }
         return const _AuthDecision(
           destination: _AuthDestination.inactiveAdmin,
-          message: 'Your admin account is currently inactive. Contact another admin for reactivation.',
+          message:
+              'Your admin account is currently inactive. Contact another admin for reactivation.',
         );
       } catch (e) {
         debugPrint('AuthWrapper: Failed to parse admin document: $e');
@@ -135,8 +131,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
     var learnerIsActive = true;
     try {
-      final learnerDoc =
-          await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      final learnerDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get();
       learnerIsActive = (learnerDoc.data()?['isActive'] ?? true) == true;
     } catch (e) {
       debugPrint('AuthWrapper: Could not resolve learner status: $e');
@@ -145,7 +143,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
     if (!learnerIsActive) {
       return const _AuthDecision(
         destination: _AuthDestination.inactiveLearner,
-        message: 'This learner account has been deactivated. Please contact support.',
+        message:
+            'This learner account has been deactivated. Please contact support.',
       );
     }
 
@@ -159,9 +158,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
         if ((data['isEnabled'] ?? false) == true) {
           return _AuthDecision(
             destination: _AuthDestination.maintenance,
-            message: (data['message'] ??
-                    'KairoAI is currently under maintenance. Please check back soon.')
-                .toString(),
+            message:
+                (data['message'] ??
+                        'KairoAI is currently under maintenance. Please check back soon.')
+                    .toString(),
           );
         }
       }
@@ -195,7 +195,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
                     borderRadius: BorderRadius.circular(22),
                     border: Border.all(color: ink, width: 4),
                     boxShadow: const [
-                      BoxShadow(color: ink, blurRadius: 0, offset: Offset(8, 8)),
+                      BoxShadow(
+                        color: ink,
+                        blurRadius: 0,
+                        offset: Offset(8, 8),
+                      ),
                     ],
                   ),
                   child: const Icon(Icons.block_rounded, color: ink, size: 56),
@@ -268,7 +272,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
                     borderRadius: BorderRadius.circular(28),
                     border: Border.all(color: ink, width: 4),
                     boxShadow: const [
-                      BoxShadow(color: ink, blurRadius: 0, offset: Offset(8, 8)),
+                      BoxShadow(
+                        color: ink,
+                        blurRadius: 0,
+                        offset: Offset(8, 8),
+                      ),
                     ],
                   ),
                   child: ClipRRect(
@@ -301,7 +309,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
                 ),
                 const SizedBox(height: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: blue,
                     borderRadius: BorderRadius.circular(12),
@@ -338,7 +349,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
                         tween: Tween(begin: 0.2, end: 1),
                         duration: Duration(milliseconds: 520 + (i * 120)),
                         curve: Curves.easeOut,
-                        builder: (context, v, child) => Opacity(opacity: v, child: child),
+                        builder: (context, v, child) =>
+                            Opacity(opacity: v, child: child),
                         child: Container(
                           width: 42,
                           height: 42,
@@ -347,7 +359,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(color: ink, width: 3),
                           ),
-                          child: const Icon(Icons.front_hand, color: ink, size: 20),
+                          child: const Icon(
+                            Icons.front_hand,
+                            color: ink,
+                            size: 20,
+                          ),
                         ),
                       ),
                     ),
@@ -383,15 +399,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
         // User is logged in - check if admin or learner
         if (snapshot.hasData) {
-          final uid = snapshot.data!.uid;
-          if (_lastUid != uid) {
-            _lastUid = uid;
-            _adminStatusFuture = _checkAdminStatus(uid);
-          }
-          return FutureBuilder<DocumentSnapshot?>(
-            future: _adminStatusFuture,
-            builder: (context, adminSnapshot) {
-              if (adminSnapshot.connectionState == ConnectionState.waiting) {
+          return FutureBuilder<_AuthDecision>(
+            future: _resolveAuthDecision(snapshot.data!),
+            builder: (context, decisionSnapshot) {
+              if (decisionSnapshot.connectionState == ConnectionState.waiting) {
                 return _transitionPlaceholder();
               }
 
@@ -433,8 +444,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
                 );
               }
 
-              // Regular user - go to main navigation
-              return const MainNavigation();
+              // Regular learner - gate post-login tour and first lesson activation.
+              return PostLoginExperienceGate(
+                builder: (controller) => MainNavigation(controller: controller),
+              );
             },
           );
         }

@@ -7,6 +7,11 @@ import 'word_group_detail_page.dart';
 import '../services/database_service.dart';
 import '../models/app_models.dart';
 
+class WordsTourTargets {
+  static final gems = GlobalKey(debugLabel: 'tour_gems_badge');
+  static final firstWordGroup = GlobalKey(debugLabel: 'tour_first_word_group');
+}
+
 class WordsPage extends StatelessWidget {
   const WordsPage({super.key});
 
@@ -29,9 +34,14 @@ class WordsPage extends StatelessWidget {
                   trailing: uid == null
                       ? null
                       : StreamBuilder<DocumentSnapshot>(
-                          stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
+                          key: WordsTourTargets.gems,
+                          stream: FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(uid)
+                              .snapshots(),
                           builder: (context, snapshot) {
-                            final data = snapshot.data?.data() as Map<String, dynamic>?;
+                            final data =
+                                snapshot.data?.data() as Map<String, dynamic>?;
                             final gems = (data?['gems'] ?? 0) as int;
                             return NeoSticker(
                               label: '$gems GEMS',
@@ -54,7 +64,11 @@ class WordsPage extends StatelessWidget {
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const SliverFillRemaining(
-                    child: Center(child: CircularProgressIndicator(color: AppTheme.cobaltBlue)),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: AppTheme.cobaltBlue,
+                      ),
+                    ),
                   );
                 }
 
@@ -64,7 +78,9 @@ class WordsPage extends StatelessWidget {
                   final isActive = data['isActive'];
                   final isPublished = data['isPublished'];
                   final activeFlag = isActive is bool ? isActive : true;
-                  final publishedFlag = isPublished is bool ? isPublished : true;
+                  final publishedFlag = isPublished is bool
+                      ? isPublished
+                      : true;
                   return activeFlag && publishedFlag;
                 }).toList();
 
@@ -73,7 +89,8 @@ class WordsPage extends StatelessWidget {
                     child: NeoEmptyState(
                       icon: Icons.text_fields,
                       title: 'No Word Packs Yet',
-                      subtitle: 'Word packs will appear once content is published.',
+                      subtitle:
+                          'Word packs will appear once content is published.',
                     ),
                   );
                 }
@@ -81,39 +98,48 @@ class WordsPage extends StatelessWidget {
                 return StreamBuilder<List<WordGroupUnlockModel>>(
                   stream: DatabaseService().wordGroupUnlocksStream(),
                   builder: (context, unlockSnapshot) {
-                    final unlockedGroupIds = unlockSnapshot.data?.map((u) => u.groupId).toSet() ?? {};
+                    final unlockedGroupIds =
+                        unlockSnapshot.data?.map((u) => u.groupId).toSet() ??
+                        {};
 
                     return SliverGrid(
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 10,
-                        mainAxisSpacing: 10,
-                        childAspectRatio: 0.83,
-                      ),
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final doc = visibleDocs[index];
-                          final data = doc.data() as Map<String, dynamic>;
-                          
-                          final unlockCost = (data['unlockGemCost'] ?? data['gemCost'] ?? 0) as int;
-                          final isLocked = unlockCost > 0 && !unlockedGroupIds.contains(doc.id);
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 10,
+                            mainAxisSpacing: 10,
+                            childAspectRatio: 0.83,
+                          ),
+                      delegate: SliverChildBuilderDelegate((context, index) {
+                        final doc = visibleDocs[index];
+                        final data = doc.data() as Map<String, dynamic>;
 
-                          return _WordGroupCard(
-                            id: doc.id,
-                            uid: uid,
-                            name: data['name'] ?? '',
-                            iconEmoji: data['iconEmoji'] ?? '📝',
-                            difficulty: data['difficulty'] ?? 'beginner',
-                            totalWords: (data['totalWords'] ?? 0) as int,
-                            gemCost: unlockCost,
-                            isLocked: isLocked,
-                            colorSeed: AppTheme.categoryColors[index % AppTheme.categoryColors.length],
-                          );
-                        },
-                        childCount: visibleDocs.length,
-                      ),
+                        final unlockCost =
+                            (data['unlockGemCost'] ?? data['gemCost'] ?? 0)
+                                as int;
+                        final isLocked =
+                            unlockCost > 0 &&
+                            !unlockedGroupIds.contains(doc.id);
+
+                        return _WordGroupCard(
+                          key: index == 0
+                              ? WordsTourTargets.firstWordGroup
+                              : null,
+                          id: doc.id,
+                          uid: uid,
+                          name: data['name'] ?? '',
+                          iconEmoji: data['iconEmoji'] ?? '📝',
+                          difficulty: data['difficulty'] ?? 'beginner',
+                          totalWords: (data['totalWords'] ?? 0) as int,
+                          gemCost: unlockCost,
+                          isLocked: isLocked,
+                          colorSeed:
+                              AppTheme.categoryColors[index %
+                                  AppTheme.categoryColors.length],
+                        );
+                      }, childCount: visibleDocs.length),
                     );
-                  }
+                  },
                 );
               },
             ),
@@ -136,6 +162,7 @@ class _WordGroupCard extends StatelessWidget {
   final Color colorSeed;
 
   const _WordGroupCard({
+    super.key,
     required this.id,
     required this.uid,
     required this.name,
@@ -194,7 +221,9 @@ class _WordGroupCard extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: isLocked ? AppTheme.paperCream : colorSeed.withValues(alpha: 0.25),
+                    color: isLocked
+                        ? AppTheme.paperCream
+                        : colorSeed.withValues(alpha: 0.25),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: AppTheme.inkBlack, width: 2),
                   ),
@@ -216,7 +245,9 @@ class _WordGroupCard extends StatelessWidget {
             Text(
               name,
               style: TextStyle(
-                color: isLocked ? AppTheme.inkBlack.withValues(alpha: 0.65) : AppTheme.inkBlack,
+                color: isLocked
+                    ? AppTheme.inkBlack.withValues(alpha: 0.65)
+                    : AppTheme.inkBlack,
                 fontSize: 17,
                 height: 1.05,
                 fontWeight: FontWeight.w900,
@@ -228,7 +259,10 @@ class _WordGroupCard extends StatelessWidget {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: _difficultyColor(),
                     borderRadius: BorderRadius.circular(8),
@@ -276,22 +310,31 @@ class _WordGroupCard extends StatelessWidget {
               Navigator.pop(dialogContext);
               if (uid == null) return;
               try {
-                final success = await DatabaseService().unlockWordGroup(id, gemCost);
+                final success = await DatabaseService().unlockWordGroup(
+                  id,
+                  gemCost,
+                );
                 if (!context.mounted) return;
                 final messenger = ScaffoldMessenger.of(context);
                 if (success) {
                   messenger.showSnackBar(
-                    const SnackBar(content: Text('Pack unlocked. Gems deducted.')),
+                    const SnackBar(
+                      content: Text('Pack unlocked. Gems deducted.'),
+                    ),
                   );
                 } else {
                   messenger.showSnackBar(
-                    const SnackBar(content: Text('Not enough gems or unlock failed.')),
+                    const SnackBar(
+                      content: Text('Not enough gems or unlock failed.'),
+                    ),
                   );
                 }
               } catch (e) {
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Unlock failed. Please try again.')),
+                  const SnackBar(
+                    content: Text('Unlock failed. Please try again.'),
+                  ),
                 );
               }
             },

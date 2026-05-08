@@ -6,6 +6,11 @@ import '../theme/app_theme.dart';
 import '../theme/neo_brutal_widgets.dart';
 import 'category_lessons_page.dart';
 
+class LearnTourTargets {
+  static final firstCategory = GlobalKey(debugLabel: 'tour_first_category');
+  static final secondCategory = GlobalKey(debugLabel: 'tour_second_category');
+}
+
 class LearnPage extends StatelessWidget {
   const LearnPage({super.key});
 
@@ -49,9 +54,13 @@ class LearnPage extends StatelessWidget {
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 100),
             sliver: StreamBuilder<DocumentSnapshot>(
-              stream: FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
+              stream: FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(uid)
+                  .snapshots(),
               builder: (context, userSnapshot) {
-                final userData = userSnapshot.data?.data() as Map<String, dynamic>?;
+                final userData =
+                    userSnapshot.data?.data() as Map<String, dynamic>?;
                 final currentLevel =
                     (userData?['currentLevel'] as num?)?.toInt() ?? 1;
 
@@ -86,87 +95,105 @@ class LearnPage extends StatelessWidget {
                     return SliverList.builder(
                       itemCount: docs.length,
                       itemBuilder: (context, index) {
-                        final category = CategoryModel.fromFirestore(docs[index]);
-                        final color = AppTheme
-                            .categoryColors[index % AppTheme.categoryColors.length];
+                        final category = CategoryModel.fromFirestore(
+                          docs[index],
+                        );
+                        final color =
+                            AppTheme.categoryColors[index %
+                                AppTheme.categoryColors.length];
                         final isLast = index == docs.length - 1;
                         final isLocked =
-                            category.isLocked || currentLevel < category.requiredLevel;
+                            category.isLocked ||
+                            currentLevel < category.requiredLevel;
                         final lockMessage = category.isLocked
                             ? '${category.name} is temporarily locked by admin.'
                             : 'Reach level ${category.requiredLevel} to unlock ${category.name}.';
 
-                        return IntrinsicHeight(
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              SizedBox(
-                                width: 44,
-                                child: Column(
-                                  children: [
-                                    Container(
-                                      width: 26,
-                                      height: 26,
-                                      decoration: BoxDecoration(
-                                        color: isLocked
-                                            ? AppTheme.paperCream
-                                            : color,
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: AppTheme.inkBlack,
-                                          width: 3,
-                                        ),
-                                      ),
-                                      child: Icon(
-                                        isLocked ? Icons.lock : Icons.flag,
-                                        color: AppTheme.inkBlack,
-                                        size: 14,
-                                      ),
-                                    ),
-                                    if (!isLast)
-                                      Expanded(
-                                        child: Container(
-                                          width: 6,
-                                          margin: const EdgeInsets.symmetric(
-                                            vertical: 4,
-                                          ),
-                                          decoration: BoxDecoration(
+                        return KeyedSubtree(
+                          key: index == 0
+                              ? LearnTourTargets.firstCategory
+                              : index == 1
+                              ? LearnTourTargets.secondCategory
+                              : null,
+                          child: IntrinsicHeight(
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                SizedBox(
+                                  width: 44,
+                                  child: Column(
+                                    children: [
+                                      Container(
+                                        width: 26,
+                                        height: 26,
+                                        decoration: BoxDecoration(
+                                          color: isLocked
+                                              ? AppTheme.paperCream
+                                              : color,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
                                             color: AppTheme.inkBlack,
-                                            borderRadius: BorderRadius.circular(4),
+                                            width: 3,
                                           ),
+                                        ),
+                                        child: Icon(
+                                          isLocked ? Icons.lock : Icons.flag,
+                                          color: AppTheme.inkBlack,
+                                          size: 14,
                                         ),
                                       ),
-                                  ],
-                                ),
-                              ),
-                              Expanded(
-                                child: Padding(
-                                  padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
-                                  child: _CategoryNode(
-                                    uid: uid,
-                                    category: category,
-                                    color: color,
-                                    isLocked: isLocked,
-                                    onTap: () {
-                                      if (isLocked) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text(lockMessage)),
-                                        );
-                                        return;
-                                      }
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => CategoryLessonsPage(
-                                            category: category,
+                                      if (!isLast)
+                                        Expanded(
+                                          child: Container(
+                                            width: 6,
+                                            margin: const EdgeInsets.symmetric(
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: AppTheme.inkBlack,
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                            ),
                                           ),
                                         ),
-                                      );
-                                    },
+                                    ],
                                   ),
                                 ),
-                              ),
-                            ],
+                                Expanded(
+                                  child: Padding(
+                                    padding: EdgeInsets.only(
+                                      bottom: isLast ? 0 : 16,
+                                    ),
+                                    child: _CategoryNode(
+                                      uid: uid,
+                                      category: category,
+                                      color: color,
+                                      isLocked: isLocked,
+                                      onTap: () {
+                                        if (isLocked) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(lockMessage),
+                                            ),
+                                          );
+                                          return;
+                                        }
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => CategoryLessonsPage(
+                                              category: category,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         );
                       },
@@ -220,23 +247,23 @@ class _CategoryNode extends StatelessWidget {
                 child: isLocked
                     ? const Icon(Icons.lock, color: AppTheme.inkBlack)
                     : (category.iconUrl != null && category.iconUrl!.isNotEmpty)
-                        ? ClipRRect(
-                            borderRadius: BorderRadius.circular(10),
-                            child: Image.network(
-                              category.iconUrl!,
-                              width: 54,
-                              height: 54,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Text(
-                                category.iconEmoji,
-                                style: const TextStyle(fontSize: 28),
-                              ),
-                            ),
-                          )
-                        : Text(
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.network(
+                          category.iconUrl!,
+                          width: 54,
+                          height: 54,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Text(
                             category.iconEmoji,
                             style: const TextStyle(fontSize: 28),
                           ),
+                        ),
+                      )
+                    : Text(
+                        category.iconEmoji,
+                        style: const TextStyle(fontSize: 28),
+                      ),
               ),
             ),
             const SizedBox(width: 12),

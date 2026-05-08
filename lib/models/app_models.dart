@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'experience_models.dart';
 import 'lesson_assessment_models.dart';
 
 class UserModel {
@@ -28,6 +29,8 @@ class UserModel {
   final int currentLevel;
   final int xp;
   final bool isActive;
+  final List<String> completedSignCharacters;
+  final ExperienceState postLoginExperienceV1;
 
   UserModel({
     required this.uid,
@@ -50,6 +53,8 @@ class UserModel {
     this.currentLevel = 1,
     this.xp = 0,
     this.isActive = true,
+    this.completedSignCharacters = const [],
+    this.postLoginExperienceV1 = const ExperienceState(),
   });
 
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
@@ -77,6 +82,14 @@ class UserModel {
       currentLevel: data['currentLevel'] ?? 1,
       xp: data['xp'] ?? 0,
       isActive: data['isActive'] ?? true,
+      completedSignCharacters: List<String>.from(
+        data['completedSignCharacters'] ?? [],
+      ),
+      postLoginExperienceV1: ExperienceState.fromMap(
+        data['postLoginExperienceV1'] is Map
+            ? Map<String, dynamic>.from(data['postLoginExperienceV1'] as Map)
+            : null,
+      ),
     );
   }
 
@@ -105,6 +118,8 @@ class UserModel {
       'currentLevel': currentLevel,
       'xp': xp,
       'isActive': isActive,
+      'completedSignCharacters': completedSignCharacters,
+      'postLoginExperienceV1': postLoginExperienceV1.toFirestore(),
     };
   }
 
@@ -129,6 +144,8 @@ class UserModel {
     int? currentLevel,
     int? xp,
     bool? isActive,
+    List<String>? completedSignCharacters,
+    ExperienceState? postLoginExperienceV1,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -154,6 +171,10 @@ class UserModel {
       currentLevel: currentLevel ?? this.currentLevel,
       xp: xp ?? this.xp,
       isActive: isActive ?? this.isActive,
+      completedSignCharacters:
+          completedSignCharacters ?? this.completedSignCharacters,
+      postLoginExperienceV1:
+          postLoginExperienceV1 ?? this.postLoginExperienceV1,
     );
   }
 }
@@ -348,8 +369,9 @@ class SignModel {
         (data['imageUrl'] ?? data['assetPathImage'] ?? data['pictureUrl'] ?? '')
             .toString()
             .trim();
-    final resolvedGifRef =
-        (data['gifUrl'] ?? data['assetPathGif'] ?? '').toString().trim();
+    final resolvedGifRef = (data['gifUrl'] ?? data['assetPathGif'] ?? '')
+        .toString()
+        .trim();
 
     return SignModel(
       id: doc.id,
@@ -533,7 +555,8 @@ class WordGroupUnlockModel {
     final data = doc.data() as Map<String, dynamic>;
     return WordGroupUnlockModel(
       groupId: data['groupId'] ?? doc.id,
-      unlockedAt: (data['unlockedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      unlockedAt:
+          (data['unlockedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       gemCostPaid: data['gemCostPaid'] ?? 0,
     );
   }
@@ -583,7 +606,9 @@ class WordProgressModel {
       wordId: data['wordId'] ?? doc.id,
       status: data['status'] ?? 'not_started',
       currentCharacterIndex: data['currentCharacterIndex'] ?? 0,
-      completedCharacterIndexes: List<int>.from(data['completedCharacterIndexes'] ?? []),
+      completedCharacterIndexes: List<int>.from(
+        data['completedCharacterIndexes'] ?? [],
+      ),
       attemptsCount: data['attemptsCount'] ?? 0,
       timeSpentMs: data['timeSpentMs'] ?? 0,
       bestTimeMs: data['bestTimeMs'] ?? 0,
@@ -604,8 +629,12 @@ class WordProgressModel {
       'attemptsCount': attemptsCount,
       'timeSpentMs': timeSpentMs,
       'bestTimeMs': bestTimeMs,
-      'firstCompletedAt': firstCompletedAt != null ? Timestamp.fromDate(firstCompletedAt!) : null,
-      'lastPracticedAt': lastPracticedAt != null ? Timestamp.fromDate(lastPracticedAt!) : null,
+      'firstCompletedAt': firstCompletedAt != null
+          ? Timestamp.fromDate(firstCompletedAt!)
+          : null,
+      'lastPracticedAt': lastPracticedAt != null
+          ? Timestamp.fromDate(lastPracticedAt!)
+          : null,
       'rewardClaimed': rewardClaimed,
       'lastAccuracy': lastAccuracy,
     };
