@@ -219,10 +219,24 @@ class _CategoryNode extends StatelessWidget {
               child: Center(
                 child: isLocked
                     ? const Icon(Icons.lock, color: AppTheme.inkBlack)
-                    : Text(
-                        category.iconEmoji,
-                        style: const TextStyle(fontSize: 28),
-                      ),
+                    : (category.iconUrl != null && category.iconUrl!.isNotEmpty)
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Image.network(
+                              category.iconUrl!,
+                              width: 54,
+                              height: 54,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Text(
+                                category.iconEmoji,
+                                style: const TextStyle(fontSize: 28),
+                              ),
+                            ),
+                          )
+                        : Text(
+                            category.iconEmoji,
+                            style: const TextStyle(fontSize: 28),
+                          ),
               ),
             ),
             const SizedBox(width: 12),

@@ -1,10 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import '../services/issue_report_service.dart';
+import '../services/database_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/neo_brutal_widgets.dart';
-import 'login_page.dart';
+import 'settings_page.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -23,16 +23,15 @@ class ProfilePage extends StatelessWidget {
 
           final name = (data?['displayName'] ?? user?.displayName ?? 'Learner') as String;
           final email = user?.email ?? '';
-            final level = (data?['currentLevel'] as num?)?.toInt() ??
-              (data?['level'] as num?)?.toInt() ??
-              1;
-            final xp = (data?['xp'] as num?)?.toInt() ?? 0;
-            final streak = (data?['streakDays'] as num?)?.toInt() ?? 0;
-            final gems = (data?['gems'] as num?)?.toInt() ?? 0;
-            final lessonsCompleted =
-              (data?['totalLessonsCompleted'] as num?)?.toInt() ??
-              ((data?['completedLessonIds']) as List?)?.length ??
-              0;
+          final xp = (data?['xp'] ?? 0) as int;
+          final storedLevel = data?['currentLevel'];
+          final level = (storedLevel is int && storedLevel > 0)
+              ? storedLevel
+              : DatabaseService.computeLevel(xp);
+          final streak = (data?['streakDays'] ?? 0) as int;
+          final gems = (data?['gems'] ?? 0) as int;
+          final signsLearned = (data?['totalSignsLearned'] ?? 0) as int;
+          final lessonsCompleted = (data?['totalLessonsCompleted'] ?? 0) as int;
 
           return CustomScrollView(
             slivers: [
@@ -180,42 +179,15 @@ class ProfilePage extends StatelessWidget {
                   child: NeoPanel(
                     color: AppTheme.warmWhite,
                     radius: 18,
-                    child: Column(
-                      children: [
-                        NeoPrimaryButton(
-                          label: 'Report An Issue',
-                          onPressed: () {
-                            _showIssueReportDialog(
-                              context,
-                              reporterUid: uid,
-                              reporterName: name,
-                              reporterEmail: email,
-                            );
-                          },
-                          icon: Icons.bug_report_outlined,
-                        ),
-                        const SizedBox(height: 10),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 52,
-                          child: ElevatedButton.icon(
-                            onPressed: () async {
-                              await FirebaseAuth.instance.signOut();
-                              if (!context.mounted) return;
-                              Navigator.of(context).pushAndRemoveUntil(
-                                MaterialPageRoute(builder: (_) => const LoginPage()),
-                                (_) => false,
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.punchRed,
-                              foregroundColor: AppTheme.warmWhite,
-                            ),
-                            icon: const Icon(Icons.logout_rounded),
-                            label: const Text('Sign Out'),
-                          ),
-                        ),
-                      ],
+                    child: NeoPrimaryButton(
+                      label: 'Settings',
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const SettingsPage()),
+                        );
+                      },
+                      icon: Icons.settings_rounded,
                     ),
                   ),
                 ),

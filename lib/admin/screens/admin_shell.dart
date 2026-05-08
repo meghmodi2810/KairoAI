@@ -5,6 +5,7 @@ import 'package:kairo_ai/admin/theme/admin_theme.dart';
 import 'package:kairo_ai/admin/widgets/a_overlays.dart';
 import 'package:kairo_ai/admin/screens/dashboard/admin_dashboard_screen.dart';
 import 'package:kairo_ai/admin/screens/lessons/admin_lessons_screen.dart';
+import 'package:kairo_ai/admin/screens/words/admin_words_screen.dart';
 import 'package:kairo_ai/admin/screens/users/admin_users_screen.dart';
 import 'package:kairo_ai/admin/screens/analytics/admin_analytics_screen.dart';
 import 'package:kairo_ai/admin/screens/issues/admin_issues_screen.dart';
@@ -32,7 +33,7 @@ class _AdminShellState extends State<AdminShell> {
       _selectedIndex = index;
       if (settingsTab != null) {
         _settingsTabIndex = settingsTab;
-      } else if (index != 5) {
+      } else if (index != 6) {
         _settingsTabIndex = 0;
       }
       _history.add(index);
@@ -71,16 +72,75 @@ class _AdminShellState extends State<AdminShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Theme(
-      data: adminThemeLight(),
-      child: Builder(
-        builder: (context) {
-          final c2 = ac(context);
-          return PopScope(
-            canPop: false,
-            onPopInvokedWithResult: (didPop, result) {
-              if (didPop) return;
-              _handleBack();
+    return ListenableBuilder(
+      listenable: MyApp.themeProvider,
+      builder: (context, _) {
+        final bool isDarkMode = MyApp.themeProvider.isDarkMode;
+        return Theme(
+          data: isDarkMode ? adminThemeDark() : adminThemeLight(),
+          child: Builder(
+            builder: (context) {
+              final c2 = ac(context);
+              return PopScope(
+                canPop: false,
+                onPopInvokedWithResult: (didPop, result) {
+                  if (didPop) return;
+                  _handleBack();
+                },
+                child: Scaffold(
+                  key: _scaffoldKey,
+                  backgroundColor: c2.bgBase,
+                  drawer: AdminDrawer(
+                    adminName: widget.admin.displayName,
+                    adminEmail: widget.admin.email,
+                    selectedIndex: _selectedIndex,
+                    onTabSelected: _onTabSelected,
+                    onSignOut: _handleSignOut,
+                  ),
+                  body: IndexedStack(
+                    index: _selectedIndex,
+                    children: [
+                      AdminDashboardScreen(
+                        admin: widget.admin,
+                        onMenuTap: _openDrawer,
+                        onTabChange: (idx, {subIndex}) =>
+                            _onTabSelected(idx, settingsTab: subIndex),
+                      ),
+                      AdminLessonsScreen(
+                        admin: widget.admin,
+                        onMenuTap: _openDrawer,
+                      ),
+                      AdminWordsScreen(
+                        admin: widget.admin,
+                        onMenuTap: _openDrawer,
+                      ),
+                      AdminUsersScreen(
+                        admin: widget.admin,
+                        onMenuTap: _openDrawer,
+                      ),
+                      AdminAnalyticsScreen(
+                        admin: widget.admin,
+                        onMenuTap: _openDrawer,
+                      ),
+                      AdminIssuesScreen(
+                        admin: widget.admin,
+                        onMenuTap: _openDrawer,
+                      ),
+                      AdminSettingsScreen(
+                        admin: widget.admin,
+                        onMenuTap: _openDrawer,
+                        initialTabIndex: _settingsTabIndex,
+                      ),
+                    ],
+                  ),
+                  bottomNavigationBar: _selectedIndex < 6
+                      ? AdminNavBar(
+                          selectedIndex: _selectedIndex,
+                          onTabSelected: _onTabSelected,
+                        )
+                      : null,
+                ),
+              );
             },
             child: Scaffold(
               key: _scaffoldKey,

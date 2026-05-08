@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/app_models.dart';
 import '../services/database_service.dart';
+import '../services/audio_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/neo_brutal_widgets.dart';
 import 'sign_learning_page.dart';
@@ -103,7 +104,21 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
                         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                         child: Row(
                           children: [
-                            Text(widget.category.iconEmoji, style: const TextStyle(fontSize: 26)),
+                          (widget.category.iconUrl != null && widget.category.iconUrl!.isNotEmpty)
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.network(
+                                    widget.category.iconUrl!,
+                                    width: 30,
+                                    height: 30,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Text(
+                                      widget.category.iconEmoji,
+                                      style: const TextStyle(fontSize: 26),
+                                    ),
+                                  ),
+                                )
+                              : Text(widget.category.iconEmoji, style: const TextStyle(fontSize: 26)),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Column(
@@ -247,6 +262,7 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
         onTap: locked
             ? null
             : () {
+                AudioService().playClick();
                 Navigator.push(
                   context,
                   MaterialPageRoute(

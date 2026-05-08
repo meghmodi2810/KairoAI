@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/admin_database_service.dart';
-import 'admin_navigation.dart';
+import 'screens/admin_shell.dart';
+import 'models/admin_models.dart';
 import '../theme/app_theme.dart';
 import '../theme/neo_brutal_widgets.dart';
 
@@ -31,6 +32,13 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
 
   Future<void> _signIn() async {
     if (!_formKey.currentState!.validate()) return;
+    
+    // CRITICAL: Dismiss keyboard FIRST to prevent UI overflow during navigation
+    FocusScope.of(context).unfocus();
+    
+    // Small delay to let keyboard dismissal animation start
+    await Future.delayed(const Duration(milliseconds: 100));
+    
     setState(() => _isLoading = true);
 
     try {
@@ -49,10 +57,26 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
       }
 
       await _adminDbService.updateAdminLastLogin();
+      
+      // Additional delay to ensure keyboard is fully dismissed before navigation
+      await Future.delayed(const Duration(milliseconds: 150));
+      
       if (mounted) {
+        final admin = AdminModel(
+          id: userCredential.user!.uid,
+          email: userCredential.user!.email ?? '',
+          displayName: 'Admin',
+          role: 'admin',
+          permissions: [],
+          isActive: true,
+          createdAt: DateTime.now(),
+          lastLoginAt: DateTime.now(),
+        );
+        
+        // Navigate after keyboard is fully dismissed
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const AdminNavigation()),
+          MaterialPageRoute(builder: (_) => AdminShell(admin: admin)),
         );
       }
     } catch (e) {
@@ -81,6 +105,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(32),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 420),
               child: Column(

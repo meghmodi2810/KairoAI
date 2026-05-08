@@ -2,7 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../theme/neo_brutal_widgets.dart';
-import 'sign_practice_page.dart';
+import 'word_practice_page.dart';
+import '../models/admin_models.dart';
 
 class WordGroupDetailPage extends StatelessWidget {
   final String groupId;
@@ -127,7 +128,7 @@ class WordGroupDetailPage extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 100),
             sliver: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
-                  .collection('wordGroups')
+                  .collection('word_groups')
                   .doc(groupId)
                   .collection('words')
                   .orderBy('order')
@@ -153,9 +154,9 @@ class WordGroupDetailPage extends StatelessWidget {
                   itemCount: snapshot.data!.docs.length,
                   itemBuilder: (context, index) {
                     final doc = snapshot.data!.docs[index];
-                    final data = doc.data() as Map<String, dynamic>;
-                    final word = (data['text'] ?? data['word'] ?? '') as String;
-                    final hindi = data['wordInHindi'] as String?;
+                    final wordModel = WordModel.fromFirestore(doc);
+                    final word = wordModel.text;
+                    final hindi = ''; // Hindi not strictly typed yet, could be added later or ignored
 
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 10),
@@ -215,7 +216,10 @@ class WordGroupDetailPage extends StatelessWidget {
                                     : () => Navigator.push(
                                           context,
                                           MaterialPageRoute(
-                                            builder: (_) => SignPracticePage(targetSign: word),
+                                            builder: (_) => WordPracticePage(
+                                              wordModel: wordModel,
+                                              groupId: groupId,
+                                            ),
                                           ),
                                         ),
                                 icon: const Icon(Icons.camera_alt, size: 16),

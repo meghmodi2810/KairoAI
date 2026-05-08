@@ -369,6 +369,7 @@ class _AdminDrawerState extends State<AdminDrawer>
   static const _navItems = [
     (LucideIcons.layoutGrid, 'Dashboard'),
     (LucideIcons.bookOpen, 'Lessons'),
+    (LucideIcons.type, 'Words'),
     (LucideIcons.users, 'Learners'),
     (LucideIcons.barChart2, 'Analytics'),
     (LucideIcons.activity, 'Issues'),
@@ -442,14 +443,14 @@ class _AdminDrawerState extends State<AdminDrawer>
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       child: Text('NAVIGATION', style: adminLabel(c.textMuted)),
                     ),
-                    ..._navItems.take(3).toList().asMap().entries.map((e) => _item(e, c)),
+                    ..._navItems.take(4).toList().asMap().entries.map((e) => _item(e, c)),
                     const SizedBox(height: 8),
                     Divider(indent: 14, endIndent: 14, height: 24, color: c.border),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       child: Text('SYSTEM', style: adminLabel(c.textMuted)),
                     ),
-                    ..._navItems.skip(3).toList().asMap().entries.map((e) => _item(e, c, offset: 3)),
+                    ..._navItems.skip(4).toList().asMap().entries.map((e) => _item(e, c, offset: 4)),
                   ],
                 ),
               ),
@@ -557,6 +558,7 @@ class AdminNavBar extends StatelessWidget {
   static const _tabs = [
     (LucideIcons.layoutGrid, 'Dashboard'),
     (LucideIcons.bookOpen, 'Lessons'),
+    (LucideIcons.type, 'Words'),
     (LucideIcons.users, 'Learners'),
     (LucideIcons.barChart2, 'Analytics'),
     (LucideIcons.activity, 'Issues'),

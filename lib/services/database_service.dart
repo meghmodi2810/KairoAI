@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/app_models.dart';
@@ -9,6 +10,14 @@ class DatabaseService {
   static const List<int> _defaultXpThresholds = <int>[0, 120, 280, 520, 860, 1300];
 
   String? get currentUserId => _auth.currentUser?.uid;
+
+  /// Compute player level from XP.
+  /// Formula: level = floor(0.5 + sqrt(0.25 + xp / 50)), min 1.
+  static int computeLevel(int xp) {
+    if (xp <= 0) return 1;
+    final level = (0.5 + sqrt(0.25 + xp / 50.0)).floor();
+    return level < 1 ? 1 : level;
+  }
 
   // ==================== USER OPERATIONS ====================
 
@@ -604,6 +613,12 @@ class DatabaseService {
         updates['totalSignsLearned'] = FieldValue.increment(signsCount);
       }
 
+      // Recalculate level from new XP total
+      final userSnap = await tx.get(userRef);
+      final currentXp = (userSnap.data()?['xp'] as int?) ?? 0;
+      final newLevel = computeLevel(currentXp + safeXpEarned);
+      updates['currentLevel'] = newLevel;
+
       tx.update(userRef, updates);
     });
 
@@ -684,5 +699,124 @@ class DatabaseService {
     }
 
     return null;
+  }
+
+  // ==================== WORD PRACTICE OPERATIONS ====================
+
+  Stream<List<WordGroupUnlockModel>> wordGroupUnlocksStream() {
+    if (currentUserId == null) return Stream.value([]);
+    return _db
+        .collection('users')
+        .doc(currentUserId)
+        .collection('word_group_unlocks')
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => WordGroupUnlockModel.fromFirestore(doc))
+              .toList(),
+        );
+  }
+
+  Stream<List<WordProgressModel>> wordProgressStream(String groupId) {
+    if (currentUserId == null) return Stream.value([]);
+    return _db
+        .collection('users')
+        .doc(currentUserId)
+        .collection('word_progress')
+        .where('groupId', isEqualTo: groupId)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => WordProgressModel.fromFirestore(doc))
+              .toList(),
+        );
+  }
+
+  Future<bool> unlockWordGroup(String groupId, int cost) async {
+    if (currentUserId == null) return false;
+
+    final userRef = _db.collection('users').doc(currentUserId);
+    final unlockRef = userRef.collection('word_group_unlocks').doc(groupId);
+
+    try {
+      await _db.runTransaction((tx) async {
+        final userDoc = await tx.get(userRef);
+        final userData = userDoc.data() ?? {};
+        final currentGems = userData['gems'] as int? ?? 0;
+
+        if (currentGems < cost) {
+          throw Exception('Insufficient gems to unlock this pack.');
+        }
+
+        final unlockDoc = await tx.get(unlockRef);
+        if (unlockDoc.exists) {
+          // Already unlocked
+          return;
+        }
+
+        tx.update(userRef, {
+          'gems': FieldValue.increment(-cost),
+        });
+
+        final unlockModel = WordGroupUnlockModel(
+          groupId: groupId,
+          unlockedAt: DateTime.now(),
+          gemCostPaid: cost,
+        );
+
+        tx.set(unlockRef, unlockModel.toFirestore());
+      });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<void> updateWordProgress(WordProgressModel progress) async {
+    if (currentUserId == null) return;
+    await _db
+        .collection('users')
+        .doc(currentUserId)
+        .collection('word_progress')
+        .doc(progress.wordId)
+        .set(progress.toFirestore(), SetOptions(merge: true));
+  }
+  
+  Future<void> grantWordCompletionReward({
+    required int xpEarned, 
+    required int coinsEarned, 
+    required int gemsEarned
+  }) async {
+    if (currentUserId == null) return;
+
+    final userRef = _db.collection('users').doc(currentUserId);
+
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(userRef);
+      final currentXp = (snap.data()?['xp'] as int?) ?? 0;
+      final newLevel = computeLevel(currentXp + xpEarned);
+
+      final updates = <String, dynamic>{
+        'currentLevel': newLevel,
+      };
+      if (xpEarned > 0) updates['xp'] = FieldValue.increment(xpEarned);
+      if (coinsEarned > 0) updates['coins'] = FieldValue.increment(coinsEarned);
+      if (gemsEarned > 0) updates['gems'] = FieldValue.increment(gemsEarned);
+
+      tx.update(userRef, updates);
+    });
+  }
+
+  Future<void> saveWordPracticeLog(Map<String, dynamic> logData) async {
+    if (currentUserId == null) return;
+    
+    // Convert to SignPracticeLogModel if it exists or just push raw data.
+    // Given SignPracticeLogModel is in admin_models, we can just push raw data 
+    // structured identically.
+    await _db.collection('sign_practice_logs').add({
+      ...logData,
+      'learnerId': currentUserId,
+      'timestamp': FieldValue.serverTimestamp(),
+    });
   }
 }

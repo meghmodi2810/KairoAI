@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../models/app_models.dart';
 import '../services/sign_image_service.dart';
 import '../services/sign_detection_service.dart';
+import '../services/audio_service.dart';
 import '../theme/app_theme.dart';
 
 class LessonPracticePage extends StatefulWidget {
@@ -68,10 +69,7 @@ class _LessonPracticePageState extends State<LessonPracticePage>
   }
 
   Future<void> _initCamera() async {
-    bool granted = await _detection.checkCameraPermission();
-    if (!granted) {
-      granted = await _detection.requestCameraPermission();
-    }
+    final granted = await _detection.checkCameraPermission();
 
     if (!mounted) return;
     setState(() {
@@ -79,6 +77,19 @@ class _LessonPracticePageState extends State<LessonPracticePage>
       _loading = false;
     });
 
+    if (granted) {
+      await _startCamera();
+    }
+  }
+
+  Future<void> _requestCameraPermission() async {
+    setState(() => _loading = true);
+    final granted = await _detection.requestCameraPermission();
+    if (!mounted) return;
+    setState(() {
+      _hasPermission = granted;
+      _loading = false;
+    });
     if (granted) {
       await _startCamera();
     }
@@ -150,6 +161,7 @@ class _LessonPracticePageState extends State<LessonPracticePage>
     if (_matched) return;
     setState(() => _matched = true);
     HapticFeedback.heavyImpact();
+    AudioService().playSuccess();
     Future.delayed(const Duration(milliseconds: 900), _nextSign);
   }
 
@@ -514,7 +526,7 @@ class _LessonPracticePageState extends State<LessonPracticePage>
                         ),
                         const SizedBox(height: 10),
                         ElevatedButton.icon(
-                          onPressed: _initCamera,
+                          onPressed: _requestCameraPermission,
                           icon: const Icon(Icons.camera_alt_rounded),
                           label: const Text('Enable Camera'),
                         ),

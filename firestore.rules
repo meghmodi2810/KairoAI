@@ -41,6 +41,16 @@ service cloud.firestore {
         allow read, write: if isOwner(userId) || isAdmin();
       }
 
+      // Word progress subcollection
+      match /word_progress/{progressId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+
+      // Word group unlocks subcollection
+      match /word_group_unlocks/{unlockId} {
+        allow read, write: if isOwner(userId) || isAdmin();
+      }
+
       // Daily insights subcollection (if nested under users)
       match /daily_insights/{insightId} {
         allow read, write: if isOwner(userId) || isAdmin();

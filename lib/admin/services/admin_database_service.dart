@@ -239,7 +239,7 @@ class AdminDatabaseService {
         action: 'create',
         entityType: 'word_group',
         entityId: docRef.id,
-        changes: {'name': group.name, 'gemCost': group.gemCost},
+        changes: {'name': group.name, 'gemCost': group.unlockGemCost},
       );
       return docRef.id;
     } catch (e) {
@@ -293,6 +293,31 @@ class AdminDatabaseService {
     }
   }
 
+  /// Maintain totalWords
+  Future<void> _updateWordGroupTotalWords(String groupId) async {
+    final wordsSnapshot = await _db
+        .collection('word_groups')
+        .doc(groupId)
+        .collection('words')
+        .get();
+    
+    await _db.collection('word_groups').doc(groupId).update({
+      'totalWords': wordsSnapshot.docs.length,
+    });
+  }
+
+  /// Validate word characters — only A-Z and 0-9 allowed
+  void _validateWordCharacters(String text) {
+    final upperText = text.toUpperCase();
+    if (upperText.isEmpty) {
+      throw Exception('Word text cannot be empty.');
+    }
+    final unsupportedRegex = RegExp(r'[^A-Z0-9]');
+    if (unsupportedRegex.hasMatch(upperText)) {
+      throw Exception('Only characters A-Z and 0-9 are supported.');
+    }
+  }
+
   // ==================== WORD OPERATIONS ====================
 
   /// Get words in a group
@@ -307,29 +332,58 @@ class AdminDatabaseService {
   }
 
   /// Add word to group
-  Future<String?> addWord(String groupId, WordModel word) async {
-    try {
-      final docRef = await _db
-          .collection('word_groups')
-          .doc(groupId)
-          .collection('words')
-          .add(word.toFirestore());
-      await _logAuditAction(
-        action: 'create',
-        entityType: 'word',
-        entityId: docRef.id,
-        changes: {'text': word.text, 'groupId': groupId},
-      );
-      return docRef.id;
-    } catch (e) {
-      debugPrint('Error adding word: $e');
-      return null;
+  Future<String> addWord(String groupId, WordModel word) async {
+    _validateWordCharacters(word.text);
+    
+    // Check for duplicate normalizedText
+    final duplicates = await _db
+        .collection('word_groups')
+        .doc(groupId)
+        .collection('words')
+        .where('normalizedText', isEqualTo: word.normalizedText)
+        .get();
+        
+    if (duplicates.docs.isNotEmpty) {
+      throw Exception('A word with this text already exists in this group.');
     }
+
+    final docRef = await _db
+        .collection('word_groups')
+        .doc(groupId)
+        .collection('words')
+        .add(word.toFirestore());
+        
+    await _updateWordGroupTotalWords(groupId);
+        
+    await _logAuditAction(
+      action: 'create',
+      entityType: 'word',
+      entityId: docRef.id,
+      changes: {'text': word.text, 'groupId': groupId},
+    );
+    return docRef.id;
   }
 
   /// Update word
   Future<bool> updateWord(String groupId, String wordId, Map<String, dynamic> updates) async {
     try {
+      if (updates.containsKey('text')) {
+        _validateWordCharacters(updates['text']);
+        final normalizedText = (updates['text'] as String).toUpperCase();
+        
+        // Check for duplicate
+        final duplicates = await _db
+            .collection('word_groups')
+            .doc(groupId)
+            .collection('words')
+            .where('normalizedText', isEqualTo: normalizedText)
+            .get();
+            
+        if (duplicates.docs.any((doc) => doc.id != wordId)) {
+          throw Exception('A word with this text already exists in this group.');
+        }
+      }
+
       await _db
           .collection('word_groups')
           .doc(groupId)
@@ -358,6 +412,9 @@ class AdminDatabaseService {
           .collection('words')
           .doc(wordId)
           .delete();
+          
+      await _updateWordGroupTotalWords(groupId);
+          
       await _logAuditAction(
         action: 'delete',
         entityType: 'word',

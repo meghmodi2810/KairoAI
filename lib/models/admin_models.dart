@@ -489,8 +489,12 @@ class WordGroupModel {
   final String id;
   final String name;
   final String description;
-  final int gemCost;
+  final String iconEmoji;
+  final String difficulty;
+  final int unlockGemCost;
+  final int completionGemReward;
   final int order;
+  final int totalWords;
   final List<WordModel> words;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -501,8 +505,12 @@ class WordGroupModel {
     required this.id,
     required this.name,
     required this.description,
-    required this.gemCost,
+    this.iconEmoji = '📝',
+    this.difficulty = 'beginner',
+    required this.unlockGemCost,
+    this.completionGemReward = 0,
     required this.order,
+    this.totalWords = 0,
     this.words = const [],
     required this.createdAt,
     required this.updatedAt,
@@ -516,8 +524,12 @@ class WordGroupModel {
       id: doc.id,
       name: data['name'] ?? '',
       description: data['description'] ?? '',
-      gemCost: data['gemCost'] ?? 0,
+      iconEmoji: data['iconEmoji'] ?? '📝',
+      difficulty: data['difficulty'] ?? 'beginner',
+      unlockGemCost: data['unlockGemCost'] ?? data['gemCost'] ?? 0,
+      completionGemReward: data['completionGemReward'] ?? 0,
       order: data['order'] ?? 0,
+      totalWords: data['totalWords'] ?? 0,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       createdBy: data['createdBy'],
@@ -529,8 +541,12 @@ class WordGroupModel {
     return {
       'name': name,
       'description': description,
-      'gemCost': gemCost,
+      'iconEmoji': iconEmoji,
+      'difficulty': difficulty,
+      'unlockGemCost': unlockGemCost,
+      'completionGemReward': completionGemReward,
       'order': order,
+      'totalWords': totalWords,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
       'createdBy': createdBy,
@@ -542,8 +558,12 @@ class WordGroupModel {
     String? id,
     String? name,
     String? description,
-    int? gemCost,
+    String? iconEmoji,
+    String? difficulty,
+    int? unlockGemCost,
+    int? completionGemReward,
     int? order,
+    int? totalWords,
     List<WordModel>? words,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -554,8 +574,12 @@ class WordGroupModel {
       id: id ?? this.id,
       name: name ?? this.name,
       description: description ?? this.description,
-      gemCost: gemCost ?? this.gemCost,
+      iconEmoji: iconEmoji ?? this.iconEmoji,
+      difficulty: difficulty ?? this.difficulty,
+      unlockGemCost: unlockGemCost ?? this.unlockGemCost,
+      completionGemReward: completionGemReward ?? this.completionGemReward,
       order: order ?? this.order,
+      totalWords: totalWords ?? this.totalWords,
       words: words ?? this.words,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -570,8 +594,10 @@ class WordModel {
   final String id;
   final String wordGroupId;
   final String text;
+  final String normalizedText;
   final List<WordCharacter> characters;
   final int order;
+  final bool isPublished;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -579,8 +605,10 @@ class WordModel {
     required this.id,
     required this.wordGroupId,
     required this.text,
+    required this.normalizedText,
     this.characters = const [],
     required this.order,
+    this.isPublished = true,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -591,12 +619,14 @@ class WordModel {
       id: doc.id,
       wordGroupId: data['wordGroupId'] ?? '',
       text: data['text'] ?? '',
+      normalizedText: data['normalizedText'] ?? (data['text'] ?? '').toString().toUpperCase(),
       characters:
           (data['characters'] as List<dynamic>?)
               ?.map((e) => WordCharacter.fromMap(e as Map<String, dynamic>))
               .toList() ??
           [],
       order: data['order'] ?? 0,
+      isPublished: data['isPublished'] ?? true,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
@@ -606,8 +636,10 @@ class WordModel {
     return {
       'wordGroupId': wordGroupId,
       'text': text,
+      'normalizedText': normalizedText,
       'characters': characters.map((e) => e.toMap()).toList(),
       'order': order,
+      'isPublished': isPublished,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };

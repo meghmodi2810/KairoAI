@@ -60,6 +60,7 @@ class _SignLearningPageState extends State<SignLearningPage> {
   bool _completed = false;
   bool _assessmentFlowStarted = false;
   int _totalPracticeSeconds = 0;
+  final Map<String, String?> _resolvedImageRefs = <String, String?>{};
   final Set<String> _practicedSignIds = <String>{};
   final Set<String> _skippedSignIds = <String>{};
   final List<String> _skippedAssessmentTypes = <String>[];
@@ -494,6 +495,18 @@ class _SignLearningPageState extends State<SignLearningPage> {
           ? existingProgress
           : await _db.getLessonProgress(widget.lesson.id);
 
+      // Pre-resolve all sign image refs to avoid FutureBuilder flickering
+      final imageRefs = <String, String?>{};
+      for (final sign in signs) {
+        final ref = await _imageService.resolveImageRefForWord(
+          sign.word,
+          lessonImageRef: sign.imageUrl,
+          lessonFallbackRef: sign.gifUrl,
+          fallbackLabel: sign.id,
+        );
+        imageRefs[sign.id] = ref;
+      }
+
       final validSignIds = signs.map((sign) => sign.id).toSet();
       final restoredPracticed = <String>{
         ...?progress?.signsCompleted.where(validSignIds.contains),
@@ -558,6 +571,9 @@ class _SignLearningPageState extends State<SignLearningPage> {
         _assessmentResumeType = restoredAssessmentResume;
         _assessmentSession = restoredSession;
         _totalPracticeSeconds = progress?.timeSpentSeconds ?? 0;
+        _resolvedImageRefs
+          ..clear()
+          ..addAll(imageRefs);
         _loading = false;
       });
 
@@ -1359,28 +1375,12 @@ class _SignLearningPageState extends State<SignLearningPage> {
                               width: 3,
                             ),
                           ),
-                          child: FutureBuilder<String?>(
-                            future: _imageService.resolveImageRefForWord(
-                              _current.word,
-                              lessonImageRef: _current.imageUrl,
-                              lessonFallbackRef: _current.gifUrl,
-                              fallbackLabel: _current.id,
-                            ),
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState ==
-                                  ConnectionState.waiting) {
-                                return const Center(
-                                  child: CircularProgressIndicator(
-                                    color: AppTheme.cobaltBlue,
-                                  ),
-                                );
-                              }
-
-                              final resolvedRef = (snapshot.data ?? '').trim();
+                          child: Builder(
+                            builder: (context) {
+                              final resolvedRef = (_resolvedImageRefs[_current.id] ?? '').trim();
                               if (resolvedRef.isNotEmpty) {
                                 return _buildGuidedSignMedia(resolvedRef);
                               }
-
                               return _buildGuidedPlaceholder();
                             },
                           ),

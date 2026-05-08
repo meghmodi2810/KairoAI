@@ -505,41 +505,12 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
       appBar: AdminTopBar(
         title: 'Users',
         onMenuTap: widget.onMenuTap,
-        adminName: widget.admin.displayName,
-        adminEmail: widget.admin.email,
-        action: _creatingUser
-            ? const SizedBox(
-                width: 48,
-                child: Center(
-                  child: SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ),
-              )
-            : AdminTopBarIconButton(
-                icon: LucideIcons.plus,
-                onTap: _openCreateUserDialog,
-              ),
-      ),
-      floatingActionButton: GestureDetector(
-        onTap: _creatingUser ? null : _openCreateUserDialog,
-        child: Container(
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(
-            color: c.btnPrimary,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: c.border, width: 2.5),
-            boxShadow: const [
-              BoxShadow(color: Color(0xFF111111), offset: Offset(3, 3), blurRadius: 0),
-            ],
-          ),
-          child: Icon(
-            LucideIcons.plus,
-            color: c.btnPrimaryFg,
-            size: 22,
+        action: AdminTopBarIconButton(
+          icon: LucideIcons.plus,
+          onTap: () => AdminToast.show(
+            context,
+            'Learners are added when they sign up.',
+            type: AdminToastType.info,
           ),
         ),
       ),

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../models/app_models.dart';
 import '../services/database_service.dart';
+import '../services/audio_service.dart';
 import '../theme/app_theme.dart';
 import '../theme/neo_brutal_widgets.dart';
 import 'category_lessons_page.dart';
@@ -18,6 +19,20 @@ class _HomePageState extends State<HomePage> {
   final DatabaseService _db = DatabaseService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  // Cache variables
+  static UserModel? _cachedUser;
+  static List<CategoryModel>? _cachedCategories;
+  static LessonModel? _cachedContinueLesson;
+  static String? _cachedContinueCategoryId;
+  static DateTime? _lastCacheTime;
+  
+  static const Duration _cacheValidity = Duration(minutes: 5);
+  
+  bool get _isCacheValid {
+    if (_lastCacheTime == null) return false;
+    return DateTime.now().difference(_lastCacheTime!) < _cacheValidity;
+  }
+
   UserModel? _user;
   List<CategoryModel> _categories = [];
   LessonModel? _continueLesson;
@@ -31,15 +46,42 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _loadData() async {
-    try {
-      final user = await _db.getCurrentUser();
-      final categories = await _db.getCategories();
+    // Use cached data immediately if valid
+    if (_isCacheValid && _cachedUser != null) {
+      setState(() {
+        _user = _cachedUser;
+        _categories = _cachedCategories ?? [];
+        _continueLesson = _cachedContinueLesson;
+        _continueCategoryId = _cachedContinueCategoryId;
+        _isLoading = false;
+      });
+      
+      // Refresh in background
+      _refreshData();
+      return;
+    }
+    
+    // Load fresh data
+    await _refreshData();
+  }
 
-      bool isCategoryLockedForUser(CategoryModel category) {
-        final currentLevel = user?.currentLevel ?? 1;
-        return category.isLocked || currentLevel < category.requiredLevel;
+  Future<void> _refreshData() async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser != null) {
+        await _db.createUserDocument(currentUser);
       }
 
+      // Parallel data fetching
+      final results = await Future.wait([
+        _db.getCurrentUser(),
+        _db.getCategories(),
+      ]);
+
+      final user = results[0] as UserModel?;
+      final categories = results[1] as List<CategoryModel>;
+
+      // Find continue lesson (optimized)
       LessonModel? nextLesson;
       String? nextCategoryId;
 
@@ -56,6 +98,13 @@ class _HomePageState extends State<HomePage> {
         }
         if (nextLesson != null) break;
       }
+
+      // Update cache
+      _cachedUser = user;
+      _cachedCategories = categories;
+      _cachedContinueLesson = nextLesson;
+      _cachedContinueCategoryId = nextCategoryId;
+      _lastCacheTime = DateTime.now();
 
       if (!mounted) return;
       setState(() {
@@ -76,15 +125,13 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.paperCream,
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppTheme.cobaltBlue),
-            )
-          : SafeArea(
-              child: RefreshIndicator(
-                color: AppTheme.cobaltBlue,
-                onRefresh: _loadData,
-                child: SingleChildScrollView(
+      body: SafeArea(
+        child: RefreshIndicator(
+          color: AppTheme.cobaltBlue,
+          onRefresh: _refreshData,
+          child: _isLoading && _user == null
+              ? _buildSkeletonLoader()
+              : SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(16, 14, 16, 30),
                   child: Column(
@@ -114,8 +161,46 @@ class _HomePageState extends State<HomePage> {
                     ],
                   ),
                 ),
-              ),
-            ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSkeletonLoader() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 30),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSkeletonBox(height: 60, width: double.infinity),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(child: _buildSkeletonBox(height: 100)),
+              const SizedBox(width: 8),
+              Expanded(child: _buildSkeletonBox(height: 100)),
+              const SizedBox(width: 8),
+              Expanded(child: _buildSkeletonBox(height: 100)),
+            ],
+          ),
+          const SizedBox(height: 18),
+          _buildSkeletonBox(height: 120, width: double.infinity),
+          const SizedBox(height: 18),
+          _buildSkeletonBox(height: 150, width: double.infinity),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSkeletonBox({required double height, double? width}) {
+    return Container(
+      height: height,
+      width: width,
+      decoration: BoxDecoration(
+        color: AppTheme.warmWhite.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.inkBlack.withValues(alpha: 0.1), width: 2),
+      ),
     );
   }
 
@@ -446,18 +531,24 @@ class _HomePageState extends State<HomePage> {
         final color = _parseColor(category.color);
 
         return GestureDetector(
-          onTap: locked
-              ? () => ScaffoldMessenger.of(context).showSnackBar(
+          onTap: category.isLocked
+              ? () {
+                  AudioService().playClick();
+                  ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(_categoryLockMessage(category)),
                   ),
-                )
-              : () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => CategoryLessonsPage(category: category),
-                  ),
-                ),
+                );
+                }
+              : () {
+                  AudioService().playClick();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => CategoryLessonsPage(category: category),
+                    ),
+                  );
+                },
           child: NeoPanel(
             radius: 16,
             color: AppTheme.warmWhite,
@@ -476,10 +567,24 @@ class _HomePageState extends State<HomePage> {
                   child: Center(
                     child: locked
                         ? const Icon(Icons.lock, color: AppTheme.inkBlack)
-                        : Text(
-                            category.iconEmoji,
-                            style: const TextStyle(fontSize: 24),
-                          ),
+                        : (category.iconUrl != null && category.iconUrl!.isNotEmpty)
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(9),
+                                child: Image.network(
+                                  category.iconUrl!,
+                                  width: 50,
+                                  height: 50,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Text(
+                                    category.iconEmoji,
+                                    style: const TextStyle(fontSize: 24),
+                                  ),
+                                ),
+                              )
+                            : Text(
+                                category.iconEmoji,
+                                style: const TextStyle(fontSize: 24),
+                              ),
                   ),
                 ),
                 const SizedBox(width: 12),

@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../theme/neo_brutal_widgets.dart';
 import 'word_group_detail_page.dart';
+import '../services/database_service.dart';
+import '../models/app_models.dart';
 
 class WordsPage extends StatelessWidget {
   const WordsPage({super.key});
@@ -45,7 +47,10 @@ class WordsPage extends StatelessWidget {
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 100),
             sliver: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance.collection('wordGroups').orderBy('order').snapshots(),
+              stream: FirebaseFirestore.instance
+                  .collection('word_groups')
+                  .orderBy('order')
+                  .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const SliverFillRemaining(
@@ -53,7 +58,17 @@ class WordsPage extends StatelessWidget {
                   );
                 }
 
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                final docs = snapshot.data?.docs ?? [];
+                final visibleDocs = docs.where((doc) {
+                  final data = doc.data() as Map<String, dynamic>? ?? {};
+                  final isActive = data['isActive'];
+                  final isPublished = data['isPublished'];
+                  final activeFlag = isActive is bool ? isActive : true;
+                  final publishedFlag = isPublished is bool ? isPublished : true;
+                  return activeFlag && publishedFlag;
+                }).toList();
+
+                if (visibleDocs.isEmpty) {
                   return SliverFillRemaining(
                     child: NeoEmptyState(
                       icon: Icons.text_fields,
@@ -63,32 +78,42 @@ class WordsPage extends StatelessWidget {
                   );
                 }
 
-                return SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                    childAspectRatio: 0.83,
-                  ),
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final doc = snapshot.data!.docs[index];
-                      final data = doc.data() as Map<String, dynamic>;
+                return StreamBuilder<List<WordGroupUnlockModel>>(
+                  stream: DatabaseService().wordGroupUnlocksStream(),
+                  builder: (context, unlockSnapshot) {
+                    final unlockedGroupIds = unlockSnapshot.data?.map((u) => u.groupId).toSet() ?? {};
 
-                      return _WordGroupCard(
-                        id: doc.id,
-                        uid: uid,
-                        name: data['name'] ?? '',
-                        iconEmoji: data['iconEmoji'] ?? '📝',
-                        difficulty: data['difficulty'] ?? 'beginner',
-                        totalWords: (data['totalWords'] ?? 0) as int,
-                        gemCost: (data['gemCost'] ?? 0) as int,
-                        isLocked: (data['isLocked'] ?? false) as bool,
-                        colorSeed: AppTheme.categoryColors[index % AppTheme.categoryColors.length],
-                      );
-                    },
-                    childCount: snapshot.data!.docs.length,
-                  ),
+                    return SliverGrid(
+                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        crossAxisSpacing: 10,
+                        mainAxisSpacing: 10,
+                        childAspectRatio: 0.83,
+                      ),
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final doc = visibleDocs[index];
+                          final data = doc.data() as Map<String, dynamic>;
+                          
+                          final unlockCost = (data['unlockGemCost'] ?? data['gemCost'] ?? 0) as int;
+                          final isLocked = unlockCost > 0 && !unlockedGroupIds.contains(doc.id);
+
+                          return _WordGroupCard(
+                            id: doc.id,
+                            uid: uid,
+                            name: data['name'] ?? '',
+                            iconEmoji: data['iconEmoji'] ?? '📝',
+                            difficulty: data['difficulty'] ?? 'beginner',
+                            totalWords: (data['totalWords'] ?? 0) as int,
+                            gemCost: unlockCost,
+                            isLocked: isLocked,
+                            colorSeed: AppTheme.categoryColors[index % AppTheme.categoryColors.length],
+                          );
+                        },
+                        childCount: visibleDocs.length,
+                      ),
+                    );
+                  }
                 );
               },
             ),
@@ -251,19 +276,23 @@ class _WordGroupCard extends StatelessWidget {
               Navigator.pop(dialogContext);
               if (uid == null) return;
               try {
-                final firestore = FirebaseFirestore.instance;
-                await firestore.runTransaction((txn) async {
-                  final userRef = firestore.collection('users').doc(uid);
-                  final groupRef = firestore.collection('wordGroups').doc(id);
-                  final userSnap = await txn.get(userRef);
-                  final userGems = (userSnap.data()?['gems'] ?? 0) as int;
-                  if (userGems < gemCost) throw Exception('Not enough gems');
-                  txn.update(userRef, {'gems': userGems - gemCost});
-                  txn.update(groupRef, {'isLocked': false});
-                });
+                final success = await DatabaseService().unlockWordGroup(id, gemCost);
+                if (!context.mounted) return;
+                final messenger = ScaffoldMessenger.of(context);
+                if (success) {
+                  messenger.showSnackBar(
+                    const SnackBar(content: Text('Pack unlocked. Gems deducted.')),
+                  );
+                } else {
+                  messenger.showSnackBar(
+                    const SnackBar(content: Text('Not enough gems or unlock failed.')),
+                  );
+                }
               } catch (e) {
-                if (!dialogContext.mounted) return;
-                ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text('$e')));
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Unlock failed. Please try again.')),
+                );
               }
             },
             child: Text('Unlock for $gemCost'),

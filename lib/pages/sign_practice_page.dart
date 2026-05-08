@@ -53,10 +53,7 @@ class _SignPracticePageState extends State<SignPracticePage>
   }
 
   Future<void> _initialize() async {
-    bool allowed = await _detectionService.checkCameraPermission();
-    if (!allowed) {
-      allowed = await _detectionService.requestCameraPermission();
-    }
+    final allowed = await _detectionService.checkCameraPermission();
 
     if (!mounted) return;
     setState(() {
@@ -64,6 +61,19 @@ class _SignPracticePageState extends State<SignPracticePage>
       _loading = false;
     });
 
+    if (allowed) {
+      await _startDetection();
+    }
+  }
+
+  Future<void> _requestCameraPermission() async {
+    setState(() => _loading = true);
+    final allowed = await _detectionService.requestCameraPermission();
+    if (!mounted) return;
+    setState(() {
+      _hasPermission = allowed;
+      _loading = false;
+    });
     if (allowed) {
       await _startDetection();
     }
@@ -294,7 +304,7 @@ class _SignPracticePageState extends State<SignPracticePage>
                     if (!_loading && !_hasPermission) ...[
                       const SizedBox(height: 10),
                       ElevatedButton.icon(
-                        onPressed: _initialize,
+                        onPressed: _requestCameraPermission,
                         icon: const Icon(Icons.camera_alt_rounded),
                         label: const Text('Grant Permission'),
                       ),

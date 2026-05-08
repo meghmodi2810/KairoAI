@@ -424,8 +424,12 @@ class WordGroupModel {
   final String id;
   final String name;
   final String description;
-  final int gemCost;
+  final String iconEmoji;
+  final String difficulty;
+  final int unlockGemCost;
+  final int completionGemReward;
   final int order;
+  final int totalWords;
   final bool isActive;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -434,8 +438,12 @@ class WordGroupModel {
     required this.id,
     required this.name,
     required this.description,
-    this.gemCost = 0,
+    this.iconEmoji = '📝',
+    this.difficulty = 'beginner',
+    this.unlockGemCost = 0,
+    this.completionGemReward = 0,
     this.order = 0,
+    this.totalWords = 0,
     this.isActive = true,
     required this.createdAt,
     required this.updatedAt,
@@ -447,8 +455,12 @@ class WordGroupModel {
       id: doc.id,
       name: data['name'] ?? '',
       description: data['description'] ?? '',
-      gemCost: data['gemCost'] ?? 0,
+      iconEmoji: data['iconEmoji'] ?? '📝',
+      difficulty: data['difficulty'] ?? 'beginner',
+      unlockGemCost: data['unlockGemCost'] ?? data['gemCost'] ?? 0,
+      completionGemReward: data['completionGemReward'] ?? 0,
       order: data['order'] ?? 0,
+      totalWords: data['totalWords'] ?? 0,
       isActive: data['isActive'] ?? true,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
@@ -459,12 +471,46 @@ class WordGroupModel {
     return {
       'name': name,
       'description': description,
-      'gemCost': gemCost,
+      'iconEmoji': iconEmoji,
+      'difficulty': difficulty,
+      'unlockGemCost': unlockGemCost,
+      'completionGemReward': completionGemReward,
       'order': order,
+      'totalWords': totalWords,
       'isActive': isActive,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };
+  }
+
+  WordGroupModel copyWith({
+    String? id,
+    String? name,
+    String? description,
+    String? iconEmoji,
+    String? difficulty,
+    int? unlockGemCost,
+    int? completionGemReward,
+    int? order,
+    int? totalWords,
+    bool? isActive,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return WordGroupModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      iconEmoji: iconEmoji ?? this.iconEmoji,
+      difficulty: difficulty ?? this.difficulty,
+      unlockGemCost: unlockGemCost ?? this.unlockGemCost,
+      completionGemReward: completionGemReward ?? this.completionGemReward,
+      order: order ?? this.order,
+      totalWords: totalWords ?? this.totalWords,
+      isActive: isActive ?? this.isActive,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
   }
 }
 
@@ -473,16 +519,20 @@ class WordModel {
   final String id;
   final String wordGroupId;
   final String text;
+  final String normalizedText;
   final List<WordCharacter> characters;
   final int order;
+  final bool isPublished;
   final DateTime createdAt;
 
   WordModel({
     required this.id,
     required this.wordGroupId,
     required this.text,
+    required this.normalizedText,
     required this.characters,
     this.order = 0,
+    this.isPublished = true,
     required this.createdAt,
   });
 
@@ -492,12 +542,14 @@ class WordModel {
       id: doc.id,
       wordGroupId: data['wordGroupId'] ?? '',
       text: data['text'] ?? '',
+      normalizedText: data['normalizedText'] ?? (data['text'] ?? '').toString().toUpperCase(),
       characters:
           (data['characters'] as List<dynamic>?)
               ?.map((c) => WordCharacter.fromMap(c as Map<String, dynamic>))
               .toList() ??
           [],
       order: data['order'] ?? 0,
+      isPublished: data['isPublished'] ?? true,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
@@ -506,8 +558,10 @@ class WordModel {
     return {
       'wordGroupId': wordGroupId,
       'text': text,
+      'normalizedText': normalizedText,
       'characters': characters.map((c) => c.toMap()).toList(),
       'order': order,
+      'isPublished': isPublished,
       'createdAt': Timestamp.fromDate(createdAt),
     };
   }
@@ -855,6 +909,12 @@ class SignPracticeLogModel {
   final double confidenceScore;
   final DateTime timestamp;
   final int attemptNumber;
+  final String contextType; // 'lesson' or 'word'
+  final String? groupId;
+  final String? wordId;
+  final int? characterIndex;
+  final String? expectedCharacter;
+  final String? detectedCharacter;
 
   SignPracticeLogModel({
     required this.id,
@@ -867,6 +927,12 @@ class SignPracticeLogModel {
     this.confidenceScore = 0.0,
     required this.timestamp,
     this.attemptNumber = 1,
+    this.contextType = 'lesson',
+    this.groupId,
+    this.wordId,
+    this.characterIndex,
+    this.expectedCharacter,
+    this.detectedCharacter,
   });
 
   factory SignPracticeLogModel.fromFirestore(DocumentSnapshot doc) {
@@ -882,6 +948,12 @@ class SignPracticeLogModel {
       confidenceScore: (data['confidenceScore'] ?? 0.0).toDouble(),
       timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
       attemptNumber: data['attemptNumber'] ?? 1,
+      contextType: data['contextType'] ?? 'lesson',
+      groupId: data['groupId'],
+      wordId: data['wordId'],
+      characterIndex: data['characterIndex'],
+      expectedCharacter: data['expectedCharacter'],
+      detectedCharacter: data['detectedCharacter'],
     );
   }
 
@@ -896,6 +968,12 @@ class SignPracticeLogModel {
       'confidenceScore': confidenceScore,
       'timestamp': Timestamp.fromDate(timestamp),
       'attemptNumber': attemptNumber,
+      'contextType': contextType,
+      'groupId': groupId,
+      'wordId': wordId,
+      'characterIndex': characterIndex,
+      'expectedCharacter': expectedCharacter,
+      'detectedCharacter': detectedCharacter,
     };
   }
 }

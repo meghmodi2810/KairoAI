@@ -508,9 +508,36 @@ class _IssueDetailSheetState extends State<_IssueDetailSheet> {
                   ],
                 ),
               ),
-            ),
-          ],
-        ),
+            )),
+          const SizedBox(height: 12),
+          AdminInput(
+            label: 'Resolution note',
+            hint: 'Add a resolution note...',
+            controller: _noteCtrl,
+            maxLines: 2,
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: AdminButton(
+                  label: 'Add Note',
+                  variant: AdminButtonVariant.secondary,
+                  onTap: _addingNote ? null : _addNote,
+                  isLoading: _addingNote,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: AdminButton(
+                  label: 'Delete',
+                  variant: AdminButtonVariant.ghost,
+                  onTap: widget.onDelete,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

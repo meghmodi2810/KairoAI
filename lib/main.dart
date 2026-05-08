@@ -6,6 +6,8 @@ import 'firebase_options.dart';
 import 'auth_wrapper.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_provider.dart';
+import 'services/audio_service.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,19 +18,8 @@ void main() async {
     );
   }
 
-  // Install App Check provider so Firebase services can request valid attestations.
-  // Debug builds use debug providers to keep local development working.
-  try {
-    await FirebaseAppCheck.instance.activate(
-      androidProvider: kDebugMode
-          ? AndroidProvider.debug
-          : AndroidProvider.playIntegrity,
-      appleProvider:
-          kDebugMode ? AppleProvider.debug : AppleProvider.deviceCheck,
-    );
-  } catch (e) {
-    debugPrint('App Check activation failed: $e');
-  }
+  await AudioService().init();
+  await NotificationService().init();
 
   runApp(const MyApp());
 }

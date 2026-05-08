@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'pages/onboarding_page.dart';
 import 'pages/login_page.dart';
 import 'main_navigation.dart';
+import 'package:kairo_ai/main.dart';
+import 'package:kairo_ai/services/permission_bootstrap.dart';
 import 'admin/screens/admin_shell.dart';
 import 'admin/theme/admin_theme.dart';
 import 'admin/models/admin_models.dart';
@@ -41,6 +43,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
   final DatabaseService _db = DatabaseService();
   bool _isLoading = true;
   bool _onboardingComplete = false;
+  Future<DocumentSnapshot?>? _adminStatusFuture;
+  String? _lastUid;
 
   static const Color ink = Color(0xFF111111);
   static const Color paper = Color(0xFFFFF7E8);
@@ -50,7 +54,16 @@ class _AuthWrapperState extends State<AuthWrapper> {
   @override
   void initState() {
     super.initState();
+    _requestInitialPermissions();
     _checkOnboardingStatus();
+  }
+
+  Future<void> _requestInitialPermissions() async {
+    try {
+      await PermissionBootstrap.requestInitialPermissions();
+    } catch (e) {
+      debugPrint('AuthWrapper: Permission bootstrap failed: $e');
+    }
   }
 
   Future<void> _checkOnboardingStatus() async {
@@ -370,10 +383,15 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
         // User is logged in - check if admin or learner
         if (snapshot.hasData) {
-          return FutureBuilder<_AuthDecision>(
-            future: _resolveAuthDecision(snapshot.data!),
-            builder: (context, decisionSnapshot) {
-              if (decisionSnapshot.connectionState == ConnectionState.waiting) {
+          final uid = snapshot.data!.uid;
+          if (_lastUid != uid) {
+            _lastUid = uid;
+            _adminStatusFuture = _checkAdminStatus(uid);
+          }
+          return FutureBuilder<DocumentSnapshot?>(
+            future: _adminStatusFuture,
+            builder: (context, adminSnapshot) {
+              if (adminSnapshot.connectionState == ConnectionState.waiting) {
                 return _transitionPlaceholder();
               }
 
