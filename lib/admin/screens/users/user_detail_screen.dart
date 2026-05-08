@@ -248,6 +248,42 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
     }
   }
 
+  Future<void> _deleteLearner() async {
+    final confirmed = await AdminConfirmModal.show(
+      context,
+      title: 'Delete learner account?',
+      body:
+          'This will permanently delete this learner\'s account, including all progress, XP, gems, and data. This action cannot be undone.',
+      confirmLabel: 'Delete account',
+      isDestructive: true,
+    );
+    if (!confirmed || !mounted) return;
+
+    setState(() => _actionLoading = true);
+    final result = await _db.deleteLearner(
+      learnerId: widget.userId,
+      actingAdminId: widget.admin.id,
+    );
+    if (!mounted) return;
+    setState(() => _actionLoading = false);
+
+    if (result.success) {
+      AdminToast.show(
+        context,
+        result.message,
+        type: AdminToastType.success,
+      );
+      // Return to users list with deleted flag
+      Navigator.of(context).pop({'deleted': true, 'userId': widget.userId});
+    } else {
+      AdminToast.show(
+        context,
+        result.message,
+        type: AdminToastType.error,
+      );
+    }
+  }
+
   Future<void> _addGems() async {
     int? gemsToAdd;
     await showModalBottomSheet(
@@ -618,8 +654,14 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
               leading: Icon(LucideIcons.rotateCcw, size: 14, color: c.warning),
               title: Text('Reset progress', style: adminH3(c.warning)),
               showChevron: true,
-              isLast: true,
               onTap: _resetProgress,
+            ),
+            AdminRow(
+              leading: Icon(LucideIcons.trash2, size: 14, color: c.error),
+              title: Text('Delete account', style: adminH3(c.error)),
+              showChevron: true,
+              isLast: true,
+              onTap: _deleteLearner,
             ),
           ],
         ),

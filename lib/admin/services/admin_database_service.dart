@@ -591,6 +591,61 @@ class AdminDatabaseService {
     }
   }
 
+  /// Delete learner account and all associated data
+  Future<AdminActionResult> deleteLearner({
+    required String learnerId,
+    required String actingAdminId,
+  }) async {
+    try {
+      // Verify learner exists
+      final learnerDoc = await _db.collection('users').doc(learnerId).get();
+      if (!learnerDoc.exists) {
+        return const AdminActionResult(
+          success: false,
+          message: 'Learner account not found.',
+        );
+      }
+
+      final learnerData = learnerDoc.data() as Map<String, dynamic>?;
+      final learnerEmail = (learnerData?['email'] ?? '').toString();
+
+      // Delete all progress subcollection documents
+      final progressSnapshot = await _db
+          .collection('users')
+          .doc(learnerId)
+          .collection('progress')
+          .get();
+      for (final doc in progressSnapshot.docs) {
+        await doc.reference.delete();
+      }
+
+      // Delete the learner document
+      await _db.collection('users').doc(learnerId).delete();
+
+      // Log audit action
+      await _logAuditAction(
+        action: 'delete_learner',
+        entityType: 'learner',
+        entityId: learnerId,
+        changes: <String, dynamic>{
+          'actor': actingAdminId,
+          'email': learnerEmail,
+        },
+      );
+
+      return const AdminActionResult(
+        success: true,
+        message: 'Learner account deleted successfully.',
+      );
+    } catch (e) {
+      debugPrint('Error deleting learner: $e');
+      return const AdminActionResult(
+        success: false,
+        message: 'Failed to delete learner account.',
+      );
+    }
+  }
+
   /// Get learner progress
   Future<List<LessonProgress>> getLearnerProgress(String learnerId) async {
     try {

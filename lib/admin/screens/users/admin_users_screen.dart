@@ -349,6 +349,72 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
     await _loadFirst();
   }
 
+  Future<void> _toggleLearnerStatus(UserModel user) async {
+    final newActive = !user.isActive;
+    final confirmed = await AdminConfirmModal.show(
+      context,
+      title: newActive ? 'Activate learner?' : 'Deactivate learner?',
+      body: newActive
+          ? 'This learner will regain access to the app.'
+          : 'This learner will be blocked from using the app.',
+      confirmLabel: newActive ? 'Activate' : 'Deactivate',
+    );
+    if (!confirmed || !mounted) return;
+
+    final ok = await _db.setLearnerStatus(user.uid, newActive);
+    if (!mounted) return;
+
+    if (ok) {
+      AdminToast.show(
+        context,
+        'Learner ${newActive ? 'activated' : 'deactivated'}.',
+        type: AdminToastType.success,
+      );
+      await _loadFirst();
+    } else {
+      AdminToast.show(
+        context,
+        'Action failed. Try again.',
+        type: AdminToastType.error,
+      );
+    }
+  }
+
+  Future<void> _deleteLearner(UserModel user) async {
+    final confirmed = await AdminConfirmModal.show(
+      context,
+      title: 'Delete learner account?',
+      body:
+          'This will permanently delete ${user.displayName.isNotEmpty ? user.displayName : user.email}\'s account, including all progress, XP, gems, and data. This action cannot be undone.',
+      confirmLabel: 'Delete account',
+      isDestructive: true,
+    );
+    if (!confirmed || !mounted) return;
+
+    final result = await _db.deleteLearner(
+      learnerId: user.uid,
+      actingAdminId: widget.admin.id,
+    );
+    if (!mounted) return;
+
+    if (result.success) {
+      AdminToast.show(
+        context,
+        result.message,
+        type: AdminToastType.success,
+      );
+      setState(() {
+        _users.removeWhere((u) => u.uid == user.uid);
+      });
+    } else {
+      AdminToast.show(
+        context,
+        result.message,
+        type: AdminToastType.error,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = ac(context);
@@ -484,6 +550,15 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
                                       user: user,
                                       isLast: i == filtered.length - 1,
                                       onTap: () => _openDetail(user),
+                                      onActionSelected: (action) {
+                                        if (action == 'view') {
+                                          _openDetail(user);
+                                        } else if (action == 'toggle') {
+                                          _toggleLearnerStatus(user);
+                                        } else if (action == 'delete') {
+                                          _deleteLearner(user);
+                                        }
+                                      },
                                     );
                                   },
                                 ),
@@ -605,11 +680,13 @@ class _UserRow extends StatelessWidget {
   final UserModel user;
   final bool isLast;
   final VoidCallback onTap;
+  final ValueChanged<String>? onActionSelected;
 
   const _UserRow({
     required this.user,
     required this.isLast,
     required this.onTap,
+    this.onActionSelected,
   });
 
   @override
@@ -645,11 +722,30 @@ class _UserRow extends StatelessWidget {
           ),
         ],
       ),
-      trailing: AdminTag(
-        label: user.isActive ? 'Active' : 'Inactive',
-        variant: user.isActive ? AdminTagVariant.active : AdminTagVariant.inactive,
-      ),
-      showChevron: true,
+      trailing: onActionSelected != null
+          ? PopupMenuButton<String>(
+              icon: Icon(LucideIcons.moreVertical, size: 16, color: c.textMuted),
+              onSelected: onActionSelected,
+              itemBuilder: (context) => [
+                const PopupMenuItem<String>(
+                  value: 'view',
+                  child: Text('View details'),
+                ),
+                PopupMenuItem<String>(
+                  value: 'toggle',
+                  child: Text(user.isActive ? 'Deactivate' : 'Activate'),
+                ),
+                const PopupMenuItem<String>(
+                  value: 'delete',
+                  child: Text('Delete account', style: TextStyle(color: Colors.red)),
+                ),
+              ],
+            )
+          : AdminTag(
+              label: user.isActive ? 'Active' : 'Inactive',
+              variant: user.isActive ? AdminTagVariant.active : AdminTagVariant.inactive,
+            ),
+      showChevron: onActionSelected == null,
       isLast: isLast,
       onTap: onTap,
       minHeight: 68,
