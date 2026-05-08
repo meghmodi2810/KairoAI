@@ -544,7 +544,13 @@ class DatabaseService {
         updates['gems'] = FieldValue.increment(safeGemsEarned);
         updates['coins'] = FieldValue.increment(safeCoinsEarned);
         updates['totalLessonsCompleted'] = FieldValue.increment(1);
-        updates['totalSignsLearned'] = FieldValue.increment(signsCount);
+
+        // Only count truly new unique signs (ones not previously in signsCompleted)
+        final existingSignsCompleted = (existingData?['signsCompleted'] as List?)?.length ?? 0;
+        final newUniqueSignsCount = signsCount - existingSignsCompleted;
+        if (newUniqueSignsCount > 0) {
+          updates['totalSignsLearned'] = FieldValue.increment(newUniqueSignsCount);
+        }
       }
 
       // Recalculate level from new XP total

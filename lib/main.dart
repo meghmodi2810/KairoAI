@@ -16,10 +16,14 @@ void main() async {
     );
   }
 
-  await AudioService().init();
-  await NotificationService().init();
-
+  // Launch the UI immediately — don't block on audio/notification setup
   runApp(const MyApp());
+
+  // Initialize non-critical services in parallel, after the first frame
+  Future.wait([
+    AudioService().init(),
+    NotificationService().init(),
+  ]);
 }
 
 class MyApp extends StatefulWidget {

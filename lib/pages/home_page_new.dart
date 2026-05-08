@@ -477,13 +477,6 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
           const SizedBox(height: 6),
-          Text(
-            '${user?.totalLessonsCompleted ?? 0} lessons • ${user?.totalSignsLearned ?? 0} signs',
-            style: const TextStyle(
-              color: AppTheme.inkBlack,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
         ],
       ),
     );
