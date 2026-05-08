@@ -1,6 +1,7 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math';
 
@@ -19,10 +20,19 @@ class NotificationService {
   Future<void> init() async {
     tz.initializeTimeZones();
 
+    // Set the local timezone to the device's actual timezone
+    try {
+      final timeZoneInfo = await FlutterTimezone.getLocalTimezone();
+      final String timeZoneName = timeZoneInfo.toString();
+      tz.setLocalLocation(tz.getLocation(timeZoneName));
+    } catch (_) {
+      // Fallback: use Asia/Kolkata if detection fails
+      tz.setLocalLocation(tz.getLocation('Asia/Kolkata'));
+    }
+
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
     
-    // For iOS, configure DarwinInitializationSettings if needed, skipping for now
     const InitializationSettings initializationSettings = InitializationSettings(
       android: initializationSettingsAndroid,
     );
@@ -35,7 +45,7 @@ class NotificationService {
     );
 
     // Request permissions for newer Android versions (Android 13+)
-    _flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
+    await _flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>()?.requestNotificationsPermission();
 
     await _loadPreferences();
@@ -60,6 +70,29 @@ class NotificationService {
     await prefs.setInt('custom_reminder_hour', hour);
     await prefs.setInt('custom_reminder_minute', minute);
     await _scheduleNotifications();
+  }
+
+  /// Sends an immediate test notification (fires in 3 seconds).
+  Future<void> sendTestNotification() async {
+    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      'test_channel',
+      'Test Notifications',
+      channelDescription: 'Used to verify notifications are working.',
+      importance: Importance.max,
+      priority: Priority.high,
+    );
+    const NotificationDetails details = NotificationDetails(android: androidDetails);
+
+    final scheduledDate = tz.TZDateTime.now(tz.local).add(const Duration(seconds: 3));
+
+    await _flutterLocalNotificationsPlugin.zonedSchedule(
+      id: 99,
+      title: 'KairoAI Test 🔔',
+      body: 'Notifications are working! You\'ll receive reminders on time.',
+      scheduledDate: scheduledDate,
+      notificationDetails: details,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+    );
   }
 
   Future<void> _scheduleNotifications() async {
@@ -100,7 +133,7 @@ class NotificationService {
     const NotificationDetails platformChannelSpecifics = NotificationDetails(android: androidPlatformChannelSpecifics);
 
     await _flutterLocalNotificationsPlugin.zonedSchedule(
-      id: 0, // ID for daily reminder
+      id: 0,
       title: 'Time to Practice!',
       body: 'Jump in and complete a lesson today.',
       scheduledDate: scheduledDate,
@@ -111,14 +144,20 @@ class NotificationService {
   }
 
   Future<void> _scheduleRandomReminders() async {
-    // Schedule a random reminder in the next 1-3 days
     final random = Random();
     final daysToWait = random.nextInt(3) + 1;
     final hour = random.nextInt(8) + 10; // Between 10 AM and 6 PM
     final minute = random.nextInt(60);
 
     final now = tz.TZDateTime.now(tz.local);
-    final scheduledDate = now.add(Duration(days: daysToWait, hours: hour - now.hour, minutes: minute - now.minute));
+    final scheduledDate = tz.TZDateTime(
+      tz.local,
+      now.year,
+      now.month,
+      now.day + daysToWait,
+      hour,
+      minute,
+    );
 
     const AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
@@ -137,7 +176,7 @@ class NotificationService {
     ];
 
     await _flutterLocalNotificationsPlugin.zonedSchedule(
-      id: 1, // ID for random reminder
+      id: 1,
       title: 'Keep it up!',
       body: messages[random.nextInt(messages.length)],
       scheduledDate: scheduledDate,

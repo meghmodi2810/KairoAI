@@ -261,6 +261,22 @@ class _SettingsPageState extends State<SettingsPage> {
                             ),
                           ],
                         ),
+                        const Divider(color: AppTheme.inkBlack, thickness: 2, height: 24),
+                        NeoSecondaryButton(
+                          label: 'Send Test Notification',
+                          onPressed: () async {
+                            await NotificationService().sendTestNotification();
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Test notification will appear in ~3 seconds.'),
+                                  backgroundColor: AppTheme.mintGreen,
+                                ),
+                              );
+                            }
+                          },
+                          icon: Icons.notifications_active_rounded,
+                        ),
                       ],
                     ),
                   ),
