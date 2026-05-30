@@ -290,7 +290,7 @@ class LessonModel {
     final data = doc.data() as Map<String, dynamic>;
     return LessonModel(
       id: doc.id,
-      categoryId: data['categoryId'] ?? '',
+      categoryId: _categoryIdFromLessonDoc(doc, data),
       unitNumber: data['unitNumber'] ?? 1,
       title: data['title'] ?? '',
       subtitle: data['subtitle'] ?? '',
@@ -338,6 +338,17 @@ class LessonModel {
 
   List<String> get enabledAssessmentTypes =>
       normalizeAssessmentTypes(testTypes);
+}
+
+String _categoryIdFromLessonDoc(
+  DocumentSnapshot doc,
+  Map<String, dynamic> data,
+) {
+  final parentCategoryId = doc.reference.parent.parent?.id;
+  if (parentCategoryId != null && parentCategoryId.isNotEmpty) {
+    return parentCategoryId;
+  }
+  return data['categoryId']?.toString() ?? '';
 }
 
 class SignModel {
@@ -415,6 +426,7 @@ class SignModel {
 class LessonProgress {
   final String lessonId;
   final String categoryId;
+  final String? lessonTitle; // Stored at start so title persists if lesson is deleted
   final String status; // "not_started", "in_progress", "completed"
   final DateTime? completedAt;
   final DateTime? startedAt;
@@ -435,6 +447,7 @@ class LessonProgress {
   LessonProgress({
     required this.lessonId,
     required this.categoryId,
+    this.lessonTitle,
     this.status = 'not_started',
     this.completedAt,
     this.startedAt,
@@ -458,6 +471,7 @@ class LessonProgress {
     return LessonProgress(
       lessonId: doc.id,
       categoryId: data['categoryId'] ?? '',
+      lessonTitle: data['lessonTitle'] as String?,
       status: data['status'] ?? 'not_started',
       completedAt: (data['completedAt'] as Timestamp?)?.toDate(),
       startedAt: (data['startedAt'] as Timestamp?)?.toDate(),
@@ -482,6 +496,7 @@ class LessonProgress {
   Map<String, dynamic> toFirestore() {
     return {
       'categoryId': categoryId,
+      'lessonTitle': lessonTitle,
       'status': status,
       'completedAt': completedAt != null
           ? Timestamp.fromDate(completedAt!)

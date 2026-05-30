@@ -507,7 +507,11 @@ class _SignLearningPageState extends State<SignLearningPage> {
     try {
       final existingProgress = await _db.getLessonProgress(widget.lesson.id);
       if (existingProgress?.status != 'completed') {
-        await _db.startLesson(widget.lesson.id, widget.categoryId);
+        await _db.startLesson(
+          widget.lesson.id,
+          widget.categoryId,
+          lessonTitle: widget.lesson.title,
+        );
       }
 
       final signs = await _db.getSigns(widget.categoryId, widget.lesson.id);

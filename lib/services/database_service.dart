@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/app_models.dart';
 import '../models/experience_models.dart';
+import '../models/lesson_category.dart';
 import '../models/lesson_character_models.dart';
 
 class DatabaseService {
@@ -308,17 +309,31 @@ class DatabaseService {
         .orderBy('order')
         .snapshots()
         .map(
-          (snapshot) => snapshot.docs
-              .map((doc) => CategoryModel.fromFirestore(doc))
-              .toList(),
+          (snapshot) =>
+              snapshot.docs
+                  .map((doc) => CategoryModel.fromFirestore(doc))
+                  .where((category) =>
+                      isCanonicalLessonCategoryId(category.id))
+                  .toList()
+                ..sort(
+                  (a, b) =>
+                      lessonCategoryOrder(a.id).compareTo(
+                        lessonCategoryOrder(b.id),
+                      ),
+                ),
         );
   }
 
   Future<List<CategoryModel>> getCategories() async {
     final snapshot = await _db.collection('categories').orderBy('order').get();
-    return snapshot.docs
+    final categories = snapshot.docs
         .map((doc) => CategoryModel.fromFirestore(doc))
+        .where((category) => isCanonicalLessonCategoryId(category.id))
         .toList();
+    categories.sort(
+      (a, b) => lessonCategoryOrder(a.id).compareTo(lessonCategoryOrder(b.id)),
+    );
+    return categories;
   }
 
   // ==================== LESSON OPERATIONS ====================
@@ -586,7 +601,11 @@ class DatabaseService {
     return index;
   }
 
-  Future<void> startLesson(String lessonId, String categoryId) async {
+  Future<void> startLesson(
+    String lessonId,
+    String categoryId, {
+    String? lessonTitle,
+  }) async {
     if (currentUserId == null) return;
 
     final progressDoc = _db
@@ -600,6 +619,7 @@ class DatabaseService {
       final progress = LessonProgress(
         lessonId: lessonId,
         categoryId: categoryId,
+        lessonTitle: lessonTitle,
         status: 'in_progress',
         startedAt: DateTime.now(),
         attemptsCount: 1,
@@ -607,10 +627,19 @@ class DatabaseService {
       );
       await progressDoc.set(progress.toFirestore());
     } else {
-      await progressDoc.update({
+      final updates = <String, dynamic>{
         'status': 'in_progress',
         'attemptsCount': FieldValue.increment(1),
-      });
+      };
+      // Store lesson title if provided and not already set
+      if (lessonTitle != null && lessonTitle.isNotEmpty) {
+        final existingData = existing.data();
+        final existingTitle = existingData?['lessonTitle'] as String?;
+        if (existingTitle == null || existingTitle.isEmpty) {
+          updates['lessonTitle'] = lessonTitle;
+        }
+      }
+      await progressDoc.update(updates);
     }
   }
 

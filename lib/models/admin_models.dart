@@ -150,7 +150,6 @@ class AdminLessonModel {
   final String title;
   final String subtitle;
   final String description;
-  final LessonType type;
   final List<AdminSignModel> signs;
   final List<TestType> testTypes;
   final int order;
@@ -175,7 +174,6 @@ class AdminLessonModel {
     required this.title,
     required this.subtitle,
     required this.description,
-    required this.type,
     this.signs = const [],
     this.testTypes = const [TestType.matching, TestType.recall, TestType.mcq],
     required this.order,
@@ -186,8 +184,8 @@ class AdminLessonModel {
     this.coinsReward = 50,
     this.xpReward = 25,
     this.isLocked = false,
-    this.requiredLessonId,
-    this.focusPoints = const [],
+      this.requiredLessonId,
+      this.focusPoints = const [],
     this.thumbnailUrl,
     required this.createdAt,
     required this.updatedAt,
@@ -229,11 +227,10 @@ class AdminLessonModel {
     final data = doc.data() as Map<String, dynamic>;
     return AdminLessonModel(
       id: doc.id,
-      categoryId: data['categoryId'] ?? '',
+      categoryId: _categoryIdFromLessonDoc(doc, data),
       title: data['title'] ?? '',
       subtitle: data['subtitle'] ?? '',
       description: data['description'] ?? '',
-      type: LessonType.fromString(data['type'] ?? 'alphabet'),
       testTypes: _normalizeTestTypes(data['testTypes'] as List<dynamic>?),
       order: data['order'] ?? 0,
       totalSigns: data['totalSigns'] ?? 0,
@@ -259,7 +256,6 @@ class AdminLessonModel {
       'title': title,
       'subtitle': subtitle,
       'description': description,
-      'type': type.value,
       'testTypes': testTypes.map((e) => e.value).toList(),
       'order': order,
       'totalSigns': signs.length,
@@ -285,7 +281,6 @@ class AdminLessonModel {
     String? title,
     String? subtitle,
     String? description,
-    LessonType? type,
     List<AdminSignModel>? signs,
     List<TestType>? testTypes,
     int? order,
@@ -310,7 +305,6 @@ class AdminLessonModel {
       title: title ?? this.title,
       subtitle: subtitle ?? this.subtitle,
       description: description ?? this.description,
-      type: type ?? this.type,
       signs: signs ?? this.signs,
       testTypes: testTypes ?? this.testTypes,
       order: order ?? this.order,
@@ -332,46 +326,15 @@ class AdminLessonModel {
   }
 }
 
-/// Lesson types enumeration
-enum LessonType {
-  alphabet('alphabet'),
-  numeric('numeric'),
-  both('both');
-
-  const LessonType(this.value);
-  final String value;
-
-  static LessonType fromString(String value) {
-    return LessonType.values.firstWhere(
-      (type) => type.value == value,
-      orElse: () => LessonType.alphabet,
-    );
+String _categoryIdFromLessonDoc(
+  DocumentSnapshot doc,
+  Map<String, dynamic> data,
+) {
+  final parentCategoryId = doc.reference.parent.parent?.id;
+  if (parentCategoryId != null && parentCategoryId.isNotEmpty) {
+    return parentCategoryId;
   }
-
-  String get displayName {
-    switch (this) {
-      case LessonType.alphabet:
-        return 'Alphabet (A-Z)';
-      case LessonType.numeric:
-        return 'Numeric (0-9)';
-      case LessonType.both:
-        return 'Both (A-Z & 0-9)';
-    }
-  }
-
-  List<String> get characters {
-    switch (this) {
-      case LessonType.alphabet:
-        return List.generate(26, (i) => String.fromCharCode(65 + i));
-      case LessonType.numeric:
-        return List.generate(10, (i) => i.toString());
-      case LessonType.both:
-        return [
-          ...List.generate(26, (i) => String.fromCharCode(65 + i)),
-          ...List.generate(10, (i) => i.toString()),
-        ];
-    }
-  }
+  return data['categoryId']?.toString() ?? '';
 }
 
 /// Test types enumeration

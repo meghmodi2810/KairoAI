@@ -1,3 +1,5 @@
+Neelu from megh's git hahaha
+
 # KairoAI - Complete Project Documentation
 ## Indian Sign Language Learning App with AI-Powered Hand Detection
 

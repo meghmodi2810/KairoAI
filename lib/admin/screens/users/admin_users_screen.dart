@@ -43,7 +43,7 @@ class _AdminUsersScreenState extends State<AdminUsersScreen> {
   String _search = '';
   String _scope = 'Learners';
   String _statusFilter = 'All';
-  bool _creatingUser = false;
+  final bool _creatingUser = false;
   String? _busyAdminId;
 
   // Pagination
@@ -893,7 +893,7 @@ class _CreateUserDialogState extends State<_CreateUserDialog> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<_CreateUserRole>(
-                value: _role,
+                initialValue: _role,
                 decoration: const InputDecoration(
                   labelText: 'Account type',
                 ),

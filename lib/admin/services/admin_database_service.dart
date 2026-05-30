@@ -7,6 +7,7 @@ import 'dart:math';
 import 'package:kairo_ai/admin/models/admin_models.dart';
 import 'package:kairo_ai/firebase_options.dart';
 import 'package:kairo_ai/models/app_models.dart';
+import 'package:kairo_ai/models/lesson_category.dart';
 
 class AdminDatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -50,20 +51,25 @@ class AdminDatabaseService {
   /// Create new lesson — writes to categories/{categoryId}/lessons
   Future<String?> createLesson(AdminLessonModel lesson) async {
     try {
+      final categoryId =
+          normalizeLessonCategoryId(lesson.categoryId) ?? lesson.categoryId;
+      final lessonData = {
+        ...lesson.toFirestore(),
+        'categoryId': categoryId,
+        'totalSigns': lesson.signs.length,
+        'subtitle': lesson.description,
+      }..remove('type');
+
       final docRef = await _db
           .collection('categories')
-          .doc(lesson.categoryId)
+          .doc(categoryId)
           .collection('lessons')
-          .add({
-            ...lesson.toFirestore(),
-            'totalSigns': lesson.signs.length,
-            'subtitle': lesson.description,
-          });
+          .add(lessonData);
 
       // Sync embedded signs to the signs subcollection for learner access
       if (lesson.signs.isNotEmpty) {
         await _syncSignsToSubcollection(
-          lesson.categoryId,
+          categoryId,
           docRef.id,
           lesson.signs,
         );
@@ -73,8 +79,9 @@ class AdminDatabaseService {
         action: 'create',
         entityType: 'lesson',
         entityId: docRef.id,
-        changes: {'name': lesson.name, 'type': lesson.type},
+        changes: {'name': lesson.name, 'categoryId': categoryId},
       );
+      await recalculateCategoryTotals(categoryId);
       return docRef.id;
     } catch (e) {
       debugPrint('Error creating lesson: $e');
@@ -86,26 +93,48 @@ class AdminDatabaseService {
   Future<bool> updateLesson(
     String categoryId,
     String lessonId,
-    Map<String, dynamic> updates,
-  ) async {
+    Map<String, dynamic> updates, {
+    String? previousCategoryId,
+  }) async {
     try {
-      updates['updatedAt'] = FieldValue.serverTimestamp();
+      final newCategoryId =
+          normalizeLessonCategoryId(categoryId) ?? categoryId;
+      final oldCategoryId =
+          previousCategoryId == null || previousCategoryId.trim().isEmpty
+          ? newCategoryId
+          : previousCategoryId;
+      final sanitizedUpdates = Map<String, dynamic>.from(updates)
+        ..remove('type')
+        ..['categoryId'] = newCategoryId
+        ..['updatedAt'] = FieldValue.serverTimestamp();
+
+      if (oldCategoryId != newCategoryId) {
+        return await _moveLessonBetweenCategories(
+          oldCategoryId: oldCategoryId,
+          newCategoryId: newCategoryId,
+          lessonId: lessonId,
+          updates: sanitizedUpdates,
+        );
+      }
+
+      final updatePayload = Map<String, dynamic>.from(sanitizedUpdates)
+        ..['type'] = FieldValue.delete();
       await _db
           .collection('categories')
-          .doc(categoryId)
+          .doc(newCategoryId)
           .collection('lessons')
           .doc(lessonId)
-          .update(updates);
+          .update(updatePayload);
 
       // If signs were updated, sync them to subcollection
-      if (updates.containsKey('signs')) {
-        final signsList = (updates['signs'] as List<dynamic>)
+      if (sanitizedUpdates.containsKey('signs')) {
+        final signsList = (sanitizedUpdates['signs'] as List<dynamic>)
             .map((s) => AdminSignItem.fromMap(s as Map<String, dynamic>))
             .toList();
-        await _syncSignsToSubcollection(categoryId, lessonId, signsList);
+        await _syncSignsToSubcollection(newCategoryId, lessonId, signsList);
         await _db
             .collection('categories')
-            .doc(categoryId)
+            .doc(newCategoryId)
             .collection('lessons')
             .doc(lessonId)
             .update({'totalSigns': signsList.length});
@@ -115,13 +144,84 @@ class AdminDatabaseService {
         action: 'update',
         entityType: 'lesson',
         entityId: lessonId,
-        changes: updates,
+        changes: sanitizedUpdates,
       );
+      await recalculateCategoryTotals(newCategoryId);
       return true;
     } catch (e) {
       debugPrint('Error updating lesson: $e');
       return false;
     }
+  }
+
+  Future<bool> _moveLessonBetweenCategories({
+    required String oldCategoryId,
+    required String newCategoryId,
+    required String lessonId,
+    required Map<String, dynamic> updates,
+  }) async {
+    final oldRef = _db
+        .collection('categories')
+        .doc(oldCategoryId)
+        .collection('lessons')
+        .doc(lessonId);
+    final newRef = _db
+        .collection('categories')
+        .doc(newCategoryId)
+        .collection('lessons')
+        .doc(lessonId);
+
+    final oldSnapshot = await oldRef.get();
+    if (!oldSnapshot.exists) {
+      debugPrint('Cannot move missing lesson $oldCategoryId/$lessonId');
+      return false;
+    }
+
+    final existingTarget = await newRef.get();
+    if (existingTarget.exists) {
+      debugPrint('Cannot move lesson because target exists: $newCategoryId/$lessonId');
+      return false;
+    }
+
+    final oldData = oldSnapshot.data() ?? <String, dynamic>{};
+    final newData = <String, dynamic>{
+      ...oldData,
+      ...updates,
+      'categoryId': newCategoryId,
+    }..remove('type');
+
+    final oldSignsSnapshot = await oldRef.collection('signs').get();
+    final batch = _db.batch();
+    batch.set(newRef, newData);
+    for (final signDoc in oldSignsSnapshot.docs) {
+      final signData = Map<String, dynamic>.from(signDoc.data())
+        ..['lessonId'] = lessonId;
+      batch.set(newRef.collection('signs').doc(signDoc.id), signData);
+      batch.delete(signDoc.reference);
+    }
+    batch.delete(oldRef);
+    await batch.commit();
+
+    if (updates.containsKey('signs')) {
+      final signsList = (updates['signs'] as List<dynamic>)
+          .map((s) => AdminSignItem.fromMap(s as Map<String, dynamic>))
+          .toList();
+      await _syncSignsToSubcollection(newCategoryId, lessonId, signsList);
+      await newRef.update({'totalSigns': signsList.length});
+    }
+
+    await _logAuditAction(
+      action: 'move',
+      entityType: 'lesson',
+      entityId: lessonId,
+      changes: {
+        'fromCategoryId': oldCategoryId,
+        'toCategoryId': newCategoryId,
+      },
+    );
+    await recalculateCategoryTotals(oldCategoryId);
+    await recalculateCategoryTotals(newCategoryId);
+    return true;
   }
 
   /// Delete lesson — deletes from categories/{categoryId}/lessons + signs subcollection
@@ -152,6 +252,7 @@ class AdminDatabaseService {
         entityType: 'lesson',
         entityId: lessonId,
       );
+      await recalculateCategoryTotals(categoryId);
       return true;
     } catch (e) {
       debugPrint('Error deleting lesson: $e');
@@ -606,7 +707,7 @@ class AdminDatabaseService {
         );
       }
 
-      final learnerData = learnerDoc.data() as Map<String, dynamic>?;
+      final learnerData = learnerDoc.data();
       final learnerEmail = (learnerData?['email'] ?? '').toString();
 
       // Delete all progress subcollection documents

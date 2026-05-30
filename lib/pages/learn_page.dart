@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../models/app_models.dart';
+import '../models/lesson_category.dart';
 import '../theme/app_theme.dart';
 import '../theme/neo_brutal_widgets.dart';
 import 'category_lessons_page.dart';
@@ -98,7 +99,24 @@ class LearnPage extends StatelessWidget {
                       );
                     }
 
-                    final docs = snapshot.data!.docs;
+                    final docs = snapshot.data!.docs.where((doc) {
+                      return isCanonicalLessonCategoryId(doc.id);
+                    }).toList()
+                      ..sort(
+                        (a, b) => lessonCategoryOrder(a.id).compareTo(
+                          lessonCategoryOrder(b.id),
+                        ),
+                      );
+
+                    if (docs.isEmpty) {
+                      return SliverFillRemaining(
+                        child: NeoEmptyState(
+                          icon: Icons.route,
+                          title: 'No Learning Path Yet',
+                          subtitle: 'Your admin will add categories here.',
+                        ),
+                      );
+                    }
 
                     return SliverList.builder(
                       itemCount: docs.length,

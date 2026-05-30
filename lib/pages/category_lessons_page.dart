@@ -133,7 +133,7 @@ class _CategoryLessonsPageState extends State<CategoryLessonsPage> {
                                       width: 30,
                                       height: 30,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => Text(
+                                      errorBuilder: (_, _, _) => Text(
                                         widget.category.iconEmoji,
                                         style: const TextStyle(fontSize: 26),
                                       ),

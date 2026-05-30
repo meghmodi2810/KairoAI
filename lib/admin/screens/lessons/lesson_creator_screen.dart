@@ -9,6 +9,7 @@ import 'package:kairo_ai/admin/widgets/a_components.dart';
 import 'package:kairo_ai/admin/widgets/a_overlays.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:kairo_ai/models/app_models.dart';
+import 'package:kairo_ai/models/lesson_category.dart';
 
 class LessonCreatorScreen extends StatefulWidget {
   final AdminModel admin;
@@ -36,7 +37,6 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
   final _coinsCtrl = TextEditingController();
 
   String _selectedCategoryId = '';
-  String _type = 'alphabet'; // 'alphabet', 'numeric', 'both'
   bool _isActive = false;
   bool _isSaving = false;
   bool _orderEditedByAdmin = false;
@@ -82,15 +82,71 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
     }
     _titleCtrl.text = l.title;
     _descCtrl.text = l.description;
-    _type = l.type;
     _isActive = l.isActive;
     _orderCtrl.text = '${l.order}';
     _xpCtrl.text = '${l.xpReward}';
     _gemsCtrl.text = '${l.gemsReward}';
     _coinsCtrl.text = '${l.coinsReward}';
-    _selectedCategoryId = l.categoryId;
+    _selectedCategoryId =
+        normalizeLessonCategoryId(l.categoryId) ??
+        classifyLessonCategoryFromSigns(
+          l.signs.map((sign) => sign.character),
+          fallbackCategoryId: l.categoryId,
+        );
     _selectedSigns = List<AdminSignItem>.from(l.signs);
     _orderEditedByAdmin = true;
+  }
+
+  CategoryModel _categoryFromDefinition(LessonCategoryDefinition definition) {
+    return CategoryModel(
+      id: definition.id,
+      name: definition.label,
+      description: definition.description,
+      iconEmoji: definition.iconEmoji,
+      color: definition.color,
+      order: definition.order,
+      totalLessons: 0,
+      totalSigns: 0,
+    );
+  }
+
+  CategoryModel _categoryFromDocument(
+    DocumentSnapshot doc,
+    LessonCategoryDefinition definition,
+  ) {
+    final data = doc.data() as Map<String, dynamic>? ?? <String, dynamic>{};
+    return CategoryModel(
+      id: definition.id,
+      name: data['name']?.toString() ?? definition.label,
+      description: data['description']?.toString() ?? definition.description,
+      iconUrl: data['iconUrl'] as String?,
+      iconEmoji: data['iconEmoji']?.toString() ?? definition.iconEmoji,
+      color: data['color']?.toString() ?? definition.color,
+      order: (data['order'] as num?)?.toInt() ?? definition.order,
+      totalLessons: (data['totalLessons'] as num?)?.toInt() ?? 0,
+      totalSigns: (data['totalSigns'] as num?)?.toInt() ?? 0,
+      isLocked: data['isLocked'] == true,
+      requiredLevel: (data['requiredLevel'] as num?)?.toInt() ?? 1,
+    );
+  }
+
+  List<CategoryModel> _canonicalCategories(QuerySnapshot snapshot) {
+    final byCanonicalId = <String, DocumentSnapshot>{};
+    for (final doc in snapshot.docs) {
+      final canonicalId = normalizeLessonCategoryId(doc.id);
+      if (canonicalId == null) continue;
+      if (byCanonicalId.containsKey(canonicalId) &&
+          doc.id != canonicalId) {
+        continue;
+      }
+      byCanonicalId[canonicalId] = doc;
+    }
+
+    return kLessonCategoryDefinitions.map((definition) {
+      final doc = byCanonicalId[definition.id];
+      if (doc == null) return _categoryFromDefinition(definition);
+      return _categoryFromDocument(doc, definition);
+    }).toList(growable: false);
   }
 
   Future<void> _loadSupportData() async {
@@ -107,9 +163,7 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
       String categoryForSuggestion = _selectedCategoryId;
 
       setState(() {
-        _categories = cats.docs
-            .map((d) => CategoryModel.fromFirestore(d))
-            .toList();
+        _categories = _canonicalCategories(cats);
         _allSigns = allSigns;
         _loadingSupport = false;
 
@@ -176,6 +230,18 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
       );
       return false;
     }
+    final invalidSigns = invalidLessonSignsForCategory(
+      _selectedCategoryId,
+      _selectedSigns.map((sign) => sign.character),
+    );
+    if (invalidSigns.isNotEmpty) {
+      AdminToast.show(
+        context,
+        'Remove incompatible signs for ${lessonCategoryLabel(_selectedCategoryId)}: ${invalidSigns.join(', ')}.',
+        type: AdminToastType.error,
+      );
+      return false;
+    }
     return true;
   }
 
@@ -188,7 +254,6 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
       categoryId: _selectedCategoryId,
       title: _titleCtrl.text.trim(),
       description: _descCtrl.text.trim(),
-      type: _type,
       isActive: _isActive,
       order: int.tryParse(_orderCtrl.text) ?? 1,
       xpReward: int.tryParse(_xpCtrl.text) ?? 25,
@@ -209,6 +274,7 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
         _selectedCategoryId,
         lesson.id,
         lesson.toFirestore(),
+        previousCategoryId: widget.existingLesson!.categoryId,
       );
     } else {
       final id = await _db.createLesson(lesson);
@@ -234,19 +300,59 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
     }
   }
 
-  void _toggleSign(String char) {
+  AdminSignItem _signWithOrder(AdminSignItem sign, int order) {
+    return AdminSignItem(
+      character: normalizeLessonSignLabel(sign.character),
+      order: order,
+      pictureUrl: sign.pictureUrl,
+      animationUrl: sign.animationUrl,
+      description: sign.description,
+    );
+  }
+
+  List<AdminSignItem> _reindexSigns(Iterable<AdminSignItem> signs) {
+    final list = signs.toList(growable: false);
+    return List<AdminSignItem>.generate(
+      list.length,
+      (index) => _signWithOrder(list[index], index),
+    );
+  }
+
+  void _selectCategory(String categoryId) {
+    final canonicalCategoryId =
+        normalizeLessonCategoryId(categoryId) ?? LessonCategoryIds.alphaNumeric;
+    final keptSigns = _selectedSigns.where(
+      (sign) =>
+          isSignAllowedForLessonCategory(canonicalCategoryId, sign.character),
+    );
+    final prunedSigns = _reindexSigns(keptSigns);
+    final removedCount = _selectedSigns.length - prunedSigns.length;
+
     setState(() {
-      final normalizedChar =
-          (char.toUpperCase() == '0' || char.toUpperCase() == 'O')
-          ? 'O'
-          : char.toUpperCase();
+      _selectedCategoryId = canonicalCategoryId;
+      _selectedSigns = prunedSigns;
+    });
+    _updateNextOrder(canonicalCategoryId);
+
+    if (removedCount > 0) {
+      AdminToast.show(
+        context,
+        '$removedCount incompatible sign${removedCount == 1 ? '' : 's'} removed.',
+        type: AdminToastType.info,
+      );
+    }
+  }
+
+  void _toggleSign(String char) {
+    if (!isSignAllowedForLessonCategory(_selectedCategoryId, char)) {
+      return;
+    }
+
+    setState(() {
+      final normalizedChar = normalizeLessonSignLabel(char);
 
       final exists = _selectedSigns.indexWhere((s) {
-        final existingNorm =
-            (s.character.toUpperCase() == '0' ||
-                s.character.toUpperCase() == 'O')
-            ? 'O'
-            : s.character.toUpperCase();
+        final existingNorm = normalizeLessonSignLabel(s.character);
         return existingNorm == normalizedChar;
       });
 
@@ -255,16 +361,13 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
       } else {
         // Find matching data from master collection
         final signData = _allSigns.where((s) {
-          final sWordNorm =
-              (s.word.toUpperCase() == '0' || s.word.toUpperCase() == 'O')
-              ? 'O'
-              : s.word.toUpperCase();
+          final sWordNorm = normalizeLessonSignLabel(s.word);
           return sWordNorm == normalizedChar;
         }).firstOrNull;
 
         _selectedSigns.add(
           AdminSignItem(
-            character: char.toUpperCase(),
+            character: normalizedChar,
             order: _selectedSigns.length,
             pictureUrl: signData?.imageUrl,
             animationUrl: signData?.gifUrl,
@@ -335,59 +438,12 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
                             return Padding(
                               padding: const EdgeInsets.only(right: 8),
                               child: AdminFilterChip(
-                                label: cat.name,
+                                label: lessonCategoryLabel(cat.id),
                                 selected: isSelected,
-                                onTap: () {
-                                  setState(() => _selectedCategoryId = cat.id);
-                                  _updateNextOrder(cat.id);
-                                },
+                                onTap: () => _selectCategory(cat.id),
                               ),
                             );
                           },
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const Divider(),
-
-            // Category Type (Big Icons)
-            Container(
-              color: c.bgSurface,
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('CATEGORY TYPE', style: adminLabel(c.textMuted)),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _TypeBox(
-                          label: 'Alphabets',
-                          icon: LucideIcons.type,
-                          isSelected: _type == 'alphabet',
-                          onTap: () => setState(() => _type = 'alphabet'),
-                        ),
-                      ),
-                      const SizedBox(width: 7),
-                      Expanded(
-                        child: _TypeBox(
-                          label: 'Numbers',
-                          icon: LucideIcons.hash,
-                          isSelected: _type == 'numeric',
-                          onTap: () => setState(() => _type = 'numeric'),
-                        ),
-                      ),
-                      const SizedBox(width: 7),
-                      Expanded(
-                        child: _TypeBox(
-                          label: 'Both',
-                          icon: LucideIcons.layers,
-                          isSelected: _type == 'both',
-                          onTap: () => setState(() => _type = 'both'),
                         ),
                       ),
                     ],
@@ -546,19 +602,7 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
   }
 
   Widget _buildSignGrid(AdminColors c) {
-    List<String> pool = [];
-    if (_type == 'alphabet' || _type == 'both') {
-      pool.addAll(
-        'ABCDEFGHIJKLMNPQRSTUVWXYZ'.split(''),
-      ); // Exclude O to handle 0/O as one
-      pool.add('O / 0');
-    }
-    if (_type == 'numeric') {
-      pool.addAll('123456789'.split(''));
-      pool.add('O / 0');
-    } else if (_type == 'both') {
-      pool.addAll('123456789'.split(''));
-    }
+    final pool = lessonSignPoolLabelsForCategory(_selectedCategoryId);
 
     return Container(
       color: c.bgBase,
@@ -576,14 +620,10 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
         itemBuilder: (context, i) {
           final char = pool[i];
           final bool isO0 = char == 'O / 0';
-          final searchChar = isO0 ? 'O' : char;
+          final searchChar = normalizeLessonSignLabel(char);
 
           final isSelected = _selectedSigns.any((s) {
-            final sNorm =
-                (s.character.toUpperCase() == '0' ||
-                    s.character.toUpperCase() == 'O')
-                ? 'O'
-                : s.character.toUpperCase();
+            final sNorm = normalizeLessonSignLabel(s.character);
             return sNorm == searchChar;
           });
 
@@ -631,53 +671,6 @@ class _LessonCreatorScreenState extends State<LessonCreatorScreen> {
             ),
           );
         },
-      ),
-    );
-  }
-}
-
-class _TypeBox extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _TypeBox({
-    required this.label,
-    required this.icon,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final c = ac(context);
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        height: 70,
-        decoration: BoxDecoration(
-          color: isSelected ? c.accentFill : c.bgBase,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isSelected ? c.accent : c.border2,
-            width: isSelected ? 1.5 : 1,
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 18, color: isSelected ? c.accent : c.textMuted),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: adminLabel(
-                isSelected ? c.accent : c.textMuted,
-              ).copyWith(fontSize: 9),
-            ),
-          ],
-        ),
       ),
     );
   }

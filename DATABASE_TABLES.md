@@ -101,6 +101,7 @@ Write patterns:
 - Status: Confirmed Active
 - Document ID: categoryId
 - Primary use: course category metadata
+- Canonical lesson category IDs: `alphabet`, `number`, `alpha-numeric`
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
@@ -124,6 +125,16 @@ Write patterns:
 
 - Create, update, delete category
 - Recompute totals
+
+Category cleanup:
+
+- Lesson categories are represented only by the category document ID.
+- Lessons must not store a separate category/type field beyond `categoryId`.
+- Firestore has document fields, not SQL columns; the cleanup migration deletes the old lesson `type` field from documents.
+- Run a dry-run before applying production cleanup:
+  - `npm install firebase-admin`
+  - `node scripts/migrate_categories.js --dry-run --service-account path/to/service-account.json`
+  - `node scripts/migrate_categories.js --apply --service-account path/to/service-account.json`
 
 ---
 
@@ -456,7 +467,6 @@ Write patterns:
 | focusPoints | List<String> | Optional |
 | testTypes | List<String> | Optional |
 | signs | List<Map> | Optional | embedded sign list in some admin flows |
-| type | String | Optional | alphabet, numeric, both |
 | createdAt | Timestamp | Optional |
 | updatedAt | Timestamp | Optional |
 | createdBy | String | Optional |

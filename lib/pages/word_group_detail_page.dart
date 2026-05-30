@@ -395,7 +395,7 @@ class _WordRow extends StatelessWidget {
                     child: ListView.separated(
                       shrinkWrap: true,
                       itemCount: candidates.length,
-                      separatorBuilder: (_, __) => const Divider(height: 12),
+                      separatorBuilder: (_, _) => const Divider(height: 12),
                       itemBuilder: (_, candidateIndex) {
                         final candidate = candidates[candidateIndex];
                         final covers =

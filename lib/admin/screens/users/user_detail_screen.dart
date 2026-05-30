@@ -132,10 +132,14 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
       }
 
       final lessonKey = '$categoryId/$lessonId';
-      if (lessonTitlesByKey.containsKey(lessonKey)) {
-        continue;
+
+      // First, use stored lesson title from progress (persists even if lesson deleted)
+      final storedTitle = p.lessonTitle?.trim();
+      if (storedTitle != null && storedTitle.isNotEmpty) {
+        lessonTitlesByKey[lessonKey] = storedTitle;
       }
 
+      // Try to fetch from lesson doc for sign count and as fallback for title
       try {
         final lessonDoc = await FirebaseFirestore.instance
             .collection('categories')
@@ -145,11 +149,13 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
             .get();
         if (lessonDoc.exists) {
           final lessonData = lessonDoc.data() ?? <String, dynamic>{};
-          final lessonTitle = (lessonData['title'] ?? lessonId)
-              .toString()
-              .trim();
-          if (lessonTitle.isNotEmpty) {
-            lessonTitlesByKey[lessonKey] = lessonTitle;
+
+          // Only use fetched title if we don't have a stored one
+          if (!lessonTitlesByKey.containsKey(lessonKey)) {
+            final lessonTitle = (lessonData['title'] ?? '').toString().trim();
+            if (lessonTitle.isNotEmpty) {
+              lessonTitlesByKey[lessonKey] = lessonTitle;
+            }
           }
 
           final explicitTotalSigns = (lessonData['totalSigns'] as num?)
@@ -528,8 +534,9 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
               final p = e.value;
               final isDone = p.status == 'completed';
               final lessonKey = _lessonKey(p);
+              // Use stored title from progress, or show "(Deleted)" if lesson was removed
               final lessonTitle =
-                  _lessonTitlesByKey[lessonKey] ?? 'Lesson ${p.lessonId}';
+                  _lessonTitlesByKey[lessonKey] ?? '(Deleted lesson)';
               final categoryTitle =
                   _categoryNamesById[p.categoryId] ?? p.categoryId;
               final trackedTotalSigns =

@@ -9,6 +9,7 @@ import 'package:kairo_ai/admin/widgets/a_components.dart';
 import 'package:kairo_ai/admin/widgets/a_inputs.dart';
 import 'package:kairo_ai/admin/widgets/a_overlays.dart';
 import 'package:kairo_ai/admin/screens/lessons/lesson_creator_screen.dart';
+import 'package:kairo_ai/models/lesson_category.dart';
 
 class AdminLessonsScreen extends StatefulWidget {
   final AdminModel admin;
@@ -28,6 +29,7 @@ class _AdminLessonsScreenState extends State<AdminLessonsScreen> {
   final _db = AdminDatabaseService();
   final _searchCtrl = TextEditingController();
   String _filter = 'All';
+  String _categoryFilterId = '';
   String _search = '';
   bool _actionLoading = false;
 
@@ -43,20 +45,19 @@ class _AdminLessonsScreenState extends State<AdminLessonsScreen> {
         return false;
       }
     }
-    switch (_filter) {
-      case 'Live':
-        return lesson.isActive;
-      case 'Draft':
-        return !lesson.isActive;
-      case 'Alphabets':
-        return lesson.type == 'alphabet';
-      case 'Numbers':
-        return lesson.type == 'numeric';
-      case 'Both':
-        return lesson.type == 'both';
-      default:
-        return true;
+
+    // Status filter
+    if (_filter == 'Live' && !lesson.isActive) return false;
+    if (_filter == 'Draft' && lesson.isActive) return false;
+
+    // Category filter
+    if (_categoryFilterId.isNotEmpty) {
+      final categoryId =
+          normalizeLessonCategoryId(lesson.categoryId) ?? lesson.categoryId;
+      if (categoryId != _categoryFilterId) return false;
     }
+
+    return true;
   }
 
   Future<void> _deleteLesson(AdminLessonModel lesson) async {
@@ -156,18 +157,42 @@ class _AdminLessonsScreenState extends State<AdminLessonsScreen> {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Row(
-              children: ['All', 'Live', 'Draft', 'Alphabets', 'Numbers', 'Both']
-                  .map(
-                    (f) => Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: AdminFilterChip(
-                        label: f,
-                        selected: _filter == f,
-                        onTap: () => setState(() => _filter = f),
-                      ),
+              children: [
+                ...['All', 'Live', 'Draft'].map(
+                  (f) => Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: AdminFilterChip(
+                      label: f,
+                      selected: _filter == f,
+                      onTap: () => setState(() => _filter = f),
                     ),
-                  )
-                  .toList(),
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 20,
+                  margin: const EdgeInsets.symmetric(horizontal: 8),
+                  color: c.border,
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: AdminFilterChip(
+                    label: 'All',
+                    selected: _categoryFilterId.isEmpty,
+                    onTap: () => setState(() => _categoryFilterId = ''),
+                  ),
+                ),
+                ...kLessonCategoryDefinitions.map(
+                  (f) => Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: AdminFilterChip(
+                      label: f.label,
+                      selected: _categoryFilterId == f.id,
+                      onTap: () => setState(() => _categoryFilterId = f.id),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           Expanded(
@@ -188,6 +213,8 @@ class _AdminLessonsScreenState extends State<AdminLessonsScreen> {
                 final docs = snapshot.data?.docs ?? [];
                 final lessons = docs
                     .map((d) => AdminLessonModel.fromFirestore(d))
+                    .where((lesson) =>
+                        isCanonicalLessonCategoryId(lesson.categoryId))
                     .where(_matchesFilter)
                     .toList()
                   ..sort((a, b) => a.title.compareTo(b.title));
@@ -245,11 +272,6 @@ class _LessonRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = ac(context);
-    final typeLabel = lesson.type == 'alphabet'
-        ? 'ALPHA'
-        : lesson.type == 'numeric'
-            ? 'NUMS'
-            : 'BOTH';
 
     Widget leading = Container(
       width: 36,
@@ -264,32 +286,9 @@ class _LessonRow extends StatelessWidget {
       ),
     );
 
-    Widget trailing = Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        AdminTag(
-          label: lesson.isActive ? 'Live' : 'Draft',
-          variant: lesson.isActive ? AdminTagVariant.live : AdminTagVariant.draft,
-        ),
-        const SizedBox(height: 4),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-          decoration: BoxDecoration(
-            color: c.accentFill,
-            borderRadius: BorderRadius.circular(3),
-            border: Border.all(color: c.border, width: 1.5),
-          ),
-          child: Text(
-            typeLabel,
-            style: TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w700,
-              color: c.isDark ? c.accentBright : c.accent,
-            ),
-          ),
-        ),
-      ],
+    Widget trailing = AdminTag(
+      label: lesson.isActive ? 'Live' : 'Draft',
+      variant: lesson.isActive ? AdminTagVariant.live : AdminTagVariant.draft,
     );
 
     return Dismissible(

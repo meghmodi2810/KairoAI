@@ -175,7 +175,6 @@ class AdminLessonModel {
   final String description;
   final String categoryId;
   final int unitNumber;
-  final String type; // 'alphabet', 'numeric', 'both'
   final String difficulty; // 'Beginner', 'Intermediate', 'Advanced'
   final int estimatedMinutes;
   final int gemsReward;
@@ -195,7 +194,6 @@ class AdminLessonModel {
     this.description = '',
     required this.categoryId,
     this.unitNumber = 1,
-    required this.type,
     this.difficulty = 'Beginner',
     this.estimatedMinutes = 5,
     this.gemsReward = 5,
@@ -246,9 +244,8 @@ class AdminLessonModel {
       id: doc.id,
       title: data['title'] ?? data['name'] ?? '',
       description: data['description'] ?? '',
-      categoryId: data['categoryId'] ?? '',
+      categoryId: _categoryIdFromLessonDoc(doc, data),
       unitNumber: data['unitNumber'] ?? 1,
-      type: data['type'] ?? 'alphabet',
       difficulty: data['difficulty'] ?? 'Beginner',
       estimatedMinutes: data['estimatedMinutes'] ?? 5,
       gemsReward: data['gemsReward'] ?? 5,
@@ -274,7 +271,6 @@ class AdminLessonModel {
       'description': description,
       'categoryId': categoryId,
       'unitNumber': unitNumber,
-      'type': type,
       'difficulty': difficulty,
       'estimatedMinutes': estimatedMinutes,
       'gemsReward': gemsReward,
@@ -289,6 +285,17 @@ class AdminLessonModel {
       'createdBy': createdBy,
     };
   }
+}
+
+String _categoryIdFromLessonDoc(
+  DocumentSnapshot doc,
+  Map<String, dynamic> data,
+) {
+  final parentCategoryId = doc.reference.parent.parent?.id;
+  if (parentCategoryId != null && parentCategoryId.isNotEmpty) {
+    return parentCategoryId;
+  }
+  return data['categoryId']?.toString() ?? '';
 }
 
 class AdminSignItem {
